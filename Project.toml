@@ -23,6 +23,7 @@ ArrayInterface = "3"
 ForwardDiff = "0.10"
 Polyester = "0.4"
 SIMDTypes = "0.1"
+SLEEFPirates = "0.6"
 VectorizationBase = "0.21"
 julia = "1"
 
