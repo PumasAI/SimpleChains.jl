@@ -22,6 +22,7 @@ VectorizationBase = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
 ArrayInterface = "3"
 ForwardDiff = "0.10"
 Polyester = "0.4"
+SIMDTypes = "0.1"
 VectorizationBase = "0.21"
 julia = "1"
 
