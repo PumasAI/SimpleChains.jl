@@ -19,7 +19,15 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 VectorizationBase = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
 
 [compat]
+ArrayInterface = "3"
+ChainRules = "1"
+ForwardDiff = "0.10"
+LoopVectorization = "0.12"
+Polyester = "0.4"
+SIMDTypes = "0.1"
+SLEEFPirates = "0.6"
 StrideArraysCore = "0.2"
+VectorizationBase = "0.21"
 julia = "1"
 
 [extras]
