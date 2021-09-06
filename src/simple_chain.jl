@@ -44,7 +44,17 @@ function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T
   _chain(res, Base.tail(l), p)
 end
 
+"""
+Allowed destruction:
 
+  valgrad_layer!
+Accepts return of previous layer (`B`) and returns an ouput `C`
+
+  pullback!
+Accepts adjoint of its return (`C̄`). It is allowed to destroy this.
+It is also allowed to destroy the previous layer's return `B` to produce `B̄` (the `C̄` it receives).
+Thus, the pullback is not allowed to depend on `C`, as it may have been destroyed in producing `C̄`.
+"""
 function valgrad!(g, c::SimpleChain, arg, params)
   @unpack layers, memory = c
   resize_memory!(layers, memory, arg)
@@ -62,7 +72,7 @@ function chain_valgrad_entry!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::
   pg2, larg, pb, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
 
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-  pullback!(pg, grad, p)
+  pullback_param!(pg, l, grad, p, pu)
   return val
 end
 function chain_valgrad!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {X1,X2}
@@ -70,13 +80,13 @@ function chain_valgrad!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UI
   pg2, larg, pb, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
 
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-  lgrad, pu4 = pullback!(pg, grad, p, pu3)
+  lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
   return val, lgrad, pu4
 end
 function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where {X}
   l = getfield(layers,1)
   val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-  lgrad, pu3 = pullback!(pg, One(), p, pu2)
+  lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
   return val, lgrad, pu3
 end
 

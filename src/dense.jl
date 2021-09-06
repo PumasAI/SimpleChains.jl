@@ -288,8 +288,19 @@ function valgrad_layer!(pg::Ptr{T}, td::TurboDense{O}, B, p::Ptr{T}, pu::Ptr{UIn
   pg + length(p2)*sizeof(T), C, nothing, p2, pu3
 end
 
-function pullback(td::TurboDense{O}, B, p::Ptr{T}, pu::Ptr{UInt8}) where {T,O}
-  # Ā = C̄ * B'
+function pullback!(pg::Ptr{T}, td::TurboDense{O}, C̄, p::Ptr{T}, pu::Ptr{UInt8}) where {T,O}
+  # Start with 4-arg `pulback!` to update `∂C`
+  pullback_param!(pg, td, B, p, pu) # Ā = C̄ * B'
+  # Now 5-arg
   # B̄ = A' * C̄
+  
+end
+upate_C̄!(C̄, td::TurboDense{B,D,typeof(identity)}, _) = nothing
+function upate_C̄!(C̄, td::TurboDense, _)
+  
+end
+function pullback!(pg::Ptr{T}, td::TurboDense{O}, C̄, p::Ptr{T}) where {T,O}
+  # Ā = C̄ * B'
+  
 end
 
