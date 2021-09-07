@@ -34,8 +34,8 @@ using Test, Aqua, ForwardDiff
   end;
 
   @test g ≈ gfd
-
-  @test iszero(@allocated(valgrad!(g, sc, x, p)))
+  # let g=g, sc=sc, x=x, p=p
+  # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 end
 Aqua.test_all(SimpleChains, ambiguities=false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 
