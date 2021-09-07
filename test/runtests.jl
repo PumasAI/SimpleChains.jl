@@ -1,6 +1,10 @@
 using SimpleChains
 using Test, Aqua, ForwardDiff
 
+function countallocations!(g, sc, x, p)
+  @allocated valgrad!(g, sc, x, p)
+end
+
 @testset "SimpleChains.jl" begin
   p = rand(8*25 + 2*9); #pu = Vector{UInt8}(undef,sizeof(Float64)*(24*8 + 24*2 + 24));
   x = rand(24,24);
@@ -35,6 +39,7 @@ using Test, Aqua, ForwardDiff
 
   @test g ≈ gfd
   # let g=g, sc=sc, x=x, p=p
+  @test iszero(countallocations!(g, sc, x, p))
   # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 end
 Aqua.test_all(SimpleChains, ambiguities=false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
