@@ -1,12 +1,22 @@
 module SimpleChains
 
 # using ChainRules, ChainRulesCore, NNlibCPU
-using UnPack, VectorizationBase, ArrayInterface, LoopVectorization, Polyester, SLEEFPirates, StrideArraysCore, Static
-using ArrayInterface: size, axes
+using UnPack, VectorizationBase, ArrayInterface, Polyester, SLEEFPirates, StrideArraysCore, Static
+using ArrayInterface: size, axes, StrideIndex, contiguous_axis, stride_rank, static_length, indices
 using SIMDTypes: Bit
-using VectorizationBase: align, static_sizeof
+using VectorizationBase: align, static_sizeof, relu, stridedpointer
+using LayoutPointers: bytestrideindex
+import ForwardDiff
+
+using LoopVectorization
+# macro turbo(ex)
+#   esc(ex)
+# end
+
+export SimpleChain, TurboDense, relu, static, SquaredLoss, StrideArray, valgrad!
 
 include("simple_chain.jl")
-include("dense_layer.jl")
+include("dense.jl")
+include("squared_loss.jl")
 
 end
