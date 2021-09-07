@@ -4,7 +4,7 @@ module SimpleChains
 using UnPack, VectorizationBase, ArrayInterface, Polyester, SLEEFPirates, StrideArraysCore, Static
 using ArrayInterface: size, axes, StrideIndex, contiguous_axis, stride_rank, static_length, indices
 using SIMDTypes: Bit
-using VectorizationBase: align, static_sizeof, relu, stridedpointer
+using VectorizationBase: align, static_sizeof, relu, stridedpointer, AbstractSIMD
 using LayoutPointers: bytestrideindex
 import ForwardDiff
 

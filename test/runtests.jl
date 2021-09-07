@@ -41,6 +41,21 @@ end
   # let g=g, sc=sc, x=x, p=p
   @test iszero(countallocations!(g, sc, x, p))
   # @test iszero(@allocated(valgrad!(g, sc, x, p)))
+
+  pd = ForwardDiff.Dual.(p, randn.(), randn.(), randn.());
+  pu = Vector{UInt8}(undef, sizeof(eltype(pd))*(24*8 + 24*2 + 24));
+  xd = ForwardDiff.Dual.(x, randn.(), randn.(), randn.());
+  td = TurboDense{true}(tanh, (static(24),static(8)));
+  
+  Ad = reshape(view(pd, 1:8*24), (8,24));
+  bd = view(p, 1+8*24:8*25);
+  ld = tanh.(Ad * x .+ bd);
+  ldd = tanh.(Ad * xd .+ bd);
+  GC.@preserve pd pu begin
+    @test ld ≈ td(x, pointer(pd), pointer(pu))[1]
+    @test ldd ≈ td(xd, pointer(pd), pointer(pu))[1]
+  end
+  
 end
 Aqua.test_all(SimpleChains, ambiguities=false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 
