@@ -22,6 +22,9 @@ function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, b) where {T,X1,X2}
   s = output_size(Val{T}(), getfield(x,1), b)
   s + output_size(Val{T}(), Base.tail(x), b)
 end
+numparam(c::SimpleChain) = _nparam(0, c.layers)
+_numparam(s, ::Tuple{}) = s
+_numparam(s, layers::Tuple{L,Vararg}) where {L} = _numparam(s + numparam(getfield(layers, 1)), Base.tail(layers))
 
 function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}) where {T}
   d = output_size(Val(T), layers, ArrayInterface.size(arg, StaticInt(2)))*8
@@ -47,7 +50,8 @@ end
 Allowed destruction:
 
   valgrad_layer!
-Accepts return of previous layer (`B`) and returns an ouput `C`
+Accepts return of previous layer (`B`) and returns an ouput `C`.
+If an internal layer, allowed to destroy `B` (e.g. dropout layer).
 
   pullback!
 Accepts adjoint of its return (`C̄`). It is allowed to destroy this.

@@ -6,9 +6,12 @@ end
 TurboDense{B}(f::F, t::Tuple{I1,I2}) where {F,I1,I2,B} = TurboDense{B,Tuple{I1,I2},F}(f, t)
 TurboDense(f::F, t::Tuple{I1,I2}) where {F,I1,I2} = TurboDense{true,Tuple{I1,I2},F}(f, t)
 
-numparams(d::TurboDense{false}) = prod(d.dims)
+function numparams(d::TurboDense{false})
+  id,  od = d.dims
+  id * od
+end
 function numparams(d::TurboDense{true})
-  id, od = d.dims
+  id,  od = d.dims
   id * od + od
 end
 function output_size(::Val{T}, td::TurboDense, batch_size) where {T}

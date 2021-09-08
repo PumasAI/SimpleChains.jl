@@ -26,4 +26,4 @@ function (sl::SquaredLoss)(arg, p, pu)
   s, p, pu
 end
 
-
+numparam(::SquaredLoss) = 0

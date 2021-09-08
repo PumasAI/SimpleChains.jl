@@ -17,6 +17,7 @@ export SimpleChain, TurboDense, relu, static, SquaredLoss, StrideArray, valgrad!
 
 include("simple_chain.jl")
 include("dense.jl")
+include("dropout.jl")
 include("squared_loss.jl")
 
 end
