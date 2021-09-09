@@ -6,14 +6,16 @@ function countallocations!(g, sc, x, p)
 end
 
 @testset "SimpleChains.jl" begin
-  p = rand(8*25 + 2*9); #pu = Vector{UInt8}(undef,sizeof(Float64)*(24*8 + 24*2 + 24));
-  x = rand(24,24);
+  x = rand(24,199);
 
-  y = StrideArray{Float64}(undef, (static(2),24)) .= randn.() .* 10;
+  y = StrideArray{Float64}(undef, (static(2),size(x,2))) .= randn.() .* 10;
   sc = SimpleChain((TurboDense{true}(tanh, (static(24),static(8))), TurboDense{true}(identity, (static(8),static(2))), SquaredLoss(y)));
 
-  @test Dropout(0.5)(x, pointer(x), pointer(sc.memory)) === x
+  @test first(Dropout(0.5)(x, pointer(x), pointer(sc.memory))) === x
+  @test sum(iszero, x) == 0
+  x .= rand.();
 
+  p = rand(SimpleChains.numparam(sc)); #pu = Vector{UInt8}(undef,sizeof(Float64)*(24*8 + 24*2 + 24));
   g = similar(p);
   valgrad!(g, sc, x, p)
 
@@ -74,10 +76,10 @@ end
   @test iszero(countallocations!(g, sc, x, p))
   # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 
-  pd = ForwardDiff.Dual.(p, randn.(), randn.(), randn.());
-  pu = Vector{UInt8}(undef, sizeof(eltype(pd))*(24*8 + 24*2 + 24));
-  xd = ForwardDiff.Dual.(x, randn.(), randn.(), randn.());
   td = TurboDense{true}(tanh, (static(24),static(8)));
+  pd = ForwardDiff.Dual.(p, randn.(), randn.(), randn.());
+  xd = ForwardDiff.Dual.(x, randn.(), randn.(), randn.());
+  pu = Vector{UInt8}(undef, first(SimpleChains.output_size(Val(eltype(xd)), td, size(x))));
   
   Ad = reshape(view(pd, 1:8*24), (8,24));
   bd = view(p, 1+8*24:8*25);

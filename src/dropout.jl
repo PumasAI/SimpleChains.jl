@@ -12,7 +12,13 @@ getrng(d::Dropout{<:VectorizedRNG.AbstractRNG}) = getfield(d, :rng)
 gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
 numparam(::Dropout) = 0
 
-(d::Dropout)(B::AbstractVecOrMat, p::Ptr, pu::Ptr{UInt8}) = B, p, pu # inference
+function (d::Dropout)(B::AbstractVecOrMat{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
+  x = muladd(T(d.p), -inv(T(typemax(UInt32))), one(T))
+  @turbo for i ∈ eachindex(B)
+    B[i] *= x
+  end
+  B, p, pu # inference
+end
 
 getpcmp(::StaticInt{W}, ::StaticInt{W}, x) where {W} = x
 getpcmp(::StaticInt{W}, ::StaticInt{WU}, x) where {W,WU} = getpcmp(StaticInt(W), StaticInt(WU), x, Static.gt(StaticInt(W), StaticInt(WU)))

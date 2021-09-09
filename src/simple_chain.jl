@@ -30,7 +30,7 @@ _numparam(s, ::Tuple{}) = s
 _numparam(s, layers::Tuple{L,Vararg}) where {L} = _numparam(s + numparam(getfield(layers, 1)), Base.tail(layers))
 
 function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}) where {T}
-  d = output_size(Val(T), layers, ArrayInterface.size(arg))*8
+  d = output_size(Val(T), layers, ArrayInterface.size(arg))*2
   d > length(memory) && resize!(memory, d)
   nothing
 end
