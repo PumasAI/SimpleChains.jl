@@ -12,7 +12,7 @@ getrng(d::Dropout{<:VectorizedRNG.AbstractRNG}) = getfield(d, :rng)
 gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
 numparam(::Dropout) = 0
 
-(d::Dropout)(B::AbstractVecOrMat, p::Ptr, pu::Ptr{UInt8}) = B # inference
+(d::Dropout)(B::AbstractVecOrMat, p::Ptr, pu::Ptr{UInt8}) = B, p, pu # inference
 
 getpcmp(::StaticInt{W}, ::StaticInt{W}, x) where {W} = x
 getpcmp(::StaticInt{W}, ::StaticInt{WU}, x) where {W,WU} = getpcmp(StaticInt(W), StaticInt(WU), x, Static.gt(StaticInt(W), StaticInt(WU)))
@@ -61,10 +61,10 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
     elseif n < N
       msk = VectorizationBase.mask(W, N)
       state, _zvu1 = VectorizedRNG.random_unsigned(state, Val{1}(), UInt64);
-      (z₁,) = data(zvu1)
+      (z₁,) = VectorizedRNG.data(_zvu1)
       m₁ = reinterpret(typeof(pcmp), z₁) > pcmp;
       m₁msk = m₁ & msk
-      u₁ = MM(W, n)
+      u₁ = (MM(W, n),)
       vstore!(ptrx, vload(ptrx, u₁, m₁msk), u₁, msk);
       vstore!(ptrm, m₁, u₁);
     end

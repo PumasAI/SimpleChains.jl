@@ -25,12 +25,12 @@ function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1) where {T,X1,X2}
   b, s2 = output_size(Val{T}(), getfield(x,1), s1)
   b + output_size(Val{T}(), Base.tail(x), s2)
 end
-numparam(c::SimpleChain) = _nparam(0, c.layers)
+numparam(c::SimpleChain) = _numparam(0, c.layers)
 _numparam(s, ::Tuple{}) = s
 _numparam(s, layers::Tuple{L,Vararg}) where {L} = _numparam(s + numparam(getfield(layers, 1)), Base.tail(layers))
 
 function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}) where {T}
-  d = output_size(Val(T), layers, ArrayInterface.size(arg))*2
+  d = output_size(Val(T), layers, ArrayInterface.size(arg))*8
   d > length(memory) && resize!(memory, d)
   nothing
 end

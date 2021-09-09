@@ -21,7 +21,8 @@ function (sl::SquaredLoss)(arg, p, pu)
   y = getfield(sl, :y)
   s = zero(promote_type(eltype(arg), eltype(y)))
   @turbo for i ∈ eachindex(arg)
-    s += abs2(arg[i] - y[i])
+    δ = arg[i] - y[i]
+    s += δ*δ
   end
   s, p, pu
 end

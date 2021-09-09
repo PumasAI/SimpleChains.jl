@@ -6,17 +6,17 @@ end
 TurboDense{B}(f::F, t::Tuple{I1,I2}) where {F,I1,I2,B} = TurboDense{B,Tuple{I1,I2},F}(f, t)
 TurboDense(f::F, t::Tuple{I1,I2}) where {F,I1,I2} = TurboDense{true,Tuple{I1,I2},F}(f, t)
 
-function numparams(d::TurboDense{false})
+function numparam(d::TurboDense{false})
   id,  od = d.dims
   id * od
 end
-function numparams(d::TurboDense{true})
+function numparam(d::TurboDense{true})
   id,  od = d.dims
   id * od + od
 end
 function output_size(::Val{T}, td::TurboDense, s) where {T}
-  g1 = numparams(td) # for gradients
-  g2 = getfield(td.dims, 1) * getfield(s,2) # for output
+  g1 = numparam(td) # for gradients
+  g2 = getfield(td.dims, 1) * getfield(s, 2) # for output
   align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), getfield(s,2))
 end
 
@@ -29,7 +29,7 @@ fast_fuse(td::TurboDense) = fast_fuse(getfield(td,:f))
 
 function getparams(td::TurboDense{false}, p::Ptr{T}) where {T}
   id, od = td.dims
-  PtrArray(reinterpret(Ptr{T}, p), (id, od)), p + id * od * sizeof(T)
+  PtrArray(reinterpret(Ptr{T}, p), (od, id)), p + id * od * sizeof(T)
 end
 function getparams(td::TurboDense{true}, p::Ptr{T}) where {T}
   id, od = td.dims

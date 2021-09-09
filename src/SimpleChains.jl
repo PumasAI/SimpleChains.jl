@@ -10,9 +10,7 @@ using IfElse: ifelse
 import ForwardDiff
 
 using LoopVectorization
-# macro turbo(ex)
-#   esc(ex)
-# end
+# macro turbo(ex); esc(ex); end
 
 export SimpleChain, TurboDense, SquaredLoss, Dropout, relu, static, StrideArray, valgrad!
 
