@@ -48,12 +48,16 @@ jobs:
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
+        env:
+          JULIA_PKG_SERVER: ""
       - run: |
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
             using SimpleChains
             DocMeta.setdocmeta!(SimpleChains, :DocTestSetup, :(using SimpleChains); recursive=true)
             doctest(SimpleChains)'
+        env:
+          JULIA_PKG_SERVER: ""
       - run: julia --project=docs docs/make.jl
         env:
           JULIA_PKG_SERVER: ""
