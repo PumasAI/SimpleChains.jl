@@ -15,7 +15,7 @@ function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p
   return 0.5s, g, pu + sizeof(T)*length(g)
 end
 
-output_size(::Val{T}, sl::SquaredLoss, s) where {T} = sizeof(T) * length(sl.y)
+output_size(::Val{T}, sl::SquaredLoss, s) where {T} = align(length(sl.y) * static_sizeof(T)), static_sizeof(T)
 
 function (sl::SquaredLoss)(arg, p, pu)
   y = getfield(sl, :y)

@@ -14,10 +14,10 @@ function numparams(d::TurboDense{true})
   id,  od = d.dims
   id * od + od
 end
-function output_size(::Val{T}, td::TurboDense, batch_size) where {T}
+function output_size(::Val{T}, td::TurboDense, s) where {T}
   g1 = numparams(td) # for gradients
-  g2 = getfield(td.dims, 1) * batch_size # for output
-  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2)
+  g2 = getfield(td.dims, 1) * getfield(s,2) # for output
+  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), getfield(s,2))
 end
 
 fast_fuse(::typeof(relu)) = True()
@@ -308,9 +308,9 @@ function valgrad_layer!(pg::Ptr{T}, td::TurboDense{O}, B, p::Ptr{T}, pu::Ptr{UIn
   pg + length(A)*sizeof(T), C, nothing, p2, pu3
 end
 
-function pullback!(pg::Ptr{T}, td::TurboDense{O}, C̄, B, p::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T,O}
+function pullback!(pg::Ptr{T}, td::TurboDense{O}, _C̄, B, p::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T,O}
   # Start with 4-arg `pulback!` to update `∂C`
-  C̄ = pullback_param!(pg, td, C̄, B, p, pu) # Ā = C̄ * B'
+  C̄ = pullback_param!(pg, td, _C̄, B, p, pu) # Ā = C̄ * B'
   # Now 5-arg
   # B̄ = A' * C̄
   A, _  = getparams(td, p)

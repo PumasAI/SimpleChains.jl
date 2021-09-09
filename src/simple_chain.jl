@@ -17,17 +17,20 @@ Base.vcat(c::SimpleChain, l) = SimpleChain((c.layers...,l), c.memory)
 
 # output_size must be defined to return the total size of all outputs
 output_size(::Val{T}, x::Tuple{}, _) where {T} = 0
-output_size(::Val{T}, x::Tuple{X}, b) where {T,X} = output_size(Val{T}(), getfield(x,1), b)
-function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, b) where {T,X1,X2}
-  s = output_size(Val{T}(), getfield(x,1), b)
-  s + output_size(Val{T}(), Base.tail(x), b)
+function output_size(::Val{T}, x::Tuple{X}, s1) where {T,X}
+  b, _ = output_size(Val{T}(), getfield(x,1), s1)
+  b
+end
+function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1) where {T,X1,X2}
+  b, s2 = output_size(Val{T}(), getfield(x,1), s1)
+  b + output_size(Val{T}(), Base.tail(x), s2)
 end
 numparam(c::SimpleChain) = _nparam(0, c.layers)
 _numparam(s, ::Tuple{}) = s
 _numparam(s, layers::Tuple{L,Vararg}) where {L} = _numparam(s + numparam(getfield(layers, 1)), Base.tail(layers))
 
 function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}) where {T}
-  d = output_size(Val(T), layers, ArrayInterface.size(arg, StaticInt(2)))*8
+  d = output_size(Val(T), layers, ArrayInterface.size(arg))*2
   d > length(memory) && resize!(memory, d)
   nothing
 end
@@ -45,6 +48,7 @@ function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T
   res, p = getfield(l,1)(arg, p, pu)
   _chain(res, Base.tail(l), p, pu)
 end
+
 
 """
 Allowed destruction:

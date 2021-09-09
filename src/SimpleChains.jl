@@ -6,6 +6,7 @@ using ArrayInterface: size, axes, StrideIndex, contiguous_axis, stride_rank, sta
 using SIMDTypes: Bit
 using VectorizationBase: align, static_sizeof, relu, stridedpointer, AbstractSIMD
 using LayoutPointers: bytestrideindex
+using IfElse: ifelse
 import ForwardDiff
 
 using LoopVectorization
@@ -13,7 +14,7 @@ using LoopVectorization
 #   esc(ex)
 # end
 
-export SimpleChain, TurboDense, relu, static, SquaredLoss, StrideArray, valgrad!
+export SimpleChain, TurboDense, SquaredLoss, Dropout, relu, static, StrideArray, valgrad!
 
 include("simple_chain.jl")
 include("dense.jl")
