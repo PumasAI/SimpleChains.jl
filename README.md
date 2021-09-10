@@ -6,6 +6,7 @@
 
 
 `SimpleChains.jl` only supports simple chains, but it intends to be fast for small problems on the CPU.
+Currently, `valgrad!` is the only means of extracting gradient information.
 
 ```julia
 using SimpleChains, BenchmarkTools
