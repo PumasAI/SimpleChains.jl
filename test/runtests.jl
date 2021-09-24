@@ -17,8 +17,7 @@ end
 
   p = rand(SimpleChains.numparam(sc)); #pu = Vector{UInt8}(undef,sizeof(Float64)*(24*8 + 24*2 + 24));
   g = similar(p);
-  valgrad!(g, sc, x, p)
-
+  valgrad!(g, FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45)), x, p)
   
   gfd = ForwardDiff.gradient(p) do p
     off = 8*24
@@ -37,9 +36,10 @@ end
     b2 = view(p, 1+off_old:off)
     l2 = (A2 * l1 .+ b2)
 
-    0.5mapreduce(+, vec(l2), y.data) do xi, yi
+    l = 0.5mapreduce(+, vec(l2), y.data) do xi, yi
       abs2(xi - yi)
-    end  
+    end
+    l + 2.3*(sum(abs2, A1) + sum(abs2, b1)) + 0.45*(sum(abs, A2) + sum(abs, b2))
   end;
   @test g ≈ @. gfd
   
@@ -73,7 +73,8 @@ end
   @test g ≈ gfdd
 
   # let g=g, sc=sc, x=x, p=p
-  @test iszero(countallocations!(g, sc, x, p))
+  @test iszero(countallocations!(g, FrontLastPenalty(sc, L2Penalty(2.3), NoPenalty()), x, p))
+  @test iszero(countallocations!(g, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, p))
   # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 
   td = TurboDense{true}(tanh, (static(24),static(8)));
