@@ -5,6 +5,7 @@ struct SimpleChain{N,L<:Tuple{Vararg{Any,N}}}
 end
 SimpleChain(l::Vararg) = SimpleChain(l, UInt8[])
 SimpleChain(l::Tuple) = SimpleChain(l, UInt8[])
+Base.similar(c::SimpleChain) = SimpleChain(c.layers, similar(c.memory))
 
 """
   Base.front(c::SimpleChain)

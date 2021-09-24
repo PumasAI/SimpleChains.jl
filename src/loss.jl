@@ -1,11 +1,18 @@
 abstract type AbstractLoss end
 
+has_loss(sc::SimpleChain) = last(sc.layers) isa AbstractLoss
+function add_loss(sc::SimpleChain, l::AbstractLoss)
+  has_loss(sc) ? SimpleChain((Base.front(sc.layers)...,l), sc.memory) : SimpleChain((sc.layers...,l), sc.memory)
+end
+
+
 numparam(::AbstractLoss) = 0
 output_size(::Val{T}, sl::AbstractLoss, s) where {T} = align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 
 struct SquaredLoss{Y} <: AbstractLoss
   y::Y
 end
+(::SquaredLoss)(y) = SquaredLoss(y)
 target(sl::SquaredLoss) = getfield(sl, :y)
 
 function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
@@ -34,6 +41,7 @@ end
 struct AbsoluteLoss{Y} <: AbstractLoss
   y::Y
 end
+(::AbsoluteLoss)(y) = AbsoluteLoss(y)
 target(sl::AbsoluteLoss) = getfield(sl, :y)
 
 function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}

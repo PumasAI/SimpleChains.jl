@@ -13,7 +13,8 @@ import ForwardDiff
 using LoopVectorization
 # macro turbo(ex); esc(ex); end
 
-export SimpleChain, TurboDense, SquaredLoss, Dropout, relu, static, StrideArray, valgrad!, valgrad,
+export SimpleChain, TurboDense, Dropout,
+  AbsoluteLoss, SquaredLoss, relu, static, StrideArray, valgrad!, valgrad,
   NoPenalty, L1Penalty, L2Penalty, FrontLastPenalty
 
 include("simple_chain.jl")
