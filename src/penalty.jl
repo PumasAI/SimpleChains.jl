@@ -28,6 +28,7 @@ getchain(p::NoPenalty) = getfield(p,:chn)
 NoPenalty() = NoPenalty(nothing)
 apply_penalty(::NoPenalty) = Static.Zero()
 apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
+(::NoPenalty)(chn::SimpleChain) = NoPenalty(chn)
 
 struct L1Penalty{NN,T} <: AbstractPenalty{NN}
   chn::NN
@@ -37,7 +38,6 @@ getchain(p::L1Penalty) = getfield(p,:chn)
 L1Penalty(λ::Number) = L1Penalty(nothing, λ)
 L1Penalty(p::AbstractPenalty, λ) = L1Penalty(getchain(p), λ)
 (p::L1Penalty)(chn::SimpleChain) = L1Penalty(chn, p.λ)
-(p::L1Penalty)() = L1Penalty(chn, p.λ)
 
 @inline function apply_penalty(Λ::L1Penalty{NN,T2}, p::AbstractVector{T3}) where {T2,T3,NN}
   l = zero(T3)
