@@ -29,10 +29,11 @@ numparam(c::SimpleChain) = _numparam(0, c.layers)
 _numparam(s, ::Tuple{}) = s
 _numparam(s, layers::Tuple{L,Vararg}) where {L} = _numparam(s + numparam(getfield(layers, 1)), Base.tail(layers))
 
-function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}) where {T}
-  d = output_size(Val(T), layers, ArrayInterface.size(arg))*2
-  d > length(memory) && resize!(memory, d)
-  nothing
+@inline function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}) where {T}
+  d = output_size(Val(T), layers, ArrayInterface.size(arg))
+  d2 = 2d
+  d2 > length(memory) && resize!(memory, d2)
+  d
 end
 function (c::SimpleChain)(arg, params)
   @unpack layers, memory = c
@@ -96,5 +97,17 @@ function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where
   val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
   return val, lgrad, pu3
+end
+@inline getchain(sc::SimpleChain) = sc
+function valgrad(sc, arg, params::AbstractVector{T}) where {T}
+  c = getchain(sc)
+  @unpack layers, memory = c
+  off = align(resize_memory!(layers, memory, arg))
+  GC.@preserve memory begin
+    g = PtrArray(reinterpret(Ptr{T}, pointer(memory)+off), (static_length(params),))
+    l = unsafe_valgrad!(g, layers, params, memory, arg)
+    l = Base.FastMath.add_fast(l, apply_penalty!(g, getpenalty(sc), params))
+  end
+  return l, StrideArraysCore.StrideArray(g, memory)
 end
 

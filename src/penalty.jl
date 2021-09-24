@@ -29,6 +29,8 @@ NoPenalty() = NoPenalty(nothing)
 apply_penalty(::NoPenalty) = Static.Zero()
 apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
 (::NoPenalty)(chn::SimpleChain) = NoPenalty(chn)
+getpenalty(sc::SimpleChain) = NoPenalty()
+getpenalty(Λ::AbstractPenalty) = Λ
 
 struct L1Penalty{NN,T} <: AbstractPenalty{NN}
   chn::NN

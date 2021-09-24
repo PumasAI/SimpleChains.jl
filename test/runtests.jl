@@ -1,5 +1,5 @@
 using SimpleChains
-using Test, Aqua, ForwardDiff
+using Test, Aqua, ForwardDiff, Zygote
 
 function countallocations!(g, sc, x, p)
   @allocated valgrad!(g, sc, x, p)
@@ -18,6 +18,9 @@ end
   p = rand(SimpleChains.numparam(sc)); #pu = Vector{UInt8}(undef,sizeof(Float64)*(24*8 + 24*2 + 24));
   g = similar(p);
   valgrad!(g, FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45)), x, p)
+  if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
+    @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)[1]
+  end
   
   gfd = ForwardDiff.gradient(p) do p
     off = 8*24
