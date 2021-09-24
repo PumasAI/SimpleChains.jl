@@ -105,9 +105,9 @@ struct FrontLastPenalty{NN, P1<:AbstractPenalty{Nothing}, P2<:AbstractPenalty{No
   last::P2
 end
 getchain(p::FrontLastPenalty) = getfield(p,:chn)
-FrontLastPenalty(λ₁, λ₂) = L2Penalty(nothing, λ₁, λ₂)
-FrontLastPenalty(p::AbstractPenalty, λ₁, λ₂) = L2Penalty(getchain(p), λ₁, λ₂)
-(p::FrontLastPenalty)(chn::SimpleChain) = L2Penalty(chn, p.front, p.last)
+FrontLastPenalty(λ₁, λ₂) = FrontLastPenalty(nothing, λ₁, λ₂)
+FrontLastPenalty(p::AbstractPenalty, λ₁, λ₂) = FrontLastPenalty(getchain(p), λ₁, λ₂)
+(p::FrontLastPenalty)(chn::SimpleChain) = FrontLastPenalty(chn, p.front, p.last)
 
 
 function split_front_last(c::SimpleChain)
