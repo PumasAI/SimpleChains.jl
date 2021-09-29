@@ -50,7 +50,7 @@ end
   valgrad!(g, scd, x, p)
   offset = SimpleChains.align(size(x,2) * 8 * sizeof(Float64)) + SimpleChains.align(8*size(x,2)*8)
   si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
-  m = SimpleChains.StrideArray(SimpleChains.PtrArray(SimpleChains.stridedpointer(reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset), si), (size(x,2)*8,), Val((true,))), scd.memory)
+  m = SimpleChains.StrideArray(SimpleChains.PtrArray(SimpleChains.stridedpointer(reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset), si), (size(x,2)*8,), Val((true,))), scd.memory);
   gfdd = ForwardDiff.gradient(p) do p
     off = 8*24
     A1 = reshape(view(p, 1:off), (8,24))

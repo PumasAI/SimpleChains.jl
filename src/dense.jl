@@ -364,164 +364,143 @@ struct DualCall{F}; f::F; end
     @inbounds (ForwardDiff.value(fd), (Base.Cartesian.@ntuple $P p -> ∂fd[p])...)
   end
 end
-
-@generated function dense!(f::F, Cdual::AbstractArray{D,N}, Adual::AbstractMatrix{D}, B::AbstractArray{T,N}, ::BT, ::FF) where {F,BT,FF,T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P},N}
-  if BT === True
-    assign = :(Cmn + A[1, m, Kp1])
-    ∂assign = :(Cmn_p + A[1+p, m, Kp1])
-    Krange_prefix = quote
-      Kp1 = ArrayInterface.size(A, StaticInt(3))
-      K = Kp1 - StaticInt(1)
-    end
-    Krange = :(1:K)
-  else
-    assign = :(Cmn)
-    ∂assign = :(Cmn_p)
-    Krange_prefix = Expr(:block)
-    Krange = :(indices((A,B),(3,1)))
-  end
-  if N == 1
-    Bindex = :(B[k])
-    Cindex = :(C[1,m])
-    Cpindex = :(C[1+p,m])
-  else
-    Bindex = :(B[k,n])
-    Cindex = :(C[1,m,n])
-    Cpindex = :(C[1+p,m,n])
-  end
-  inner_loop = quote
-    Cmn = zero($T)
-    Base.Cartesian.@nexprs $P p -> Cmn_p = zero($T)
-    for k ∈ $Krange
-      Cmn += A[1,m,k] * $Bindex
-      Base.Cartesian.@nexprs $P p -> Cmn_p += A[1+p,m,k] * $Bindex
-    end
-    $Cindex = $assign
-    Base.Cartesian.@nexprs $P p -> $Cpindex = $∂assign
-  end
-  prefix = quote
-    C = reinterpret(reshape, $T, Cdual)
-    A = reinterpret(reshape, $T, Adual)
-    $Krange_prefix
-  end
-  q = if N == 1
-    quote
-      $prefix
-      # @turbo
-      for m ∈ indices((A,C),2)
-        $inner_loop
-      end
-    end
-  else
-    quote
-      $prefix
-      @turbo for n ∈ indices((B,C),(2,3)), m ∈ indices((A,C),2)
-        $inner_loop
-      end
+dualeval!(f::typeof(identity), Cdual::AbstractArray{D}) where {T<:Union{Float32,Float64}, P, D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
+@generated function dualeval!(f::F, Cdual::AbstractArray{D}) where {F,T<:Union{Float32,Float64}, P, D<:ForwardDiff.Dual{<:Any,T,P}}
+  quote
+    C = reinterpret(reshape, T, Cdual)
+    g = DualCall(f)
+    @turbo for m ∈ eachindex(Cdual)
+      (Base.Cartesian.@ntuple $(P+1) p -> C[p,m]) = Base.Cartesian.@ncall $(P+1) g p -> C[p,m]
     end
   end
-  if F ≢ typeof(identity)
-    q2 = if N == 1
-      quote
-        g = DualCall(f)
-        # @turbo
-        for m ∈ axes(C,2)
-          (Base.Cartesian.@ntuple $(P+1) p -> C[p,m]) = Base.Cartesian.@ncall $(P+1) g p -> C[p,m]
-        end
-      end
-    else
-      quote
-        g = DualCall(f)
-        @turbo for n ∈ axes(C,3), m ∈ axes(C,2)
-          (Base.Cartesian.@ntuple $(P+1) p -> C[p,m,n]) = Base.Cartesian.@ncall $(P+1) g p -> C[p,m,n]
-        end
-      end
-    end
-    push!(q.args, q2)
-  end
-  # @show q
-  q
-end
-@generated function dense!(
-  f::F, Cdual::AbstractArray{D,N}, Adual::AbstractMatrix{D}, Bdual::AbstractArray{D,N}, ::BT, ::FF
-) where {F,BT,FF,T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P},N}
-  if BT === True
-    assign = :(Cmn + A[1, m, Kp1])
-    ∂assign = :(Cmn_p + A[1+p, m, Kp1])
-    Krange_prefix = quote
-      Kp1 = ArrayInterface.size(A, StaticInt(3))
-      K = Kp1 - StaticInt(1)
-    end
-    Krange = :(1:K)
-  else
-    assign = :(Cmn)
-    ∂assign = :(Cmn_p)
-    Krange_prefix = Expr(:block)
-    Krange = :(indices((A,B),(3,2)))
-  end
-  if N == 1
-    Bindex = :(B[1,k])
-    Bpindex = :(B[1+p,k])
-    Cindex = :(C[1,m])
-    Cpindex = :(C[1+p,m])
-  else
-    Bindex = :(B[1,k,n])
-    Bpindex = :(B[1+p,k,n])
-    Cindex = :(C[1,m,n])
-    Cpindex = :(C[1+p,m,n])
-  end
-  inner_loop = quote
-    Cmn = zero($T)
-    Base.Cartesian.@nexprs $P p -> Cmn_p = zero($T)
-    for k ∈ $Krange
-      Cmn += A[1,m,k] * $Bindex
-      Base.Cartesian.@nexprs $P p -> Cmn_p += A[1+p,m,k] * $Bindex + A[1,m,k] * $Bpindex
-    end
-    $Cindex = $assign
-    Base.Cartesian.@nexprs $P p -> $Cpindex = $∂assign
-  end
-  prefix = quote
-    C = reinterpret(reshape, $T, Cdual)
-    A = reinterpret(reshape, $T, Adual)
-    B = reinterpret(reshape, $T, Bdual)
-    $Krange_prefix
-  end
-  q = if N == 1
-    quote
-      $prefix
-      @turbo for m ∈ indices((A,C),2)
-        $inner_loop
-      end
-    end
-  else
-    quote
-      $prefix
-      @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2)
-        $inner_loop
-      end
-    end
-  end
-  if F ≢ typeof(identity)
-    q2 = if N == 1
-      quote
-        g = DualCall(f)
-        @turbo for m ∈ axes(C,2)
-          (Base.Cartesian.@ntuple $(P+1) p -> C[p,m]) = Base.Cartesian.@ncall $(P+1) g p -> C[p,m]
-        end
-      end
-    else
-      quote
-        g = DualCall(f)
-        @turbo for n ∈ axes(C,3), m ∈ axes(C,2)
-          (Base.Cartesian.@ntuple $(P+1) p -> C[p,m,n]) = Base.Cartesian.@ncall $(P+1) g p -> C[p,m,n]
-        end
-      end
-    end
-    push!(q.args, q2)
-  end
-  q
 end
 
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector{T}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  Kp1 = ArrayInterface.size(A, StaticInt(3))
+  K = Kp1 - StaticInt(1)
+  Pp1 = StaticInt(P) + StaticInt(1)
+  @turbo for m ∈ indices((A,C),2), p ∈ 1:Pp1
+    Cmn = zero(T)
+    for k ∈ 1:K
+      Cmn += A[p,m,k] * B[k]
+    end
+    C[p,m] = Cmn + A[p, m, Kp1]
+  end
+end
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix{T}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  Kp1 = ArrayInterface.size(A, StaticInt(3))
+  K = Kp1 - StaticInt(1)
+  Pp1 = StaticInt(P) + StaticInt(1)
+  @turbo for n ∈ indices((B,C),(2,3)), m ∈ indices((A,C),2), p ∈ 1:Pp1
+    Cmn = zero(T)
+    for k ∈ 1:K
+      Cmn += A[p,m,k] * B[k,n]
+    end
+    C[p,m,n] = Cmn + A[p, m, Kp1]
+  end
+end
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector{T}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  Pp1 = StaticInt(P) + StaticInt(1)
+  @turbo for m ∈ indices((A,C),2), p ∈ 1:Pp1
+    Cmn = zero(T)
+    for k ∈ indices((A,B),(3,1))
+      Cmn += A[p,m,k] * B[k]
+    end
+    C[p,m] = Cmn
+  end
+end
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix{T}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  Pp1 = StaticInt(P) + StaticInt(1)
+  @turbo for n ∈ indices((B,C),(2,3)), m ∈ indices((A,C),2), p ∈ 1:Pp1
+    Cmn = zero(T)
+    for k ∈ indices((A,B),(3,1))
+      Cmn += A[p,m,k] * B[k,n]
+    end
+    C[p,m,n] = Cmn
+  end
+end
+
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::AbstractVector{D}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  B = reinterpret(reshape, T, Bdual)
+  Kp1 = ArrayInterface.size(A, StaticInt(3))
+  K = Kp1 - StaticInt(1)
+  Pstatic = StaticInt(P)
+  @turbo for m ∈ indices((A,C),2), p ∈ 0:Pstatic
+    Cmn = zero(T)
+    for k ∈ 1:K
+      Cmn += A[p+1,m,k] * B[1,k]
+    end
+    C[p+1,m] = Cmn + A[p+1, m, Kp1]
+  end
+  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
+    C[p+1,m] += A[1,m,k] * B[p+1,k]
+  end
+end
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  B = reinterpret(reshape, T, Bdual)
+  Kp1 = ArrayInterface.size(A, StaticInt(3))
+  K = Kp1 - StaticInt(1)
+  Pstatic = StaticInt(P)
+  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 0:Pstatic
+    Cmn = zero(T)
+    for k ∈ 1:K
+      Cmn += A[p+1,m,k] * B[1,k,n]
+    end
+    C[p+1,m,n] = Cmn + A[p+1, m, Kp1]
+  end
+  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
+    C[p+1,m,n] += A[1,m,k] * B[p+1,k,n]
+  end
+end
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::AbstractVector{D}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  B = reinterpret(reshape, T, Bdual)
+  Pstatic = StaticInt(P)
+  @turbo for m ∈ indices((A,C),2), p ∈ 0:Pstatic
+    Cmn = zero(T)
+    for k ∈ indices((A,B),(3,2))
+      Cmn += A[p+1,m,k] * B[1,k]
+    end
+    C[p+1,m] = Cmn
+  end
+  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
+    C[p+1,m] += A[1,m,k] * B[p+1,k]
+  end
+end
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  A = reinterpret(reshape, T, Adual)
+  B = reinterpret(reshape, T, Bdual)
+  Pstatic = StaticInt(P)
+  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 0:Pstatic
+    Cmn = zero(T)
+    for k ∈ indices((A,B),(3,2))
+      Cmn += A[p+1,m,k] * B[1,k,n]
+    end
+    C[p+1,m,n] = Cmn  
+  end
+  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
+    C[p+1,m,n] += A[1,m,k] * B[p+1,k,n]
+  end
+end
+
+function dense!(f::F, Cdual::AbstractArray{D}, Adual::AbstractMatrix{D}, B::AbstractArray, ::BT, ::FF) where {F,BT,FF,T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  matmul!(Cdual, Adual, B, BT())
+  dualeval!(f, Cdual)
+end
 # derivatives
 
 @inline function Base.abs(x::ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}) where {N}
