@@ -19,7 +19,6 @@ function output_size(::Val{T}, td::TurboDense, s) where {T}
   g2 = getfield(td.dims, 1) * getfield(s, 2) # for output
   align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), getfield(s,2))
 end
-
 fast_fuse(::typeof(relu)) = True()
 fast_fuse(::typeof(abs)) = True()
 fast_fuse(::typeof(abs2)) = True()
@@ -36,6 +35,19 @@ function getparams(td::TurboDense{true}, p::Ptr{T}) where {T}
   idp1 = id + StaticInt(1)
   W = PtrArray(reinterpret(Ptr{T}, p), (od, idp1))
   W, p + (od * idp1) * sizeof(T)
+end
+function init_params!(td::TurboDense{true}, p)
+  W, p = getparams(td, p)
+  id, od = td.dims
+  lrng = local_rng()
+  randn!(lrng, view(W, :, 1:id), static(0), static(0), eltype(W)(2/(id+od)))
+  randn!(lrng, view(W, :, id+1))
+  return p
+end
+function init_params!(td::TurboDense{false}, p)
+  W, p = getparams(td, p)
+  randn!(local_rng(), W, static(0), static(0), eltype(W)(2/sum(td.dims)))
+  return p
 end
 
 function alloc_return(td::TurboDense, batch_size, p::Ptr{T}, ::StaticInt{1}, ::Tuple{StaticInt{1}}) where {T}

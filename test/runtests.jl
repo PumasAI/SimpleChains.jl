@@ -15,7 +15,7 @@ end
   @test sum(iszero, x) == 0
   x .= rand.();
 
-  p = rand(SimpleChains.numparam(sc)); #pu = Vector{UInt8}(undef,sizeof(Float64)*(24*8 + 24*2 + 24));
+  p = SimpleChains.init_params(c, Float64);
   g = similar(p);
   valgrad!(g, FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45)), x, p)
   if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 

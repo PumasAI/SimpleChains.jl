@@ -5,7 +5,7 @@ function add_loss(sc::SimpleChain, l::AbstractLoss)
   has_loss(sc) ? SimpleChain((Base.front(sc.layers)...,l), sc.memory) : SimpleChain((sc.layers...,l), sc.memory)
 end
 function remove_loss(sc::SimpleChain)
-  has_loss(sc) ? Base.front(sc.layers) : sc
+  has_loss(sc) ? Base.front(sc) : sc
 end
 
 numparam(::AbstractLoss) = 0
@@ -16,6 +16,7 @@ struct SquaredLoss{Y} <: AbstractLoss
 end
 (::SquaredLoss)(y) = SquaredLoss(y)
 target(sl::SquaredLoss) = getfield(sl, :y)
+init_params!(::AbstractLoss, p) = p
 
 squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
 

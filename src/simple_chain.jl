@@ -51,6 +51,16 @@ function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T
   _chain(res, Base.tail(l), p, pu)
 end
 
+function init_params!(chn::SimpleChain, x::AbstractVector)
+  GC.@preserve x init_params!(chn.layers, pointer(x))
+  return x
+end
+function init_params!(layers::Tuple, p::Ptr)
+  p = init_params!(first(layers), p)
+  init_params!(Base.tail(layers), p)
+end
+init_params!(::Tuple{}, p::Ptr) = nothing
+init_params(Λ::SimpleChain, ::Type{T} = Float32) where {T} = init_params!(Λ, Vector{T}(undef, numparam(Λ)))
 
 """
 Allowed destruction:

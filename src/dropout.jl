@@ -20,6 +20,8 @@ getrng(d::Dropout{<:VectorizedRNG.AbstractRNG}) = getfield(d, :rng)
 gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
 numparam(::Dropout) = 0
 
+init_params!(::Dropout, p) = p
+
 function (d::Dropout)(B::AbstractVecOrMat{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   x = muladd(T(d.p), -inv(T(typemax(UInt32))), one(T))
   @turbo for i ∈ eachindex(B)

@@ -19,7 +19,10 @@ function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
 end
 
 Base.front(Λ::AbstractPenalty) = Base.front(getchain(Λ))
-
+numparam(Λ::AbstractPenalty) = numparam(getchain(Λ))
+remove_loss(Λ::AbstractPenalty) = remove_loss(getchain(Λ))
+init_params(Λ::AbstractPenalty, ::Type{T} = Float32) where {T} = init_params!(getchain(Λ), Vector{T}(undef, numparam(Λ)))
+init_params!(Λ::AbstractPenalty, x) = init_params!(getchain(Λ), x)
 
 struct NoPenalty{NN} <: AbstractPenalty{NN}
   chn::NN
