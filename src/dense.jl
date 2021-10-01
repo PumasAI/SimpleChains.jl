@@ -40,14 +40,14 @@ function init_params!(td::TurboDense{true}, p)
   W, p = getparams(td, p)
   id, od = td.dims
   lrng = local_rng()
-  randn!(lrng, view(W, :, 1:id), static(0), static(0), eltype(W)(2/(id+od)))
+  randn!(lrng, view(W, :, 1:id), static(0), static(0), Base.FastMath.sqrt_fast(eltype(W)(2/(id+od))))
   # randn!(lrng, view(W, :, id+1))
   fill!(view(W, :, id+1), 0)
   return p
 end
 function init_params!(td::TurboDense{false}, p)
   W, p = getparams(td, p)
-  randn!(local_rng(), W, static(0), static(0), eltype(W)(2/sum(td.dims)))
+  randn!(local_rng(), W, static(0), static(0), Base.FastMath.sqrt_fast(eltype(W)(2/sum(td.dims))))
   return p
 end
 
