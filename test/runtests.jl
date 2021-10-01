@@ -44,7 +44,7 @@ end
     end
     l + 2.3*(sum(abs2, A1) + sum(abs2, b1)) + 0.45*(sum(abs, A2) + sum(abs, b2))
   end;
-  @test g ≈ @. gfd
+  @test g ≈ gfd
   
   scd = SimpleChain((TurboDense{true}(tanh, (static(24),static(8))), Dropout(0.2), TurboDense{true}(identity, (static(8),static(2))), SquaredLoss(y)));
   valgrad!(g, scd, x, p)

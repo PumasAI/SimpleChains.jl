@@ -57,7 +57,7 @@ function apply_penalty!(g::AbstractVector{T1}, Λ::L1Penalty{NN,T2}, p::Abstract
   λ = Λ.λ
   @turbo for i ∈ eachindex(g) # add penalty
     pᵢ = p[i]
-    pos = pᵢ > zero(T3)
+    pos = pᵢ ≥ zero(T3)
     λᵢ = ifelse(pos, λ, -λ)
     l += λᵢ * pᵢ
     g[i] += λᵢ
@@ -76,7 +76,6 @@ L2Penalty(p::AbstractPenalty, λ) = L2Penalty(getchain(p), λ)
 
 @inline function apply_penalty(Λ::L2Penalty{NN,T2}, p::AbstractVector{T3}) where {T2,T3,NN}
   l = zero(promote_type(T1,T2,T3))
-  λ = 
   @turbo for i ∈ eachindex(g) # add penalty
     pᵢ = p[i]
     l += pᵢ*pᵢ
