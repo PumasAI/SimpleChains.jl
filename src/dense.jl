@@ -387,18 +387,57 @@ dualeval!(f::typeof(identity), Cdual::AbstractArray{D}) where {T<:Union{Float32,
   end
 end
 
+# maybe collapses dims 1 and 2 of a 3d array.
+collapse_dims12(::AbstractArray, A) = A
+function collapse_dims12(A::PtrArray{S,(true,true),T,1,1,0,(1,2)}) where {S,T}
+  M, N = size(A)
+  sp = stridedpointer(A)
+  o1, o2 = offsets(sp)
+  x1, x2 = strides(sp)
+  si = ArrayInterface.StrideIndex{2,(1,2),1}((x1,StaticInt(0)), (o1, o2))
+  spnew = stridedpointer(pointer(sp), si)
+  PtrArray(sp, (M*N,StaticInt(1)), Val((true,true)))
+end
+function collapse_dims12(A::PtrArray{S,(true,true,true),T,3,1,0,(1,2,3)}) where {S,T}
+  M, N, P = size(A)
+  sp = stridedpointer(A)
+  o1, o2, o3 = offsets(sp)
+  x1, x2, x3 = strides(sp)
+  si = ArrayInterface.StrideIndex{3,(1,2,3),1}((x1,StaticInt(0),x3), (o1, o2, o3))
+  spnew = stridedpointer(pointer(sp), si)
+  PtrArray(sp, (M*N, StaticInt(1), P), Val((true,true,true)))
+end
+const Collapsible12PtrArray{S,T} = Union{PtrArray{S,(true,true),T,1,1,0,(1,2)},PtrArray{S,(true,true,true),T,3,1,0,(1,2,3)}}
+function collapse_dims12(A::Collapsible12PtrArray, O::AbstractArray)
+  StrideArray(collapse_dims12(A), O)
+end
+function collapse_dims12(A::AbstractArray)
+  collapse_dims12(PtrArray(A), A)
+end
+collapse_dims12(::AbstractArray, ::AbstractArray, A, B) = A, B
+function collapse_dims12(A::Collapsible12PtrArray, B::Collapsible12PtrArray, OA, OB)
+  StrideArray(collapse_dims12(A), OA), StrideArray(collapse_dims12(B), OB)
+end
+function collapse_dims12(A::Collapsible12PtrArray, B::Collapsible12PtrArray)
+  collapse_dims12(A), collapse_dims12(B)
+end
+function collapse_dims12(A::AbstractArray, B::AbstractArray)
+  collapse_dims12(PtrArray(A), PtrArray(B), A, B)
+end
+
 function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector{T}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
   Kp1 = ArrayInterface.size(A, StaticInt(3))
   K = Kp1 - StaticInt(1)
-  Pp1 = StaticInt(P) + StaticInt(1)
-  @turbo for m ∈ indices((A,C),2), p ∈ 1:Pp1
+  # Pp1 = StaticInt(P) + StaticInt(1)
+  Af, Cf = collapse_dims12(A, C)
+  @turbo for m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
     Cmn = zero(T)
     for k ∈ 1:K
-      Cmn += A[p,m,k] * B[k]
+      Cmn += Af[p,m,k] * B[k]
     end
-    C[p,m] = Cmn + A[p, m, Kp1]
+    Cf[p,m] = Cmn + Af[p, m, Kp1]
   end
 end
 function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix{T}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
@@ -406,40 +445,51 @@ function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::Abstract
   A = reinterpret(reshape, T, Adual)
   Kp1 = ArrayInterface.size(A, StaticInt(3))
   K = Kp1 - StaticInt(1)
-  Pp1 = StaticInt(P) + StaticInt(1)
-  @turbo for n ∈ indices((B,C),(2,3)), m ∈ indices((A,C),2), p ∈ 1:Pp1
+  # Pp1 = StaticInt(P) + StaticInt(1)
+  Af, Cf = collapse_dims12(A, C)
+  @turbo for n ∈ indices((B,Cf),(2,3)), m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
     Cmn = zero(T)
     for k ∈ 1:K
-      Cmn += A[p,m,k] * B[k,n]
+      Cmn += Af[p,m,k] * B[k,n]
     end
-    C[p,m,n] = Cmn + A[p, m, Kp1]
+    Cf[p, m, n] = Cmn + Af[p, m, Kp1]
   end
 end
 function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector{T}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
-  Pp1 = StaticInt(P) + StaticInt(1)
-  @turbo for m ∈ indices((A,C),2), p ∈ 1:Pp1
+  # Pp1 = StaticInt(P) + StaticInt(1)
+  Af, Cf = collapse_dims12(A, C)
+  @turbo for m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
     Cmn = zero(T)
-    for k ∈ indices((A,B),(3,1))
-      Cmn += A[p,m,k] * B[k]
+    for k ∈ indices((Af,B),(3,1))
+      Cmn += Af[p,m,k] * B[k]
     end
-    C[p,m] = Cmn
+    Cf[p,m] = Cmn
   end
 end
 function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix{T}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
-  Pp1 = StaticInt(P) + StaticInt(1)
-  @turbo for n ∈ indices((B,C),(2,3)), m ∈ indices((A,C),2), p ∈ 1:Pp1
+  # Pp1 = StaticInt(P) + StaticInt(1)
+  Af, Cf = collapse_dims12(A, C)
+  @turbo for n ∈ indices((B,Cf),(2,3)), m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
     Cmn = zero(T)
-    for k ∈ indices((A,B),(3,1))
-      Cmn += A[p,m,k] * B[k,n]
+    for k ∈ indices((Af,B),(3,1))
+      Cmn += Af[p,m,k] * B[k,n]
     end
-    C[p,m,n] = Cmn
+    Cf[p,m,n] = Cmn
   end
 end
 
+# @inline function clip_r1_view(a::AbstractVector)
+#   d1 = axes(a, StaticInt(1))
+#   view(a, static_first(d1) + static_step(d1):static_last(d1))
+# end
+# @inline function clip_r1_view(A::AbstractMatrix)
+#   d1 = axes(A, StaticInt(1))
+#   view(A, static_first(d1) + static_step(d1):static_last(d1), :)
+# end
 function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::AbstractVector{D}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
@@ -447,15 +497,16 @@ function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::Abst
   Kp1 = ArrayInterface.size(A, StaticInt(3))
   K = Kp1 - StaticInt(1)
   Pstatic = StaticInt(P)
-  @turbo for m ∈ indices((A,C),2), p ∈ 0:Pstatic
+  Af, Cf1 = collapse_dims12(A, C)
+  @turbo for m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
     for k ∈ 1:K
-      Cmn += A[p+1,m,k] * B[1,k]
+      Cmn += Af[p, m, k] * B[1, k]
     end
-    C[p+1,m] = Cmn + A[p+1, m, Kp1]
+    Cf1[p, m] = Cmn + Af[p, m, Kp1]
   end
   @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
-    C[p+1,m] += A[1,m,k] * B[p+1,k]
+    C[p+1, m] += A[1, m, k] * B[p+1, k]
   end
 end
 function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
@@ -465,13 +516,15 @@ function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::Abst
   Kp1 = ArrayInterface.size(A, StaticInt(3))
   K = Kp1 - StaticInt(1)
   Pstatic = StaticInt(P)
-  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 0:Pstatic
+  Af, Cf1 = collapse_dims12(A, C)
+  @turbo for n ∈ indices((B,Cf1),3), m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
     for k ∈ 1:K
-      Cmn += A[p+1,m,k] * B[1,k,n]
+      Cmn += Af[p, m, k] * B[1, k, n]
     end
-    C[p+1,m,n] = Cmn + A[p+1, m, Kp1]
+    Cf1[p, m, n] = Cmn + Af[p, m, Kp1]
   end
+  # Bf, Cf2 = collapse_dims12(clip_r1_view(B), clip_r1_view(C))
   @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
     C[p+1,m,n] += A[1,m,k] * B[p+1,k,n]
   end
@@ -481,29 +534,34 @@ function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::Abst
   A = reinterpret(reshape, T, Adual)
   B = reinterpret(reshape, T, Bdual)
   Pstatic = StaticInt(P)
-  @turbo for m ∈ indices((A,C),2), p ∈ 0:Pstatic
+  Af, Cf1 = collapse_dims12(A, C)
+  @turbo for m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
-    for k ∈ indices((A,B),(3,2))
-      Cmn += A[p+1,m,k] * B[1,k]
+    for k ∈ indices((Af,B),(3,2))
+      Cmn += Af[p,m,k] * B[1,k]
     end
-    C[p+1,m] = Cmn
+    Cf1[p,m] = Cmn
   end
   @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
     C[p+1,m] += A[1,m,k] * B[p+1,k]
   end
 end
+
+
 function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
   B = reinterpret(reshape, T, Bdual)
   Pstatic = StaticInt(P)
-  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 0:Pstatic
+  Af, Cf1 = collapse_dims12(A, C)
+  @turbo for n ∈ indices((B,Cf1),3), m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
-    for k ∈ indices((A,B),(3,2))
-      Cmn += A[p+1,m,k] * B[1,k,n]
+    for k ∈ indices((Af,B),(3,2))
+      Cmn += Af[p,m,k] * B[1,k,n]
     end
-    C[p+1,m,n] = Cmn  
+    Cf1[p,m,n] = Cmn  
   end
+  # Bf, Cf2 = collapse_dims12(clip_r1_view(B), clip_r1_view(C))
   @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
     C[p+1,m,n] += A[1,m,k] * B[p+1,k,n]
   end
@@ -515,22 +573,21 @@ function dense!(f::F, Cdual::AbstractArray{D}, Adual::AbstractMatrix{D}, B::Abst
 end
 # derivatives
 
-@inline function Base.abs(x::ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}) where {N}
-  vx = ForwardDiff.value(x)
-  gz = vx > zero(vx)
-  vx = LoopVectorization.ifelse(gz, vx, -vx)
-  vp = let vp = ForwardDiff.partials(x)
-    ntuple(Val(N)) do n
-      vpn = vp[n]
-      LoopVectorization.ifelse(gz, vpn, -vpn)
-    end
+@generated function Base.abs(x::ForwardDiff.Dual{TAG,S,N}) where {TAG,S<:AbstractSIMD,N}
+  quote
+    $(Expr(:meta,:inline))
+    val = x.value
+    p = x.partials
+    cmp = val < zero($S)
+    absx = $ifelse(cmp, -val, val)
+    Base.Cartesian.@nexprs $N n -> p_n = p[n]
+    ForwardDiff.Dual{$TAG}(absx, ForwardDiff.Partials(Base.Cartesian.@ntuple $N n -> $ifelse(cmp, -p_n, p_n)))
   end
-  ForwardDiff.Dual(vx, vp...)
 end
 @inline function Base.max(
-  x::ForwardDiff.Dual{<:Any,<:AbstractSIMD,N},
-  y::ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}
-) where {N}
+  x::ForwardDiff.Dual{TAG,<:AbstractSIMD,N},
+  y::ForwardDiff.Dual{TAG,<:AbstractSIMD,N}
+) where {TAG,N}
   vx = ForwardDiff.value(x)
   vy = ForwardDiff.value(y)
   xgy = vx > vy
@@ -540,7 +597,7 @@ end
       LoopVectorization.ifelse(xgy, px[n], py[n])
     end
   end
-  ForwardDiff.Dual(z, p...)
+  ForwardDiff.Dual{TAG}(z, p...)
 end
 
 @inline Base.max(x::T, y::Real) where {N,T<:ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}} = max(x, T(y))
