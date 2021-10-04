@@ -20,6 +20,13 @@ end
   valgrad!(g, FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45)), x, p)
   if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
     @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)[1]
+    _gzyg = Zygote.gradient(p) do p
+      0.5*sum(abs2, Base.front(sc)(x, p) .- y)
+    end;
+    gzyg = copy(_gzyg[1]);
+    g2 = similar(g);
+    valgrad!(g2, sc, x, p)
+    @test g2 ≈ gzyg
   end
   
   gfd = ForwardDiff.gradient(p) do p

@@ -87,7 +87,7 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
     VectorizedRNG.storestate!(rng, state)
   end # GC preserve  
   
-  pg, x, nothing, p, align(pu + ((7+N) & -8))
+  pg, x, p, align(pu + ((7+N) & -8))
 end
 @inline pullback_param!(pg::Ptr, d::Dropout, C̄, B, p::Ptr, pu::Ptr{UInt8}) = nothing
 

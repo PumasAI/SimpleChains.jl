@@ -6,6 +6,7 @@ end
 TurboDense{B}(f::F, t::Tuple{I1,I2}) where {F,I1,I2,B} = TurboDense{B,Tuple{I1,I2},F}(f, t)
 TurboDense(f::F, t::Tuple{I1,I2}) where {F,I1,I2} = TurboDense{true,Tuple{I1,I2},F}(f, t)
 
+input_dims(d::TurboDense) = getfield(d.dims, 1)
 function numparam(d::TurboDense{false})
   id,  od = d.dims
   id * od
@@ -317,18 +318,24 @@ function valgrad_layer!(pg::Ptr{T}, td::TurboDense{O}, B, p::Ptr{T}, pu::Ptr{UIn
   f = td.f
   dense!(f, ∂C, C, A, B, static(O))
   # doesn'tneed a pullback
-  pg + length(A)*sizeof(T), C, nothing, p2, pu3
+  pg + length(A)*sizeof(T), C, p2, pu3
 end
-
+alloc_return_B_dense(B::PtrArray, pu::Ptr{UInt8}, _) = (B, pu) # assume `PtrArray` means we can destroy it
+function alloc_return_B_dense(B::AbstractArray{T}, pu::Ptr{UInt8}, input_dim) where {T}
+  si = bytestrideindex(B)
+  sp = stridedpointer(reinterpret(Ptr{T}, pu), si)
+  B̄ = PtrArray(sp, (input_dim, size(B, static(2))), StrideArraysCore.val_dense_dims(B))
+  B̄, pu + align(length(B̄)*sizeof(T))
+end
 function pullback!(pg::Ptr{T}, td::TurboDense{O}, _C̄, B, p::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T,O}
   # Start with 4-arg `pulback!` to update `∂C`
   C̄ = pullback_param!(pg, td, _C̄, B, p, pu) # Ā = C̄ * B'
   # Now 5-arg
   # B̄ = A' * C̄
   A, _  = getparams(td, p)
-  B̄ = B
+  B̄, pu2 = alloc_return_B_dense(B, pu2, input_dims(td))
   dense!(identity, nothing, B̄, matrix_view(td, A)', C̄, False())
-  B̄, pu
+  B̄, pu2
 end
 matrix_view(::TurboDense{false}, A) = A
 function matrix_view(::TurboDense{true}, A)
