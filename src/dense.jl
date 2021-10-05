@@ -15,10 +15,17 @@ function numparam(d::TurboDense{true})
   id,  od = d.dims
   id * od + od
 end
-function output_size(::Val{T}, td::TurboDense, s) where {T}
+parameter_free(::TurboDense) = false
+function output_size(::Val{T}, td::TurboDense, s::Tuple{Integer,Integer}) where {T}
   g1 = numparam(td) # for gradients
-  g2 = getfield(td.dims, 1) * getfield(s, 2) # for output
-  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), getfield(s,2))
+  s₂ = getfield(s, 2)
+  g2 = getfield(td.dims, 1) * s₂ # for output
+  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), s₂)
+end
+function output_size(::Val{T}, td::TurboDense, s::Tuple{Integer}) where {T}
+  g1 = numparam(td) # for gradients
+  g2 = getfield(td.dims, 1) # for output
+  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), )
 end
 fast_fuse(::typeof(relu)) = True()
 fast_fuse(::typeof(abs)) = True()
@@ -66,7 +73,7 @@ function alloc_return(td::TurboDense, batch_size, p::Ptr{T}, ::StaticInt{2}, ::T
 end
 
 
-function (td::TurboDense{O})(B::AbstractVecOrMat{T1}, p::Ptr{T2}, pu::Ptr{UInt8}) where {T1,T2,O}
+function (td::TurboDense{O})(B::AbstractVecOrMat{T1}, p::Ptr{T2}, pu::Ptr{UInt8}) where {T1, T2, O}
   pB = PtrArray(B)
   T = promote_type(T1, T2)
   GC.@preserve B begin

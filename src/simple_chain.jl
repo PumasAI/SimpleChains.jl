@@ -29,6 +29,7 @@ end
 numparam(c::SimpleChain) = _numparam(0, c.layers)
 _numparam(s, ::Tuple{}) = s
 _numparam(s, layers::Tuple{L,Vararg}) where {L} = _numparam(s + numparam(getfield(layers, 1)), Base.tail(layers))
+parameter_free(x) = numparam(x) == 0
 
 @inline function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}, additional = static(0)) where {T}
   d = output_size(Val(T), layers, ArrayInterface.size(arg)) + additional
@@ -47,7 +48,7 @@ end
 _chain(arg, ::Tuple{}, p::Ptr, pu::Ptr{UInt8}) = arg
 _chain(arg, l::Tuple{T}, p::Ptr, pu::Ptr{UInt8}) where {T} = getfield(getfield(l,1)(arg, p, pu), 1)
 function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
-  res, p = getfield(l,1)(arg, p, pu)
+  res, p, pu = getfield(l,1)(arg, p, pu)
   _chain(res, Base.tail(l), p, pu)
 end
 
@@ -90,15 +91,17 @@ end
 function chain_valgrad_entry!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {X1,X2}
   l = getfield(layers,1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-
-  val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-  pullback_param!(pg, l, grad, arg, p, pu)
+  if parameter_free(l)
+    val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
+  else
+    val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+    pullback_param!(pg, l, grad, arg, p, pu)
+  end
   return val
 end
 function chain_valgrad!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {X1,X2}
   l = getfield(layers,1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
   lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
   return val, lgrad, pu4

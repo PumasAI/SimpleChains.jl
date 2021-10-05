@@ -19,6 +19,7 @@ getrng(d::Dropout{<:VectorizedRNG.AbstractRNG}) = getfield(d, :rng)
 
 gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
 numparam(::Dropout) = 0
+parameter_free(::Dropout) = true
 
 init_params!(::Dropout, p) = p
 

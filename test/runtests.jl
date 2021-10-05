@@ -9,7 +9,7 @@ end
   x = rand(24,199);
 
   y = StrideArray{Float64}(undef, (static(2),size(x,2))) .= randn.() .* 10;
-  sc = SimpleChain((TurboDense{true}(tanh, (static(24),static(8))), TurboDense{true}(identity, (static(8),static(2))), SquaredLoss(y)));
+  sc = SimpleChain((Activation(abs2), TurboDense{true}(tanh, (static(24),static(8))), TurboDense{true}(identity, (static(8),static(2))), SquaredLoss(y)));
 
   @test first(Dropout(0.5)(x, pointer(x), pointer(sc.memory))) === x
   @test sum(iszero, x) == 0
@@ -35,7 +35,7 @@ end
     off_old = off
     off += 8
     b1 = view(p, 1+off_old:off)
-    l1 = tanh.(A1 * x .+ b1)
+    l1 = tanh.(A1 * abs2.(x) .+ b1)
     
     off_old = off
     off += 8*2

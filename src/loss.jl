@@ -8,6 +8,7 @@ function remove_loss(sc::SimpleChain)
   has_loss(sc) ? Base.front(sc) : sc
 end
 
+parameter_free(::AbstractLoss) = true
 numparam(::AbstractLoss) = 0
 output_size(::Val{T}, sl::AbstractLoss, s) where {T} = align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 
