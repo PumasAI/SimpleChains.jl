@@ -108,11 +108,11 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
   ldd = tanh.(Add * x .+ bdd);
   ldd_dd = tanh.(Add * xdd .+ bdd);
   GC.@preserve pd pu begin
-    @test ld ≈ td(x, pointer(pd), pointer(pu))[1]
-    @test ld_d ≈ td(xd, pointer(pd), pointer(pu))[1]
+    @test reinterpret(Float64, ld) ≈ reinterpret(Float64, td(x, pointer(pd), pointer(pu))[1])
+    @test reinterpret(Float64, ld_d) ≈ reinterpret(Float64, td(xd, pointer(pd), pointer(pu))[1])
 
-    @test ldd ≈ td(x, pointer(pdd), pointer(pu))[1]
-    @test ldd_dd ≈ td(xdd, pointer(pdd), pointer(pu))[1]
+    @test reinterpret(Float64, ldd) ≈ reinterpret(Float64, td(x, pointer(pdd), pointer(pu))[1])
+    @test reinterpret(Float64, ldd_dd) ≈ reinterpret(Float64, td(xdd, pointer(pdd), pointer(pu))[1])
   end
   
 end
