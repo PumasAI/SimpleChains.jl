@@ -4,6 +4,8 @@ using Test, Aqua, ForwardDiff, Zygote
 function countallocations!(g, sc, x, p)
   @allocated valgrad!(g, sc, x, p)
 end
+dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
+dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
 @testset "SimpleChains.jl" begin
   x = rand(24,199);
@@ -88,17 +90,29 @@ end
   # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 
   td = TurboDense{true}(tanh, (static(24),static(8)));
-  pd = ForwardDiff.Dual.(p, randn.(), randn.(), randn.());
-  xd = ForwardDiff.Dual.(x, randn.(), randn.(), randn.());
-  pu = Vector{UInt8}(undef, first(SimpleChains.output_size(Val(eltype(xd)), td, size(x))));
+  pd = dual.(p);
+  xd = dual.(x);
+
+  pdd = dual.(pd);
+  xdd = dual.(xd);
+  
+  pu = Vector{UInt8}(undef, first(SimpleChains.output_size(Val(eltype(xdd)), td, size(x))));
   
   Ad = reshape(view(pd, 1:8*24), (8,24));
-  bd = view(p, 1+8*24:8*25);
+  bd = view(pd, 1+8*24:8*25);
   ld = tanh.(Ad * x .+ bd);
-  ldd = tanh.(Ad * xd .+ bd);
+  ld_d = tanh.(Ad * xd .+ bd);
+
+  Add = reshape(view(pdd, 1:8*24), (8,24));
+  bdd = view(pdd, 1+8*24:8*25);
+  ldd = tanh.(Add * x .+ bdd);
+  ldd_dd = tanh.(Add * xdd .+ bdd);
   GC.@preserve pd pu begin
     @test ld ≈ td(x, pointer(pd), pointer(pu))[1]
-    @test ldd ≈ td(xd, pointer(pd), pointer(pu))[1]
+    @test ld_d ≈ td(xd, pointer(pd), pointer(pu))[1]
+
+    @test ldd ≈ td(x, pointer(pdd), pointer(pu))[1]
+    @test ldd_dd ≈ td(xdd, pointer(pdd), pointer(pu))[1]
   end
   
 end

@@ -390,13 +390,21 @@ struct DualCall{F}; f::F; end
     @inbounds (ForwardDiff.value(fd), (Base.Cartesian.@ntuple $P p -> ∂fd[p])...)
   end
 end
-dualeval!(f::typeof(identity), Cdual::AbstractArray{D}) where {T<:Union{Float32,Float64}, P, D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
-@generated function dualeval!(f::F, Cdual::AbstractArray{D}) where {F,T<:Union{Float32,Float64}, P, D<:ForwardDiff.Dual{<:Any,T,P}}
-  quote
-    C = reinterpret(reshape, T, Cdual)
-    g = DualCall(f)
-    @turbo for m ∈ eachindex(Cdual)
-      (Base.Cartesian.@ntuple $(P+1) p -> C[p,m]) = Base.Cartesian.@ncall $(P+1) g p -> C[p,m]
+dualeval!(f::typeof(identity), Cdual::AbstractArray{D}) where {T, P, D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
+@generated function dualeval!(f::F, Cdual::AbstractArray{D}) where {F,T, P, D<:ForwardDiff.Dual{<:Any,T,P}}
+  if isa(T, Base.HWReal)
+    quote
+      C = reinterpret(reshape, T, Cdual)
+      g = DualCall(f)
+      @turbo warn_check_args=false for m ∈ eachindex(Cdual)
+        (Base.Cartesian.@ntuple $(P+1) p -> C[p,m]) = Base.Cartesian.@ncall $(P+1) g p -> C[p,m]
+      end
+    end
+  else
+    quote
+      @inbounds for i ∈ eachindex(Cdual)
+        Cdual[i] = f(Cdual[i])
+      end
     end
   end
 end
@@ -439,56 +447,56 @@ function collapse_dims12(A::AbstractArray, B::AbstractArray)
   collapse_dims12(PtrArray(A), PtrArray(B), A, B)
 end
 
-function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector{T}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  C = reinterpret(reshape, T, Cdual)
-  A = reinterpret(reshape, T, Adual)
+@inline dual_eltype(::Type{ForwardDiff.Dual{T,V,P}}) where {T,V<:Union{Bool,Base.HWReal},P} = V
+@inline dual_eltype(::Type{ForwardDiff.Dual{T,V,P}}) where {T,V<:ForwardDiff.Dual,P} = dual_eltype(V)
+@inline reinterpret_dual(A::AbstractArray{D}) where {D<:ForwardDiff.Dual} = reinterpret(reshape, dual_eltype(D), A)
+
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector, ::True) where {D <: ForwardDiff.Dual}
+  C = reinterpret_dual(Cdual)
+  A = reinterpret_dual(Adual)
   Kp1 = ArrayInterface.size(A, StaticInt(3))
   K = Kp1 - StaticInt(1)
-  # Pp1 = StaticInt(P) + StaticInt(1)
   Af, Cf = collapse_dims12(A, C)
   @turbo for m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
-    Cmn = zero(T)
+    Cmn = zero(eltype(C))
     for k ∈ 1:K
       Cmn += Af[p,m,k] * B[k]
     end
     Cf[p,m] = Cmn + Af[p, m, Kp1]
   end
 end
-function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix{T}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  C = reinterpret(reshape, T, Cdual)
-  A = reinterpret(reshape, T, Adual)
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix, ::True) where {D <: ForwardDiff.Dual}
+  C = reinterpret_dual(Cdual)
+  A = reinterpret_dual(Adual)
   Kp1 = ArrayInterface.size(A, StaticInt(3))
   K = Kp1 - StaticInt(1)
-  # Pp1 = StaticInt(P) + StaticInt(1)
   Af, Cf = collapse_dims12(A, C)
   @turbo for n ∈ indices((B,Cf),(2,3)), m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
-    Cmn = zero(T)
+    Cmn = zero(eltype(C))
     for k ∈ 1:K
       Cmn += Af[p,m,k] * B[k,n]
     end
     Cf[p, m, n] = Cmn + Af[p, m, Kp1]
   end
 end
-function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector{T}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  C = reinterpret(reshape, T, Cdual)
-  A = reinterpret(reshape, T, Adual)
-  # Pp1 = StaticInt(P) + StaticInt(1)
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, B::AbstractVector, ::False) where {D <: ForwardDiff.Dual}
+  C = reinterpret_dual(Cdual)
+  A = reinterpret_dual(Adual)
   Af, Cf = collapse_dims12(A, C)
   @turbo for m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
-    Cmn = zero(T)
+    Cmn = zero(eltype(C))
     for k ∈ indices((Af,B),(3,1))
       Cmn += Af[p,m,k] * B[k]
     end
     Cf[p,m] = Cmn
   end
 end
-function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix{T}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  C = reinterpret(reshape, T, Cdual)
-  A = reinterpret(reshape, T, Adual)
-  # Pp1 = StaticInt(P) + StaticInt(1)
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, B::AbstractMatrix, ::False) where {D <: ForwardDiff.Dual}
+  C = reinterpret_dual(Cdual)
+  A = reinterpret_dual(Adual)
   Af, Cf = collapse_dims12(A, C)
   @turbo for n ∈ indices((B,Cf),(2,3)), m ∈ indices((Af,Cf),2), p ∈ indices((Af,Cf),1)
-    Cmn = zero(T)
+    Cmn = zero(eltype(C))
     for k ∈ indices((Af,B),(3,1))
       Cmn += Af[p,m,k] * B[k,n]
     end
@@ -504,7 +512,14 @@ end
 #   d1 = axes(A, StaticInt(1))
 #   view(A, static_first(d1) + static_step(d1):static_last(d1), :)
 # end
-function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::AbstractVector{D}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+
+
+# if `A` and `B` both contain dual numbers,
+# we currently peal through just a single layer of duals
+# If the duals are not nested, this should allow `@turbo`
+# to work. Otherwise, the fallback loop should run.
+# TODO: supported `@turbo`-ing nested duals here.
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::AbstractVector{D}, ::True) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
   B = reinterpret(reshape, T, Bdual)
@@ -512,18 +527,18 @@ function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::Abst
   K = Kp1 - StaticInt(1)
   Pstatic = StaticInt(P)
   Af, Cf1 = collapse_dims12(A, C)
-  @turbo for m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
+  @turbo warn_check_args=false for m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
     for k ∈ 1:K
       Cmn += Af[p, m, k] * B[1, k]
     end
     Cf1[p, m] = Cmn + Af[p, m, Kp1]
   end
-  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
+  @turbo warn_check_args=false for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
     C[p+1, m] += A[1, m, k] * B[p+1, k]
   end
 end
-function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::True) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::True) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
   B = reinterpret(reshape, T, Bdual)
@@ -531,7 +546,7 @@ function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::Abst
   K = Kp1 - StaticInt(1)
   Pstatic = StaticInt(P)
   Af, Cf1 = collapse_dims12(A, C)
-  @turbo for n ∈ indices((B,Cf1),3), m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
+  @turbo warn_check_args=false for n ∈ indices((B,Cf1),3), m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
     for k ∈ 1:K
       Cmn += Af[p, m, k] * B[1, k, n]
@@ -539,36 +554,36 @@ function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::Abst
     Cf1[p, m, n] = Cmn + Af[p, m, Kp1]
   end
   # Bf, Cf2 = collapse_dims12(clip_r1_view(B), clip_r1_view(C))
-  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
+  @turbo warn_check_args=false for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ 1:K
     C[p+1,m,n] += A[1,m,k] * B[p+1,k,n]
   end
 end
-function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::AbstractVector{D}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+function matmul!(Cdual::AbstractVector{D}, Adual::AbstractMatrix{D}, Bdual::AbstractVector{D}, ::False) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
   B = reinterpret(reshape, T, Bdual)
   Pstatic = StaticInt(P)
   Af, Cf1 = collapse_dims12(A, C)
-  @turbo for m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
+  @turbo warn_check_args=false for m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
     for k ∈ indices((Af,B),(3,2))
       Cmn += Af[p,m,k] * B[1,k]
     end
     Cf1[p,m] = Cmn
   end
-  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
+  @turbo warn_check_args=false for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
     C[p+1,m] += A[1,m,k] * B[p+1,k]
   end
 end
 
 
-function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::False) where {T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::AbstractMatrix{D}, ::False) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   A = reinterpret(reshape, T, Adual)
   B = reinterpret(reshape, T, Bdual)
   Pstatic = StaticInt(P)
   Af, Cf1 = collapse_dims12(A, C)
-  @turbo for n ∈ indices((B,Cf1),3), m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
+  @turbo warn_check_args=false for n ∈ indices((B,Cf1),3), m ∈ indices((Af,Cf1),2), p ∈ indices((Af,Cf1),1)
     Cmn = zero(T)
     for k ∈ indices((Af,B),(3,2))
       Cmn += Af[p,m,k] * B[1,k,n]
@@ -576,12 +591,12 @@ function matmul!(Cdual::AbstractMatrix{D}, Adual::AbstractMatrix{D}, Bdual::Abst
     Cf1[p,m,n] = Cmn  
   end
   # Bf, Cf2 = collapse_dims12(clip_r1_view(B), clip_r1_view(C))
-  @turbo for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
+  @turbo warn_check_args=false for n ∈ indices((B,C),3), m ∈ indices((A,C),2), p ∈ 1:Pstatic, k ∈ indices((A,B),(3,2))
     C[p+1,m,n] += A[1,m,k] * B[p+1,k,n]
   end
 end
 
-function dense!(f::F, Cdual::AbstractArray{D}, Adual::AbstractMatrix{D}, B::AbstractArray, ::BT, ::FF) where {F,BT,FF,T<:Union{Float32,Float64},P,D<:ForwardDiff.Dual{<:Any,T,P}}
+function dense!(f::F, Cdual::AbstractArray{D}, Adual::AbstractMatrix{D}, B::AbstractArray, ::BT, ::FF) where {F,BT,FF,T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   matmul!(Cdual, Adual, B, BT())
   dualeval!(f, Cdual)
 end
