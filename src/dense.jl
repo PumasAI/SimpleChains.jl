@@ -585,36 +585,5 @@ function dense!(f::F, Cdual::AbstractArray{D}, Adual::AbstractMatrix{D}, B::Abst
   matmul!(Cdual, Adual, B, BT())
   dualeval!(f, Cdual)
 end
-# derivatives
 
-@generated function Base.abs(x::ForwardDiff.Dual{TAG,S,N}) where {TAG,S<:AbstractSIMD,N}
-  quote
-    $(Expr(:meta,:inline))
-    val = x.value
-    p = x.partials
-    cmp = val < zero($S)
-    absx = $ifelse(cmp, -val, val)
-    Base.Cartesian.@nexprs $N n -> p_n = p[n]
-    ForwardDiff.Dual{$TAG}(absx, ForwardDiff.Partials(Base.Cartesian.@ntuple $N n -> $ifelse(cmp, -p_n, p_n)))
-  end
-end
-@inline function Base.max(
-  x::ForwardDiff.Dual{TAG,<:AbstractSIMD,N},
-  y::ForwardDiff.Dual{TAG,<:AbstractSIMD,N}
-) where {TAG,N}
-  vx = ForwardDiff.value(x)
-  vy = ForwardDiff.value(y)
-  xgy = vx > vy
-  z = LoopVectorization.ifelse(xgy, vx, vy)
-  p = let px = ForwardDiff.partials(x), py = ForwardDiff.partials(y), xgy = xgy
-    ntuple(Val(N)) do n
-      LoopVectorization.ifelse(xgy, px[n], py[n])
-    end
-  end
-  ForwardDiff.Dual{TAG}(z, p...)
-end
 
-@inline Base.max(x::T, y::Real) where {N,T<:ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}} = max(x, T(y))
-@inline Base.max(y::Real, x::T) where {N,T<:ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}} = max(x, T(y))
-@inline Base.max(x::T, y::Int) where {N,T<:ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}} = max(x, T(y))
-@inline Base.max(y::Int, x::T) where {N,T<:ForwardDiff.Dual{<:Any,<:AbstractSIMD,N}} = max(x, T(y))
