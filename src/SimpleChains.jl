@@ -24,5 +24,6 @@ include("dropout.jl")
 include("loss.jl")
 include("penalty.jl")
 include("chain_rules.jl")
+include("optimize.jl")
 
 end

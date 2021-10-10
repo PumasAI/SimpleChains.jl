@@ -10,12 +10,16 @@ The `AbstractPenalty` interface requires supporting the following methods:
 """
 abstract type AbstractPenalty{NN<:Union{SimpleChain,Nothing}} end
 
+const Chain = Union{AbstractPenalty{<:SimpleChain},SimpleChain}
 
 function (Λ::AbstractPenalty{<:SimpleChain})(arg, params)
   Base.FastMath.add_fast(getchain(Λ)(arg, params), apply_penalty(Λ, params))
 end
 function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
   Base.FastMath.add_fast(valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
+end
+function unsafe_valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
+  Base.FastMath.add_fast(unsafe_valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
 end
 
 Base.front(Λ::AbstractPenalty) = Base.front(getchain(Λ))

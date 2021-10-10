@@ -8,11 +8,11 @@ TurboDense(f::F, t::Tuple{I1,I2}) where {F,I1,I2} = TurboDense{true,Tuple{I1,I2}
 
 input_dims(d::TurboDense) = getfield(d.dims, 1)
 function numparam(d::TurboDense{false})
-  id,  od = d.dims
+  id,  od = getfield(d,:dims)
   id * od
 end
 function numparam(d::TurboDense{true})
-  id,  od = d.dims
+  id,  od = getfield(d,:dims)
   id * od + od
 end
 parameter_free(::TurboDense) = false
