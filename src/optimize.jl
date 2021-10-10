@@ -6,21 +6,21 @@ struct ADAM <: AbstractOptimizer
   β::Tuple{Float64,Float64}
 end
 
-ADAM(η = 0.001, β = (0.9, 0.999)) = ADAM(η, β)
+ADAM(η = 0.001) = ADAM(η, (0.9, 0.999))
 
 function update!(o::ADAM, (mt,vt,βp), x, Δ)
   @unpack η, β = o
 
-  # mt, vt, βp = get!(o.state, x) do
-  #     (zero(x), zero(x), Float64[β[1], β[2]])
-  # end :: Tuple{typeof(x),typeof(x),Vector{Float64}}
   β₁ = β[1]; β₂ = β[2];
   βp₁ = βp[1]; βp₂ = βp[2];
+  # @inbounds @fastmath for i ∈ eachindex(Δ)
   @turbo for i ∈ eachindex(Δ)
     mt[i] = β₁ * mt[i] + (1 - β₁) * Δ[i]
     vt[i] = β₂ * vt[i] + (1 - β₂) * Δ[i]^2
-    Δ[i] =  mt[i] / (1 - βp₁) / (sqrt(vt[i] / (1 - βp₂)) + 1e-8) * η
-    x[i] -= Δ[i]
+    # Δ[i] =  mt[i] / (1 - βp₁) / (sqrt(vt[i] / (1 - βp₂)) + 1e-8) * η
+    Δᵢ = η * (mt[i] / (1 - βp₁)) / ((sqrt(vt[i] / (1 - βp₂)) + 1e-8))
+    Δ[i] = Δᵢ
+    x[i] -= Δᵢ#Δ[i]
   end
   βp[1] = βp₁ * β₁
   βp[2] = βp₂ * β₂
@@ -36,12 +36,15 @@ end
     mt[i] = 0
     vt[i] = 0
   end
-  pu += memoff
-  βp = PtrArray(reinterpret(Ptr{Float64}, pu), (static(2),))
+  βp_doesnot_fit_at_end = sizeof(T)*length(p)+16 > memoff
+  pu_p_memoff = pu + memoff
+  pβp = ifelse(βp_doesnot_fit_at_end, pu_p_memoff, pu+sizeof(T)*length(p))
+  pu = pu_p_memoff
+  βp = PtrArray(reinterpret(Ptr{Float64}, pβp), (static(2),))
   @unpack β = opt
   βp[1] = β[1]
   βp[2] = β[2]
-  pu = ifelse(sizeof(T)*length(p)+16 > memoff, pu+align(1), pu)
+  pu = ifelse(βp_doesnot_fit_at_end, pu+align(1), pu)
   return (mt,vt,βp), pu
 end
 
@@ -130,7 +133,14 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
 end
 train_batched(chn::Chain) = train_batched!(init_params(chn), chn)
 
-function train!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
+_isstochastic(::Tuple{}) = false
+function _isstochastic(x::Tuple{T,Vararg}) where {T}
+  isstochastic(getfield(x,1)) ? true : _isstochastic(Base.tail(x))
+end
+
+isstochastic(chn::Chain) = _isstochastic(getfield(getchain(chn),:layers))
+
+function train!(g, p, chn::Chain, X, opt::AbstractOptimizer, iters)
   if isstochastic(chn)
     train_unbatched!(g, p, chn, X, opt, iters)
   else

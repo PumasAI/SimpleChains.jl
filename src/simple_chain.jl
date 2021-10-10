@@ -126,3 +126,5 @@ function valgrad(sc, arg, params::AbstractVector{T}) where {T}
   return l, StrideArraysCore.StrideArray(g, memory)
 end
 
+isstochastic(_) = false
+

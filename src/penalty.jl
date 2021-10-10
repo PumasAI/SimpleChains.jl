@@ -18,9 +18,12 @@ end
 function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
   Base.FastMath.add_fast(valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
 end
-function unsafe_valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
-  Base.FastMath.add_fast(unsafe_valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
-end
+# function unsafe_valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
+#   Base.FastMath.add_fast(unsafe_valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
+# end
+
+UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:layers}) = getfield(getchain(c), :layers)
+UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:memory}) = getfield(getchain(c), :memory)
 
 Base.front(Λ::AbstractPenalty) = Base.front(getchain(Λ))
 numparam(Λ::AbstractPenalty) = numparam(getchain(Λ))
@@ -36,7 +39,7 @@ NoPenalty() = NoPenalty(nothing)
 apply_penalty(::NoPenalty) = Static.Zero()
 apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
 (::NoPenalty)(chn::SimpleChain) = NoPenalty(chn)
-getpenalty(sc::SimpleChain) = NoPenalty()
+getpenalty(sc::SimpleChain) = NoPenalty(sc)
 getpenalty(Λ::AbstractPenalty) = Λ
 
 struct L1Penalty{NN,T} <: AbstractPenalty{NN}
@@ -79,8 +82,8 @@ L2Penalty(p::AbstractPenalty, λ) = L2Penalty(getchain(p), λ)
 (p::L2Penalty)(chn::SimpleChain) = L2Penalty(chn, p.λ)
 
 @inline function apply_penalty(Λ::L2Penalty{NN,T2}, p::AbstractVector{T3}) where {T2,T3,NN}
-  l = zero(promote_type(T1,T2,T3))
-  @turbo for i ∈ eachindex(g) # add penalty
+  l = zero(promote_type(T2,T3))
+  @turbo for i ∈ eachindex(p) # add penalty
     pᵢ = p[i]
     l += pᵢ*pᵢ
   end

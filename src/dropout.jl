@@ -102,4 +102,5 @@ function pullback!(pg::Ptr{T}, d::Dropout, C̄, B, p::Ptr{T}, pu::Ptr{UInt8}, pu
   C̄, pu2# returns `pu2` because we don't know where `C̄` was allocated
 end
 
+isstochastic(::Dropout) = true
 
