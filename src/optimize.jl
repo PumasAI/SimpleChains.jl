@@ -18,7 +18,7 @@ function update!(o::ADAM, (mt,vt,βp), x, Δ)
     mt[i] = β₁ * mt[i] + (1 - β₁) * Δ[i]
     vt[i] = β₂ * vt[i] + (1 - β₂) * Δ[i]^2
     # Δ[i] =  mt[i] / (1 - βp₁) / (sqrt(vt[i] / (1 - βp₂)) + 1e-8) * η
-    Δᵢ = η * (mt[i] / (1 - βp₁)) / ((sqrt(vt[i] / (1 - βp₂)) + 1e-8))
+    Δᵢ = η * mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1e-8))
     Δ[i] = Δᵢ
     x[i] -= Δᵢ#Δ[i]
   end
