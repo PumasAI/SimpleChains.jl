@@ -147,7 +147,7 @@ function train!(g, p, chn::Chain, X, opt::AbstractOptimizer, iters)
     train_batched!(g, p, chn, X, opt, iters)
   end
 end
-train(chn::Chain) = train!(init_params(chn), chn)
+# train(chn::Chain) = train!(init_params(chn), chn)
 
 for t ∈ [:train, :train_batched, :train_unbatched]
   t! = Symbol(t, :!)

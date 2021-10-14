@@ -16,6 +16,7 @@ struct SquaredLoss{Y} <: AbstractLoss
   y::Y
 end
 (::SquaredLoss)(y) = SquaredLoss(y)
+SquaredLoss() = SquaredLoss(nothing)
 target(sl::SquaredLoss) = getfield(sl, :y)
 init_params!(::AbstractLoss, p) = p
 
@@ -48,6 +49,7 @@ struct AbsoluteLoss{Y} <: AbstractLoss
   y::Y
 end
 (::AbsoluteLoss)(y) = AbsoluteLoss(y)
+AbsoluteLoss() = AbsoluteLoss(nothing)
 target(sl::AbsoluteLoss) = getfield(sl, :y)
 
 absolute_loss(chn::SimpleChain, y) = add_loss(chn, AbsoluteLoss(y))

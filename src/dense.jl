@@ -229,7 +229,7 @@ function dense!(f::F, ∂C::AbstractVector, C::AbstractMatrix, A::AbstractMatrix
   end
 end
 
-function dense!(::typeof(tanh), ∂C::AbstractVector, C::AbstractMatrix, A::AbstractMatrix, B::AbstractMatrix, ::True)
+function dense!(::Union{typeof(tanh_fast),typeof(tanh)}, ∂C::AbstractVector, C::AbstractMatrix, A::AbstractMatrix, B::AbstractMatrix, ::True)
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B,C),2), m ∈ indices((A,C),1)
@@ -240,12 +240,12 @@ function dense!(::typeof(tanh), ∂C::AbstractVector, C::AbstractMatrix, A::Abst
     C[m,n] = Cmn + A[m,Kp1]
   end
   @turbo for i ∈ eachindex(C)
-    Cᵢ = tanh(C[i])
+    Cᵢ = tanh_fast(C[i])
     C[i] = Cᵢ
     ∂C[i] = one(Cᵢ) - Cᵢ*Cᵢ
   end
 end
-function dense!(f::typeof(tanh), ∂C::AbstractVector, C::AbstractMatrix, A::AbstractMatrix, B::AbstractMatrix, ::False)
+function dense!(::Union{typeof(tanh_fast),typeof(tanh)}, ∂C::AbstractVector, C::AbstractMatrix, A::AbstractMatrix, B::AbstractMatrix, ::False)
   @turbo for n ∈ indices((B,C),2), m ∈ indices((A,C),1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A,B),(2,1))
@@ -254,7 +254,7 @@ function dense!(f::typeof(tanh), ∂C::AbstractVector, C::AbstractMatrix, A::Abs
     C[m,n] = Cmn
   end
   @turbo for i ∈ eachindex(C)
-    Cᵢ = tanh(C[i])
+    Cᵢ = tanh_fast(C[i])
     C[i] = Cᵢ
     ∂C[i] = one(Cᵢ) - Cᵢ*Cᵢ
   end
