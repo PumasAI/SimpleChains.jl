@@ -1,7 +1,7 @@
 name = "SimpleChains"
 uuid = "de6bee2f-e2f4-4ec7-b6ed-219cc6f6e9e5"
 authors = ["Chris Elrod <elrodc@gmail.com> and contributors"]
-version = "0.1.11"
+version = "0.1.12"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -29,7 +29,7 @@ LoopVectorization = "0.12.83"
 Polyester = "0.4, 0.5"
 SIMDTypes = "0.1"
 SLEEFPirates = "0.6"
-Static = "0.3"
+Static = "0.3, 0.4"
 StrideArraysCore = "0.2.3"
 UnPack = "1"
 VectorizationBase = "0.21.12"
