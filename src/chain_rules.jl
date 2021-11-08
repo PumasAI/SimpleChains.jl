@@ -1,4 +1,10 @@
 
+@static if isdefined(ChainRulesCore, :NoTangent)
+  const NoTangent = ChainRulesCore.NoTangent
+else
+  const NoTangent = ChainRulesCore.DoesNotExist
+end
+
 isloss(::AbstractLoss) = True()
 isloss(_) = False()
 has_loss_typed(sc::SimpleChain) = isloss(last(sc.layers))
@@ -28,7 +34,7 @@ function (pb::PullBack)(x)
   GC.@preserve grad  params  memory begin
     lgrad, pu4 = pullback_layer!(pbl, x)
   end
-  ChainRulesCore.NoTangent(), StrideArraysCore.StrideArray(lgrad, memory), StrideArraysCore.StrideArray(grad, memory)
+  NoTangent(), StrideArraysCore.StrideArray(lgrad, memory), StrideArraysCore.StrideArray(grad, memory)
 end
 
 
@@ -91,7 +97,7 @@ function _rrule(sc, arg, params, ::True)
           g[i] *= l̄
         end
       end
-      ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), g
+      NoTangent(), NoTangent(), g
     end
   end
   l, pullback
