@@ -125,6 +125,19 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     SimpleChains.train!(g, p, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, SimpleChains.ADAM(), 1000);
     @test FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p) < vg2
   end
+  @testset "vector of targets" begin
+    p .= randn.() .* 100;
+    ys = [@. y + 0.1randn() for _ in 1:1000];
+    # small penalties since we don't care about overfitting here
+    vg1 = valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p)
+    SimpleChains.train_unbatched!(g, p, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, SimpleChains.ADAM(), ys);
+    @test valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p) < vg1
+    p .= randn.() .* 100;
+    vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p)
+    SimpleChains.train_unbatched!(g, p, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, SimpleChains.ADAM(), ys);
+    @test FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p) < vg2
+
+  end
 end
 Aqua.test_all(SimpleChains, ambiguities=false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 
