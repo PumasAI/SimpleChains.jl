@@ -48,7 +48,27 @@ end
   return (mt,vt,βp), pu
 end
 
-function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
+function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
+  chn = getchain(_chn)
+  pen = getpenalty(_chn)
+  @unpack layers, memory = chn
+  fl = Base.front(layers);
+  ll = last(layers);
+  optoff = optmemsize(opt, p)
+  resize_memory!(layers, memory, X, optoff)
+  optbuffer, pm = optmemory(opt, p, pointer(memory))
+  GC.@preserve p g memory begin
+    pg = pointer(g); pp = pointer(p)
+    for y ∈ t
+      layers_y = (fl..., ll(y))
+      chain_valgrad_entry!(pg, X, layers_y, pp, pm)
+      apply_penalty!(g, pen, p)
+      update!(opt, optbuffer, p, g)
+    end
+  end
+  p
+end
+function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
   chn = getchain(_chn)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
@@ -65,11 +85,21 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   end
   p
 end
+function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer)
+  t = target(_chn)
+  if _iterate_over_losses(t)
+    train_unbatched!(g, p, _chn, X, opt, t)
+  else
+    train_unbatched!(g, p, _chn, X, opt, 10_000)
+  end
+end
+
+
 # @inline function batch_size(layers::Tuple, ::Val{T}) where {T}
 #   fl = getfield(layers,1)
 #   parameter_free(fl) && return batch_size(Base.tail(layers), Val(T))
-  
 # end
+
 @generated function turbo_dense_batch_size(id::Integer, od::Integer, Nd::Integer, ::StaticInt{W}, ::StaticInt{RS}, ::StaticInt{RC}, ::StaticInt{CLS}) where {W, RS, RC, CLS}
   Kk = Static.known(id)
   Mk = Static.known(od)

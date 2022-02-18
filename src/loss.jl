@@ -1,4 +1,4 @@
-abstract type AbstractLoss end
+abstract type AbstractLoss{Y} end
 
 has_loss(sc::SimpleChain) = last(sc.layers) isa AbstractLoss
 function add_loss(sc::SimpleChain, l::AbstractLoss)
@@ -8,11 +8,20 @@ function remove_loss(sc::SimpleChain)
   has_loss(sc) ? Base.front(sc) : sc
 end
 
+target(_) = nothing
+target(sc::SimpleChain) = target(last(sc.layers))
+_iterate_over_losses(::AbstractArray{<:AbstractArray}) = true
+_iterate_over_losses(_) = false
+iterate_over_losses(sc) = _iterate_over_losses(target(sc))
+
 parameter_free(::AbstractLoss) = true
 numparam(::AbstractLoss) = 0
+function output_size(::Val{T}, sl::AbstractLoss{<:AbstractArray{<:AbstractArray}}, s) where {T}
+  align(length(first(target(sl))) * static_sizeof(T)), static_sizeof(T)
+end
 output_size(::Val{T}, sl::AbstractLoss, s) where {T} = align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 
-struct SquaredLoss{Y} <: AbstractLoss
+struct SquaredLoss{Y} <: AbstractLoss{Y}
   y::Y
 end
 (::SquaredLoss)(y) = SquaredLoss(y)
@@ -33,7 +42,7 @@ function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p
   end
   return 0.5s, g, pu + sizeof(T)*length(g)
 end
-function (sl::SquaredLoss)(arg, p, pu)
+function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg, p, pu)
   y = getfield(sl, :y)
   s = zero(promote_type(eltype(arg), eltype(y)))
   @turbo for i ∈ eachindex(arg)
@@ -44,8 +53,7 @@ function (sl::SquaredLoss)(arg, p, pu)
 end
 
 
-
-struct AbsoluteLoss{Y} <: AbstractLoss
+struct AbsoluteLoss{Y} <: AbstractLoss{Y}
   y::Y
 end
 (::AbsoluteLoss)(y) = AbsoluteLoss(y)
@@ -68,13 +76,22 @@ function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, 
   return s, g, pu + sizeof(T)*length(g)
 end
 
-function (sl::AbsoluteLoss)(arg, p, pu)
+function (sl::AbsoluteLoss{<:AbstractArray{<:Number}})(arg, p, pu)
   y = getfield(sl, :y)
   s = zero(promote_type(eltype(arg), eltype(y)))
   @turbo for i ∈ eachindex(arg)
     s += abs(arg[i] - y[i])
   end
   s, p, pu
+end
+function (sl::AbstractLoss{<:AbstractArray{<:AbstractArray}})(arg, p, pu)
+  y = getfield(sl, :y)
+  s = zero(promote_type(eltype(arg), eltype(first(y))))
+  for yᵢ ∈ y
+    sᵢ, p, pu = sl(yᵢ)(arg, p, pu)
+    @fastmath s += sᵢ
+  end
+  return s, p, pu
 end
 
 

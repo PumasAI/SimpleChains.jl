@@ -31,6 +31,8 @@ remove_loss(Λ::AbstractPenalty) = remove_loss(getchain(Λ))
 init_params(Λ::AbstractPenalty, ::Type{T} = Float32) where {T} = init_params!(getchain(Λ), Vector{T}(undef, numparam(Λ)))
 init_params!(Λ::AbstractPenalty, x) = init_params!(getchain(Λ), x)
 
+target(c::AbstractPenalty) = target(getchain(c))
+
 struct NoPenalty{NN} <: AbstractPenalty{NN}
   chn::NN
 end
