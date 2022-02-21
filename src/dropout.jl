@@ -17,6 +17,11 @@ Dropout(x::T, rng = local_rng()) where {T <: Union{Float32,Float64}} = Dropout(B
 getrng(d::Dropout{Nothing}) = local_rng()
 getrng(d::Dropout{<:VectorizedRNG.AbstractRNG}) = getfield(d, :rng)
 
+function Base.show(io::IO, d::Dropout)
+  print(io, "Dropout(p=$(Float64(d.rng)/0xffffffff))")
+end
+
+
 gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
 numparam(::Dropout) = 0
 parameter_free(::Dropout) = true
@@ -30,6 +35,7 @@ function (d::Dropout)(B::AbstractVecOrMat{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   end
   B, p, pu # inference
 end
+
 
 getpcmp(::StaticInt{W}, ::StaticInt{W}, x) where {W} = x
 getpcmp(::StaticInt{W}, ::StaticInt{WU}, x) where {W,WU} = getpcmp(StaticInt(W), StaticInt(WU), x, Static.gt(StaticInt(W), StaticInt(WU)))

@@ -31,6 +31,8 @@ init_params!(::AbstractLoss, p) = p
 
 squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
 
+Base.show(io::IO, ::SquaredLoss) = print(io, "SquaredLoss")
+
 function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
   g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), StrideArraysCore.val_dense_dims(arg))
@@ -62,8 +64,10 @@ target(sl::AbsoluteLoss) = getfield(sl, :y)
 
 absolute_loss(chn::SimpleChain, y) = add_loss(chn, AbsoluteLoss(y))
 
+Base.show(io::IO, ::AbsoluteLoss) = print(io, "AbsoluteLoss")
 
-function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
+
+function chain_valgrad!(__, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, _::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
   g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), StrideArraysCore.val_dense_dims(arg))
   s = zero(eltype(g))

@@ -7,6 +7,18 @@ SimpleChain(l::Vararg) = SimpleChain(l, UInt8[])
 SimpleChain(l::Tuple) = SimpleChain(l, UInt8[])
 Base.similar(c::SimpleChain) = SimpleChain(c.layers, similar(c.memory))
 
+_show(::IO, ::Tuple{}) = nothing
+function _show(io::IO, t::Tuple{T,Vararg}) where {T}
+  println(io)
+  show(io, first(t))
+  _show(io, Base.tail(t))
+end
+function Base.show(io::IO, sc::SimpleChain)
+  print(io, "SimpleChain with the following layers:")
+  _show(io, sc.layers)
+end
+
+
 """
   Base.front(c::SimpleChain)
 
