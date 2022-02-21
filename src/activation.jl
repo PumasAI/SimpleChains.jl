@@ -11,7 +11,7 @@ init_params!(::Activation, p) = p
 
 output_size(::Val{T}, a::Activation, s) where {T} = align(prod(s)*(2sizeof(T))), s
 
-Base.show(io::IO, a::Activation) = print(io, "Activation layer applying function", a.f)
+Base.show(io::IO, a::Activation) = print(io, "Activation layer applying: ", a.f)
 
 function (a::Activation)(x::AbstractArray{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   f = a.f

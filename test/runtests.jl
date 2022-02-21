@@ -13,13 +13,32 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
   y = StrideArray{Float64}(undef, (static(2),size(x,2))) .= randn.() .* 10;
   sc = SimpleChain((Activation(abs2), TurboDense{true}(tanh, (static(24),static(8))), TurboDense{true}(identity, (static(8),static(2))), SquaredLoss(y)));
 
+  @test sprint((io,t) -> show(io,t), sc) == """
+SimpleChain with the following layers:
+Activation layer applying: abs2
+TurboDense (static(24), static(8)) with bias.
+Activation layer applying: tanh
+TurboDense (static(8), static(2)) with bias.
+SquaredLoss"""
+
   @test first(Dropout(0.5)(x, pointer(x), pointer(sc.memory))) === x
   @test sum(iszero, x) == 0
   x .= rand.();
 
+  scflp = FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45));
+  @test sprint((io,t) -> show(io,t), scflp) == """
+Penalty on all but last layer: L2Penalty (λ=2.3)
+Penalty on last layer: L1Penalty (λ=0.45) applied to:
+SimpleChain with the following layers:
+Activation layer applying: abs2
+TurboDense (static(24), static(8)) with bias.
+Activation layer applying: tanh
+TurboDense (static(8), static(2)) with bias.
+SquaredLoss"""
+  
   p = SimpleChains.init_params(sc, Float64);
   g = similar(p);
-  valgrad!(g, FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45)), x, p)
+  valgrad!(g, scflp, x, p)
   if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
     @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)[1]
     _gzyg = Zygote.gradient(p) do p

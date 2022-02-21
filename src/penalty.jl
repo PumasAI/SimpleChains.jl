@@ -22,6 +22,19 @@ end
 #   Base.FastMath.add_fast(unsafe_valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
 # end
 
+_penalty_applied_to_sc(io::IO, ::Nothing) = nothing
+function _penalty_applied_to_sc(io::IO, sc::SimpleChain)
+  println(io, " applied to:")
+  show(io, sc)
+end  
+function Base.show(io::IO, p::AbstractPenalty)
+  print(io, string(Base.typename(typeof(p)))[begin+9:end-1])
+  λ = getλ(p)
+  λ === nothing || print(io, " (λ=$λ)")
+  _penalty_applied_to_sc(io, getchain(p))
+end
+
+
 UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:layers}) = getfield(getchain(c), :layers)
 UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:memory}) = getfield(getchain(c), :memory)
 
@@ -43,6 +56,8 @@ apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
 (::NoPenalty)(chn::SimpleChain) = NoPenalty(chn)
 getpenalty(sc::SimpleChain) = NoPenalty(sc)
 getpenalty(Λ::AbstractPenalty) = Λ
+getλ(::NoPenalty) = nothing
+
 
 struct L1Penalty{NN,T} <: AbstractPenalty{NN}
   chn::NN
@@ -52,6 +67,7 @@ getchain(p::L1Penalty) = getfield(p,:chn)
 L1Penalty(λ::Number) = L1Penalty(nothing, λ)
 L1Penalty(p::AbstractPenalty, λ) = L1Penalty(getchain(p), λ)
 (p::L1Penalty)(chn::SimpleChain) = L1Penalty(chn, p.λ)
+getλ(p::L1Penalty) = getfield(p, :λ)
 
 @inline function apply_penalty(Λ::L1Penalty{NN,T2}, p::AbstractVector{T3}) where {T2,T3,NN}
   l = zero(T3)
@@ -81,6 +97,7 @@ end
 getchain(p::L2Penalty) = getfield(p,:chn)
 L2Penalty(λ) = L2Penalty(nothing, λ)
 L2Penalty(p::AbstractPenalty, λ) = L2Penalty(getchain(p), λ)
+getλ(p::L2Penalty) = getfield(p, :λ)
 (p::L2Penalty)(chn::SimpleChain) = L2Penalty(chn, p.λ)
 
 @inline function apply_penalty(Λ::L2Penalty{NN,T2}, p::AbstractVector{T3}) where {T2,T3,NN}
@@ -119,6 +136,12 @@ getchain(p::FrontLastPenalty) = getfield(p,:chn)
 FrontLastPenalty(λ₁, λ₂) = FrontLastPenalty(nothing, λ₁, λ₂)
 FrontLastPenalty(p::AbstractPenalty, λ₁, λ₂) = FrontLastPenalty(getchain(p), λ₁, λ₂)
 (p::FrontLastPenalty)(chn::SimpleChain) = FrontLastPenalty(chn, p.front, p.last)
+
+function Base.show(io::IO, p::FrontLastPenalty)
+  print(io, "Penalty on all but last layer: "); show(io, p.front)
+  print(io, "\nPenalty on last layer: "); show(io, p.last)
+  _penalty_applied_to_sc(io, getchain(p))
+end
 
 
 function split_front_last(c::SimpleChain)
