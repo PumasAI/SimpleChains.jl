@@ -22,7 +22,7 @@ end
 #   Base.FastMath.add_fast(unsafe_valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
 # end
 
-_penalty_applied_to_sc(io::IO, ::Nothing) = nothing
+_penalty_applied_to_sc(_::IO, ::Nothing) = nothing
 function _penalty_applied_to_sc(io::IO, sc::SimpleChain)
   println(io, " applied to:")
   show(io, sc)
