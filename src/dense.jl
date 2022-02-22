@@ -6,6 +6,16 @@ end
 TurboDense{B}(f::F, t::Tuple{I1,I2}) where {F,I1,I2,B} = TurboDense{B,Tuple{I1,I2},F}(f, t)
 TurboDense(f::F, t::Tuple{I1,I2}) where {F,I1,I2} = TurboDense{true,Tuple{I1,I2},F}(f, t)
 
+function Base.show(io::IO, td::TurboDense{B}) where {B}
+  w = B ? "with" : "without"
+  print(io, "TurboDense $(td.dims) $w bias.")
+  if td.f !== identity
+    println(io)
+    show(io, Activation(td.f))
+  end
+end
+
+
 input_dims(d::TurboDense) = getfield(d.dims, 1)
 function numparam(d::TurboDense{false})
   id,  od = getfield(d,:dims)
