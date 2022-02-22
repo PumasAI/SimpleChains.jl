@@ -35,12 +35,12 @@ TurboDense (static(24), static(8)) with bias.
 Activation layer applying: tanh
 TurboDense (static(8), static(2)) with bias.
 SquaredLoss"""
+
+    @test sprint((io, t) -> show(io, t), sc) == print_str0
     if VERSION >= v"1.6"
-        @test sprint((io, t) -> show(io, t), sc) == print_str0
         @test sprint((io, t) -> show(io, t), scflp) == print_str1
     else
         # typename doesn't work on 1.5
-        @test_broken sprint((io, t) -> show(io, t), sc) == print_str0
         @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
     end
 
