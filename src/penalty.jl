@@ -66,19 +66,18 @@ end
 getchain(p::L1Penalty) = getfield(p,:chn)
 L1Penalty(λ::Number) = L1Penalty(nothing, λ)
 L1Penalty(p::AbstractPenalty, λ) = L1Penalty(getchain(p), λ)
-(p::L1Penalty)(chn::SimpleChain) = L1Penalty(chn, p.λ)
 getλ(p::L1Penalty) = getfield(p, :λ)
+(p::L1Penalty)(chn::SimpleChain) = L1Penalty(chn, p.λ)
 
 @inline function apply_penalty(Λ::L1Penalty{NN,T2}, p::AbstractVector{T3}) where {T2,T3,NN}
   l = zero(T3)
   @turbo for i ∈ eachindex(p) # add penalty
     l += abs(p[i])
-    l += λᵢ * pᵢ
   end
   Base.FastMath.mul_fast(l, Λ.λ)
 end
 function apply_penalty!(g::AbstractVector{T1}, Λ::L1Penalty{NN,T2}, p::AbstractVector{T3}) where {T1,T2,T3,NN}
-  l = zero(T3)
+  l = zero(promote_type(T1,T2,T3))
   λ = Λ.λ
   @turbo for i ∈ eachindex(g) # add penalty
     pᵢ = p[i]
@@ -156,7 +155,7 @@ function front_last_param_lens(c::SimpleChain)
 end
 
 @inline function apply_penalty(Λ::FrontLastPenalty{<:SimpleChain}, param)
-  f, l = front_last_param_lens(getchain(Λ))
+  f, _ = front_last_param_lens(getchain(Λ))
   
   Base.FastMath.add_fast(
     apply_penalty(Λ.front, view(param, 1:f)),
@@ -164,7 +163,7 @@ end
   )
 end
 @inline function apply_penalty!(grad, Λ::FrontLastPenalty{<:SimpleChain}, param)
-  f, l = front_last_param_lens(getchain(Λ))
+  f, _ = front_last_param_lens(getchain(Λ))
   fr = 1:f
   lr = 1+f:length(param)
   Base.FastMath.add_fast(
