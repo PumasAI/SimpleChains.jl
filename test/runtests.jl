@@ -8,6 +8,11 @@ dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
 dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
 @testset "SimpleChains.jl" begin
+  @test_throws ArgumentError SimpleChain((
+    Activation(abs2), 
+    TurboDense{true}(tanh, (static(24), static(8))), 
+    TurboDense{true}(identity, (static(10), static(2))))
+  )
   scbase = SimpleChain((Activation(abs2), TurboDense{true}(tanh, (static(24), static(8))), TurboDense{true}(identity, (static(8), static(2)))))
   scdbase = SimpleChain((TurboDense{true}(tanh, (static(24), static(8))), Dropout(0.2), TurboDense{true}(identity, (static(8), static(2)))))
   
