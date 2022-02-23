@@ -12,8 +12,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     @test_throws AssertionError SimpleChain((
         Activation(abs2), 
         TurboDense{true}(tanh, (static(24), static(8))), 
-        TurboDense{true}(identity, (static(10), static(2))), 
-        SquaredLoss(y))
+        TurboDense{true}(identity, (static(10), static(2))))
     )
 
 
