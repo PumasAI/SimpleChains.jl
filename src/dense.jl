@@ -422,7 +422,7 @@ dualeval!(f::typeof(identity), Cdual::AbstractArray{D}) where {T, P, D<:ForwardD
 end
 
 # maybe collapses dims 1 and 2 of a 3d array.
-collapse_dims12(::AbstractArray, A) = A
+_collapse_dims12(::AbstractArray, A) = A
 function collapse_dims12(A::PtrArray{S,(true,true),T,1,1,0,(1,2)}) where {S,T}
   M, N = size(A)
   sp = stridedpointer(A)
@@ -430,7 +430,7 @@ function collapse_dims12(A::PtrArray{S,(true,true),T,1,1,0,(1,2)}) where {S,T}
   x1, x2 = strides(sp)
   si = ArrayInterface.StrideIndex{2,(1,2),1}((x1,StaticInt(0)), (o1, o2))
   spnew = stridedpointer(pointer(sp), si)
-  PtrArray(sp, (M*N,StaticInt(1)), Val((true,true)))
+  PtrArray(spnew, (M*N,StaticInt(1)), Val((true,true)))
 end
 function collapse_dims12(A::PtrArray{S,(true,true,true),T,3,1,0,(1,2,3)}) where {S,T}
   M, N, P = size(A)
@@ -439,14 +439,14 @@ function collapse_dims12(A::PtrArray{S,(true,true,true),T,3,1,0,(1,2,3)}) where 
   x1, x2, x3 = strides(sp)
   si = ArrayInterface.StrideIndex{3,(1,2,3),1}((x1,StaticInt(0),x3), (o1, o2, o3))
   spnew = stridedpointer(pointer(sp), si)
-  PtrArray(sp, (M*N, StaticInt(1), P), Val((true,true,true)))
+  PtrArray(spnew, (M*N, StaticInt(1), P), Val((true,true,true)))
 end
 const Collapsible12PtrArray{S,T} = Union{PtrArray{S,(true,true),T,1,1,0,(1,2)},PtrArray{S,(true,true,true),T,3,1,0,(1,2,3)}}
-function collapse_dims12(A::Collapsible12PtrArray, O::AbstractArray)
+function _collapse_dims12(A::Collapsible12PtrArray, O::AbstractArray)
   StrideArray(collapse_dims12(A), O)
 end
 function collapse_dims12(A::AbstractArray)
-  collapse_dims12(PtrArray(A), A)
+  _collapse_dims12(PtrArray(A), A)
 end
 collapse_dims12(::AbstractArray, ::AbstractArray, A, B) = A, B
 function collapse_dims12(A::Collapsible12PtrArray, B::Collapsible12PtrArray, OA, OB)
