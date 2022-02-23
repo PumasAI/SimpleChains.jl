@@ -52,8 +52,8 @@ SquaredLoss"""
         @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
     end
 
-    p = SimpleChains.init_params(sc, T)
-    g = similar(p)
+    p = SimpleChains.init_params(sc, T);
+    g = similar(p);
     valgrad!(g, scflp, x, p)
     if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
         @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)[1]
@@ -119,9 +119,17 @@ SquaredLoss"""
         end
     end
     if T === Float64
-        @test g ≈ gfdd
+      @test g ≈ gfdd
     else
-        @test_broken g ≈ gfdd
+      @show g ≈ gfdd
+      @show isapprox(g, gfdd, rtol=1e-1)
+      @show isapprox(g, gfdd, rtol=1e-2)
+      @show isapprox(g, gfdd, rtol=1e-3)
+      @show isapprox(g, gfdd, rtol=1e-4)
+      @show isapprox(g, gfdd, rtol=1e-5)
+      @show isapprox(g, gfdd, rtol=1e-6)
+      @show isapprox(g, gfdd, rtol=1e-7)
+      @show isapprox(g, gfdd, rtol=1e-8)
     end
     # let g=g, sc=sc, x=x, p=p
     @test iszero(countallocations!(g, FrontLastPenalty(sc, L2Penalty(2.3), NoPenalty()), x, p))
