@@ -36,22 +36,23 @@ Base.show(io::IO, ::SquaredLoss) = print(io, "SquaredLoss")
 function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
   g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), StrideArraysCore.val_dense_dims(arg))
-  s = zero(eltype(g))
+  s = zero(T)
   @turbo for i ∈ eachindex(g)
     δ = arg[i] - y[i]
     g[i] = δ
     s += δ*δ
   end
-  return 0.5s, g, pu + sizeof(T)*length(g)
+  return T(0.5)*s, g, pu + sizeof(T)*length(g)
 end
 function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg, p, pu)
   y = getfield(sl, :y)
-  s = zero(promote_type(eltype(arg), eltype(y)))
+  T = Base.promote_eltype(arg, y)
+  s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
     s += δ*δ
   end
-  s, p, pu
+  T(0.5)*s, p, pu
 end
 
 

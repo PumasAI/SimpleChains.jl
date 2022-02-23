@@ -127,7 +127,7 @@ function chain_valgrad_entry!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::
   if parameter_free(l)
     val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
   else
-    val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+    val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
     pullback_param!(pg, l, grad, arg, p, pu)
   end
   return val
@@ -141,7 +141,7 @@ function chain_valgrad!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UI
 end
 function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where {X}
   l = getfield(layers,1)
-  pg2, val, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
+  __, val, _, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   # val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
   return val, lgrad, pu3

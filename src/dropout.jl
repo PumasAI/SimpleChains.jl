@@ -96,9 +96,9 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
   
   pg, x, p, align(pu + ((7+N) & -8))
 end
-@inline pullback_param!(pg::Ptr, d::Dropout, C̄, B, p::Ptr, pu::Ptr{UInt8}) = nothing
+@inline pullback_param!(::Ptr, ::Dropout, _, __, ::Ptr, ::Ptr{UInt8}) = nothing
 
-function pullback!(pg::Ptr{T}, d::Dropout, C̄, B, p::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T}
+function pullback!(::Ptr{T}, ::Dropout, C̄, B, ::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T}
   N = static_length(C̄)
   si = StrideIndex{1,(1,),1}((StaticInt(1),), (StaticInt(1),))
   m = PtrArray(stridedpointer(reinterpret(Ptr{Bit}, pu), si), (N,), Val((true,)))
