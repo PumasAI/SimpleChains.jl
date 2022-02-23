@@ -327,7 +327,7 @@ end
 
 function valgrad_layer!(pg::Ptr{T}, td::TurboDense{O}, B, p::Ptr{T}, pu::Ptr{UInt8}) where {T,O}
   batch_size = size(B, StaticInt(2))
-  pu2 = Base.unsafe_convert(Ptr{T}, pu + batch_size * getfield(td.dims,2) * sizeof(T))
+  pu2 = Base.unsafe_convert(Ptr{T}, pu + align(batch_size * getfield(td.dims,2) * sizeof(T)))
   C, _pu3 = alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(B))
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
   ∂C, _ = get∂C(td, C, pu)

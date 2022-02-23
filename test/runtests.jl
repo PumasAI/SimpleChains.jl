@@ -8,11 +8,14 @@ dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
 dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
 @testset "SimpleChains.jl" begin
-    x = rand(24, 199)
+  scbase = SimpleChain((Activation(abs2), TurboDense{true}(tanh, (static(24), static(8))), TurboDense{true}(identity, (static(8), static(2)))))
+  scdbase = SimpleChain((TurboDense{true}(tanh, (static(24), static(8))), Dropout(0.2), TurboDense{true}(identity, (static(8), static(2)))))
+  
+for T in (Float32, Float64)
+    x = rand(T, 24, 199)
 
-    y = StrideArray{Float64}(undef, (static(2), size(x, 2))) .= randn.() .* 10
-    sc = SimpleChain((Activation(abs2), TurboDense{true}(tanh, (static(24), static(8))), TurboDense{true}(identity, (static(8), static(2))), SquaredLoss(y)))
-
+    y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10
+    sc = SimpleChains.add_loss(scbase, SquaredLoss(y))
 
     @test first(Dropout(0.5)(x, pointer(x), pointer(sc.memory))) === x
     @test sum(iszero, x) == 0
@@ -44,7 +47,7 @@ SquaredLoss"""
         @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
     end
 
-    p = SimpleChains.init_params(sc, Float64)
+    p = SimpleChains.init_params(sc, T)
     g = similar(p)
     valgrad!(g, scflp, x, p)
     if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
@@ -82,11 +85,12 @@ SquaredLoss"""
     end
     @test g ≈ gfd
 
-    scd = SimpleChain((TurboDense{true}(tanh, (static(24), static(8))), Dropout(0.2), TurboDense{true}(identity, (static(8), static(2))), SquaredLoss(y)))
+    scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
     valgrad!(g, scd, x, p)
-    offset = SimpleChains.align(size(x, 2) * 8 * sizeof(Float64)) + SimpleChains.align(8 * size(x, 2) * 8)
+    offset = 2SimpleChains.align(first(scd.layers).dims[2] * size(x, 2) * sizeof(T))
     si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
     m = SimpleChains.StrideArray(SimpleChains.PtrArray(SimpleChains.stridedpointer(reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset), si), (size(x, 2) * 8,), Val((true,))), scd.memory)
+
     gfdd = ForwardDiff.gradient(p) do p
         off = 8 * 24
         A1 = reshape(view(p, 1:off), (8, 24))
@@ -109,8 +113,11 @@ SquaredLoss"""
             abs2(xi - yi)
         end
     end
-    @test g ≈ gfdd
-
+    if T === Float64
+        @test g ≈ gfdd
+    else
+        @test_broken g ≈ gfdd
+    end
     # let g=g, sc=sc, x=x, p=p
     @test iszero(countallocations!(g, FrontLastPenalty(sc, L2Penalty(2.3), NoPenalty()), x, p))
     @test iszero(countallocations!(g, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, p))
@@ -134,12 +141,22 @@ SquaredLoss"""
     bdd = view(pdd, 1+8*24:8*25)
     ldd = tanh.(Add * x .+ bdd)
     ldd_dd = tanh.(Add * xdd .+ bdd)
-    GC.@preserve pd pu begin
-        @test reinterpret(Float64, ld) ≈ reinterpret(Float64, td(x, pointer(pd), pointer(pu))[1])
-        @test reinterpret(Float64, ld_d) ≈ reinterpret(Float64, td(xd, pointer(pd), pointer(pu))[1])
+    if T === Float64
+        GC.@preserve pd pu begin
+            @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
+            @test reinterpret(T, ld_d) ≈ reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
 
-        @test reinterpret(Float64, ldd) ≈ reinterpret(Float64, td(x, pointer(pdd), pointer(pu))[1])
-        @test reinterpret(Float64, ldd_dd) ≈ reinterpret(Float64, td(xdd, pointer(pdd), pointer(pu))[1])
+            @test reinterpret(T, ldd) ≈ reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
+            @test reinterpret(T, ldd_dd) ≈ reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+        end
+    else
+        GC.@preserve pd pu begin
+            @test_broken reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
+            @test_broken reinterpret(T, ld_d) ≈ reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
+
+            @test_broken reinterpret(T, ldd) ≈ reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
+            @test_broken reinterpret(T, ldd_dd) ≈ reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+        end
     end
     @testset "training" begin
         p .= randn.() .* 100
@@ -165,6 +182,7 @@ SquaredLoss"""
         @test FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p) < vg2
 
     end
+end
 end
 Aqua.test_all(SimpleChains, ambiguities = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 
