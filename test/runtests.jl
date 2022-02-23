@@ -90,6 +90,14 @@ SquaredLoss"""
     @test g ≈ gfd
 
     scd = SimpleChain((TurboDense{true}(tanh, (static(24), static(8))), Dropout(0.2), TurboDense{true}(identity, (static(8), static(2))), SquaredLoss(y)))
+    @test sprint((io,t) -> show(io,t), scd) == """
+SimpleChain with the following layers:
+TurboDense (static(24), static(8)) with bias.
+Activation layer applying: tanh
+Dropout(p=0.2)
+TurboDense (static(8), static(2)) with bias.
+SquaredLoss"""
+  
     valgrad!(g, scd, x, p)
     offset = SimpleChains.align(size(x, 2) * 8 * sizeof(Float64)) + SimpleChains.align(8 * size(x, 2) * 8)
     si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
