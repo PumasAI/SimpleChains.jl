@@ -3,8 +3,29 @@ struct SimpleChain{N,L<:Tuple{Vararg{Any,N}}}
   layers::L
   memory::Vector{UInt8}
 end
-SimpleChain(l::Vararg) = SimpleChain(l, UInt8[])
-SimpleChain(l::Tuple) = SimpleChain(l, UInt8[])
+
+input_dims(_) = nothing
+function _check_input_dims(x, i)
+  d = input_dims(x)
+  d === nothing || @assert d == i
+end
+function _input_dims(t::Tuple{L,Vararg}) where {L}
+  l = first(t)
+  d = input_dims(l)
+  d === nothing ? _input_dims(Base.tail(t)) : d
+end 
+chain_input_dims(c::SimpleChain) = _input_dims(c.layers)
+
+_verify_chain(::Tuple{}, _) = nothing
+function _verify_chain(layers::Tuple{L,Vararg}, inputdim = _input_dims(layers)) where {L}
+  l = first(layers)
+  _check_input_dims(l, inputdim)
+  d = output_size(Val(Float32), l, (inputdim,))[2][1]
+  _verify_chain(Base.tail(layers), d)
+end
+
+SimpleChain(l::Vararg) = (_verify_chain(l); SimpleChain(l, UInt8[]))
+SimpleChain(l::Tuple) = (_verify_chain(l); SimpleChain(l, UInt8[]))
 Base.similar(c::SimpleChain) = SimpleChain(c.layers, similar(c.memory))
 
 _show(::IO, ::Tuple{}) = nothing

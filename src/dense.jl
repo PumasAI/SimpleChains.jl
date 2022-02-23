@@ -5,6 +5,8 @@ end
 
 TurboDense{B}(f::F, t::Tuple{I1,I2}) where {F,I1,I2,B} = TurboDense{B,Tuple{I1,I2},F}(f, t)
 TurboDense(f::F, t::Tuple{I1,I2}) where {F,I1,I2} = TurboDense{true,Tuple{I1,I2},F}(f, t)
+TurboDense{B}(f::F, d0::I0, d1::I1) where {F,I0,I1,B} = TurboDense{B,Tuple{I0,I1},F}(f, (d0,d1))
+TurboDense(f::F, d0::I0, d1::I1) where {F,I0,I1} = TurboDense{true,Tuple{I0,I1},F}(f, (d0,d1))
 
 function Base.show(io::IO, td::TurboDense{B}) where {B}
   w = B ? "with" : "without"
@@ -30,12 +32,12 @@ function output_size(::Val{T}, td::TurboDense, s::Tuple{Integer,Integer}) where 
   g1 = numparam(td) # for gradients
   s₂ = getfield(s, 2)
   g2 = getfield(td.dims, 1) * s₂ # for output
-  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), s₂)
+  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 2), s₂)
 end
 function output_size(::Val{T}, td::TurboDense, s::Tuple{Integer}) where {T}
   g1 = numparam(td) # for gradients
   g2 = getfield(td.dims, 1) # for output
-  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 1), )
+  align(static_sizeof(T) * g1) + align(static_sizeof(T) * g2), (getfield(td.dims, 2), )
 end
 fast_fuse(::typeof(relu)) = True()
 fast_fuse(::typeof(abs)) = True()
