@@ -7,7 +7,7 @@ end
 input_dims(_) = nothing
 function _check_input_dims(x, i)
   d = input_dims(x)
-  d === nothing || @assert d == i
+  d === nothing || d == i || throw(ArgumentError("Input size of one layer did not match the next."))
 end
 function _input_dims(t::Tuple{L,Vararg}) where {L}
   l = first(t)

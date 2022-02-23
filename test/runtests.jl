@@ -9,12 +9,11 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
 @testset "SimpleChains.jl" begin
     # Should throw, as 8 ≠ 10
-    @test_throws AssertionError SimpleChain((
+    @test_throws ArgumentError SimpleChain((
         Activation(abs2), 
         TurboDense{true}(tanh, (static(24), static(8))), 
         TurboDense{true}(identity, (static(10), static(2))))
     )
-
 
     x = rand(24, 199)
 
