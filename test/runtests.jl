@@ -91,6 +91,14 @@ SquaredLoss"""
     @test g ≈ gfd
 
     scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
+    @test sprint((io,t) -> show(io,t), scd) == """
+SimpleChain with the following layers:
+TurboDense (static(24), static(8)) with bias.
+Activation layer applying: tanh
+Dropout(p=0.2)
+TurboDense (static(8), static(2)) with bias.
+SquaredLoss"""
+  
     valgrad!(g, scd, x, p)
     offset = 2SimpleChains.align(first(scd.layers).dims[2] * size(x, 2) * sizeof(T))
     si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
