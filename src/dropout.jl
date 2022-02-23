@@ -18,7 +18,7 @@ getrng(d::Dropout{Nothing}) = local_rng()
 getrng(d::Dropout{<:VectorizedRNG.AbstractRNG}) = getfield(d, :rng)
 
 function Base.show(io::IO, d::Dropout)
-  print(io, "Dropout(p=$(Float64(d.rng)/0xffffffff))")
+  print(io, "Dropout(p=$(Float64(d.p)/0xffffffff))")
 end
 
 
