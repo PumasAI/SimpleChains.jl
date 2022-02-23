@@ -16,6 +16,7 @@ function _input_dims(t::Tuple{L,Vararg}) where {L}
 end 
 chain_input_dims(c::SimpleChain) = _input_dims(c.layers)
 
+
 _verify_chain(::Tuple{}, _) = nothing
 function _verify_chain(layers::Tuple{L,Vararg}, inputdim = _input_dims(layers)) where {L}
   l = first(layers)
@@ -23,6 +24,7 @@ function _verify_chain(layers::Tuple{L,Vararg}, inputdim = _input_dims(layers)) 
   d = output_size(Val(Float32), l, (inputdim,))[2][1]
   _verify_chain(Base.tail(layers), d)
 end
+
 
 SimpleChain(l::Vararg) = (_verify_chain(l); SimpleChain(l, UInt8[]))
 SimpleChain(l::Tuple) = (_verify_chain(l); SimpleChain(l, UInt8[]))
@@ -70,7 +72,21 @@ parameter_free(x) = numparam(x) == 0
   d2 > length(memory) && resize!(memory, d2)
   d
 end
+
+matches(x::Integer, y::Integer) = x == y
+matches(x::Tuple{Integer,Vararg}, y::Integer) = first(x) == y
+matches(x::Integer, y::Tuple{Integer,Vararg}) = x == first(y)
+matches(::Tuple{}, ::Tuple) = true
+function matches(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
+  matches(first(x), first(y)) && matches(Base.tail(x), Base.tail(y))
+end
+function verify_arg(c, arg)
+  if !matches(chain_input_dims(c), size(arg))
+    throw(ArgumentError("Input argument: !matches(chain_input_dims(c), size(arg))"))
+  end
+end
 function (c::SimpleChain)(arg, params)
+  verify_arg(c, arg)
   @unpack layers, memory = c
   resize_memory!(layers, memory, arg)
   unsafe_chain(layers, params, memory, arg)
@@ -96,6 +112,8 @@ end
 init_params!(::Tuple{}, p::Ptr) = nothing
 init_params(Λ::SimpleChain, ::Type{T} = Float32) where {T} = init_params!(Λ, Vector{T}(undef, numparam(Λ)))
 
+
+
 """
 Allowed destruction:
 
@@ -109,6 +127,7 @@ It is also allowed to destroy the previous layer's return `B` to produce `B̄` (
 Thus, the pullback is not allowed to depend on `C`, as it may have been destroyed in producing `C̄`.
 """
 function valgrad!(g, c::SimpleChain, arg, params)
+  verify_arg(c, arg)
   @unpack layers, memory = c
   resize_memory!(layers, memory, arg)
   unsafe_valgrad!(g, layers, params, memory, arg)
