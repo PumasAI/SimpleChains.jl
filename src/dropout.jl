@@ -96,7 +96,7 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
   
   pg, x, p, align(pu + ((7+N) & -8))
 end
-@inline pullback_param!(::Ptr, ::Dropout, #=C̄=#_, #=B=#__, ::Ptr, ::Ptr{UInt8}) = nothing
+@inline pullback_param!(::Ptr, ::Dropout, _, __, ::Ptr, ::Ptr{UInt8}) = nothing
 
 function pullback!(::Ptr{T}, ::Dropout, C̄, B, ::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T}
   N = static_length(C̄)
