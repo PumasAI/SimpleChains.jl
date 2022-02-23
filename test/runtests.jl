@@ -54,6 +54,11 @@ SquaredLoss"""
 
     p = SimpleChains.init_params(sc, T);
     g = similar(p);
+    @test_throws ArgumentError sc(rand(T,23,2), p)
+    @test_throws ArgumentError sc(rand(T,23), p)
+    @test_throws MethodError sc(Array{T,0}(undef), p)
+    @test_throws ArgumentError valgrad!(g, sc, rand(T,23,2), p)
+    @test_throws ArgumentError valgrad!(g, sc, rand(T,23), p)
     valgrad!(g, scflp, x, p)
     if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
         @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)[1]
