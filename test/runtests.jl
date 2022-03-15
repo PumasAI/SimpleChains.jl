@@ -210,5 +210,5 @@ SquaredLoss"""
     end
 end
 end
-Aqua.test_all(SimpleChains, ambiguities = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
+Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 
