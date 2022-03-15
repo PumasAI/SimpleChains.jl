@@ -14,7 +14,7 @@ struct Dropout{R <: Union{Nothing,VectorizedRNG.AbstractRNG}}
 end
 Dropout(x::T, rng = local_rng()) where {T <: Union{Float32,Float64}} = Dropout(Base.fptoui(UInt32, T(0xffffffff)*x), rng)
 
-getrng(d::Dropout{Nothing}) = local_rng()
+getrng(::Dropout{Nothing}) = local_rng()
 getrng(d::Dropout{<:VectorizedRNG.AbstractRNG}) = getfield(d, :rng)
 
 function Base.show(io::IO, d::Dropout)
@@ -23,10 +23,10 @@ end
 
 
 gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
-numparam(::Dropout) = 0
+numparam(::Dropout, id) = 0, id
 parameter_free(::Dropout) = true
 
-init_params!(::Dropout, p) = p
+init_params!(::Dropout, p, id) = p, id
 
 function (d::Dropout)(B::AbstractVecOrMat{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   x = muladd(T(d.p), -inv(T(typemax(UInt32))), one(T))

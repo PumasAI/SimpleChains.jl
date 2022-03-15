@@ -6,8 +6,8 @@ struct Activation{F}
   f::F
 end
 parameter_free(::Activation) = true
-numparam(::Activation) = 0
-init_params!(::Activation, p) = p
+numparam(::Activation, id) = 0, id
+init_params!(::Activation, p, id) = p, id
 _check_input_dims(::Activation, _) = nothing
 
 output_size(::Val{T}, a::Activation, s) where {T} = align(prod(s)*(2sizeof(T))), s

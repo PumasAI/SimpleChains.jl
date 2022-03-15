@@ -8,23 +8,20 @@ dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
 dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
 @testset "SimpleChains.jl" begin
-  @test_throws ArgumentError SimpleChain((
-    Activation(abs2), 
-    TurboDense{true}(tanh, (static(24), static(8))), 
-    TurboDense{true}(identity, (static(10), static(2))))
-  )
-  scbase = SimpleChain((Activation(abs2), TurboDense{true}(tanh, (static(24), static(8))), TurboDense{true}(identity, (static(8), static(2)))))
-  scdbase = SimpleChain((TurboDense{true}(tanh, (static(24), static(8))), Dropout(0.2), TurboDense{true}(identity, (static(8), static(2)))))
+
+  scbase = SimpleChain(static(24), (Activation(abs2), TurboDense{true}(tanh, static(8)), TurboDense{true}(identity, static(2))))
+  # static(24), 
+  scdbase = SimpleChain((TurboDense{true}(tanh, static(8)), Dropout(0.2), TurboDense{true}(identity, static(2))))
   
 for T in (Float32, Float64)
-    x = rand(T, 24, 199)
+    x = rand(T, 24, 199);
 
-    y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10
+    y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10;
     sc = SimpleChains.add_loss(scbase, SquaredLoss(y))
 
     @test first(Dropout(0.5)(x, pointer(x), pointer(sc.memory))) === x
     @test sum(iszero, x) == 0
-    x .= rand.()
+    x .= rand.();
 
     scflp = FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))
     print_str0 = """

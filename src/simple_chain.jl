@@ -1,9 +1,14 @@
 
-struct SimpleChain{N,L<:Tuple{Vararg{Any,N}}}
+struct InputDimUnknown end
+const InputDim=Union{InputDimUnknown,Integer,Tuple{Vararg{Integer}}}
+
+struct SimpleChain{N,I<:InputDim,L<:Tuple{Vararg{Any,N}}}
+  inputdim::I
   layers::L
   memory::Vector{UInt8}
 end
 
+#=
 input_dims(_) = nothing
 function _check_input_dims(x, i)
   d = input_dims(x)
@@ -14,7 +19,6 @@ function _input_dims(t::Tuple{L,Vararg}) where {L}
   d = input_dims(l)
   d === nothing ? _input_dims(Base.tail(t)) : d
 end 
-chain_input_dims(c::SimpleChain) = _input_dims(c.layers)
 
 
 _verify_chain(::Tuple{}, _) = nothing
@@ -24,11 +28,21 @@ function _verify_chain(layers::Tuple{L,Vararg}, inputdim = _input_dims(layers)) 
   d = output_size(Val(Float32), l, (inputdim,))[2][1]
   _verify_chain(Base.tail(layers), d)
 end
+=#
+chain_input_dims(c::SimpleChain) = c.inputdim
 
+function SimpleChain(input_dim::InputDim, l::Vararg)
+  SimpleChain(input_dim, l, UInt8[])
+end
+function SimpleChain(input_dim::InputDim, l::Tuple)
+  SimpleChain(input_dim, l, UInt8[])
+end
+SimpleChain(l::Vararg) = SimpleChain(InputDimUnknown(), l, UInt8[])
+SimpleChain(l::Tuple) = SimpleChain(InputDimUnknown(), l, UInt8[])
 
-SimpleChain(l::Vararg) = (_verify_chain(l); SimpleChain(l, UInt8[]))
-SimpleChain(l::Tuple) = (_verify_chain(l); SimpleChain(l, UInt8[]))
-Base.similar(c::SimpleChain) = SimpleChain(c.layers, similar(c.memory))
+function Base.similar(c::SimpleChain)
+  SimpleChain(chain_input_dims(c), c.layers, similar(c.memory))
+end
 
 _show(::IO, ::Tuple{}) = nothing
 function _show(io::IO, t::Tuple{T,Vararg}) where {T}
@@ -47,8 +61,8 @@ end
 
 Useful for popping off a loss layer.
 """
-Base.front(c::SimpleChain) = SimpleChain(Base.front(c.layers), c.memory)
-Base.vcat(c::SimpleChain, l) = SimpleChain((c.layers...,l), c.memory)
+Base.front(c::SimpleChain) = SimpleChain(chain_input_dims(c), Base.front(c.layers), c.memory)
+Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers...,l), c.memory)
 
 
 # output_size must be defined to return the total size of all outputs
@@ -58,12 +72,19 @@ function output_size(::Val{T}, x::Tuple{X}, s1) where {T,X}
   b
 end
 function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1) where {T,X1,X2}
+  # Main._a[] = (T, x, s1)
   b, s2 = output_size(Val{T}(), getfield(x,1), s1)
   b + output_size(Val{T}(), Base.tail(x), s2)
 end
-numparam(c::SimpleChain) = _numparam(0, c.layers)
-_numparam(s, ::Tuple{}) = s
-_numparam(s, layers::Tuple{L,Vararg}) where {L} = _numparam(s + numparam(getfield(layers, 1)), Base.tail(layers))
+function numparam(c::SimpleChain, id = nothing)
+  _id = chain_input_dims(c, id)
+  _numparam(0, c.layers, _id)
+end
+_numparam(s, ::Tuple{}, _) = s
+function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
+  np, od = numparam(getfield(layers, 1), id)
+  _numparam(s + np, Base.tail(layers), od)
+end
 parameter_free(x) = numparam(x) == 0
 
 @inline function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}, additional = static(0)) where {T}
@@ -73,6 +94,7 @@ parameter_free(x) = numparam(x) == 0
   d
 end
 
+matches(::InputDimUnknown, _) = true
 matches(x::Integer, y::Integer) = x == y
 matches(x::Tuple{Integer,Vararg}, y::Integer) = first(x) == y
 matches(x::Integer, y::Tuple{Integer,Vararg}) = x == first(y)
@@ -101,18 +123,62 @@ function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T
   _chain(res, Base.tail(l), p, pu)
 end
 
-function init_params!(chn::SimpleChain, x::AbstractVector)
-  GC.@preserve x init_params!(chn.layers, pointer(x))
+@inline function _try_static(i::Integer, j::Integer)
+  @assert i == j
+  return i
+end
+@inline function _try_static(::StaticInt{I}, j::Integer) where {I}
+  @assert I == j
+  return StaticInt{I}()
+end
+@inline function _try_static(j::Integer, ::StaticInt{I}) where {I}
+  @assert I == j
+  return StaticInt{I}()
+end
+@inline function _try_static(::StaticInt{I}, ::StaticInt{J}) where {I,J}
+  throw(ArgumentError("StaticInt{$I}() != StaticInt{$J}()"))
+end
+@inline _try_static(::StaticInt{I}, ::StaticInt{I}) where {I} = StaticInt{I}()
+
+@inline _try_static(::Tuple{}, ::Tuple{}) = ()
+@inline function _try_static(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
+  (
+    _try_static(first(x), first(y)),
+    _try_static(Base.tail(x), Base.tail(y))...
+   )
+end
+
+chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, id) = id
+function chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, ::Nothing)
+  throw(ArgumentError("SimpleChains without an explicitly provided InputDim require manually providing it when calling `init_params`"))
+end
+chain_input_dims(chn::SimpleChain, ::Nothing) = chain_input_dims(chn)
+function chain_input_dims(chn::SimpleChain, id::InputDim)
+  _try_static(chain_input_dims(chn), id)
+end
+
+function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
+  GC.@preserve x begin
+    init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
+  end
   return x
 end
-function init_params!(layers::Tuple, p::Ptr)
-  p = init_params!(first(layers), p)
-  init_params!(Base.tail(layers), p)
+function init_params!(layers::Tuple, p::Ptr, id)
+  p, od = init_params!(first(layers), p, id)
+  init_params!(Base.tail(layers), p, od)
 end
-init_params!(::Tuple{}, p::Ptr) = nothing
-init_params(Λ::SimpleChain, ::Type{T} = Float32) where {T} = init_params!(Λ, Vector{T}(undef, numparam(Λ)))
-
-
+init_params!(::Tuple{}, p::Ptr, _) = nothing
+function init_params(
+  Λ::SimpleChain,
+  id::Union{Nothing,InputDim} = nothing,
+  ::Type{T} = Float32
+) where {T}
+  _id = chain_input_dims(Λ, id)
+  init_params!(Λ, Vector{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id))
+end
+function init_params(Λ::SimpleChain, ::Type{T}) where {T}
+  init_params(Λ, nothing, T)
+end
 
 """
 Allowed destruction:
@@ -172,8 +238,10 @@ function valgrad(sc, arg, params::AbstractVector{T}) where {T}
   off = align(resize_memory!(layers, memory, arg))
   GC.@preserve memory begin
     g = PtrArray(reinterpret(Ptr{T}, pointer(memory)+off), (static_length(params),))
-    l = unsafe_valgrad!(g, layers, params, memory, arg)
-    l = Base.FastMath.add_fast(l, apply_penalty!(g, getpenalty(sc), params))
+    l = Base.FastMath.add_fast(
+      unsafe_valgrad!(g, layers, params, memory, arg),
+      apply_penalty!(g, getpenalty(sc), params, size(arg))
+    )
   end
   return l, StrideArraysCore.StrideArray(g, memory)
 end
