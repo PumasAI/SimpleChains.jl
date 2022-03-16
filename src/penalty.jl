@@ -62,8 +62,8 @@ struct NoPenalty{NN} <: AbstractPenalty{NN}
 end
 getchain(p::NoPenalty) = getfield(p,:chn)
 NoPenalty() = NoPenalty(nothing)
-apply_penalty(::NoPenalty, _, __) = Static.Zero()
-apply_penalty!(_, ::NoPenalty, __, ___) = Static.Zero()
+apply_penalty(::NoPenalty, _) = Static.Zero()
+apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
 (::NoPenalty)(chn::SimpleChain) = NoPenalty(chn)
 getpenalty(sc::SimpleChain) = NoPenalty(sc)
 getpenalty(Λ::AbstractPenalty) = Λ

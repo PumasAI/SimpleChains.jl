@@ -24,21 +24,21 @@ for T in (Float32, Float64)
     x .= rand.();
 
     scflp = FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))
-    print_str0 = """
+print_str0 = """
 SimpleChain with the following layers:
 Activation layer applying: abs2
-TurboDense (static(24), static(8)) with bias.
+TurboDense static(8) with bias.
 Activation layer applying: tanh
-TurboDense (static(8), static(2)) with bias.
+TurboDense static(2) with bias.
 SquaredLoss"""
-    print_str1 = """
+print_str1 = """
 Penalty on all but last layer: L2Penalty (λ=2.3)
 Penalty on last layer: L1Penalty (λ=0.45) applied to:
 SimpleChain with the following layers:
 Activation layer applying: abs2
-TurboDense (static(24), static(8)) with bias.
+TurboDense static(8) with bias.
 Activation layer applying: tanh
-TurboDense (static(8), static(2)) with bias.
+TurboDense static(2) with bias.
 SquaredLoss"""
 
     @test sprint((io, t) -> show(io, t), sc) == print_str0
@@ -57,13 +57,13 @@ SquaredLoss"""
     @test_throws ArgumentError valgrad!(g, sc, rand(T,23,2), p)
     @test_throws ArgumentError valgrad!(g, sc, rand(T,23), p)
     valgrad!(g, scflp, x, p)
-    if VERSION < v"1.8-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
+    if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
         @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)[1]
         _gzyg = Zygote.gradient(p) do p
             0.5 * sum(abs2, Base.front(sc)(x, p) .- y)
-        end
-        gzyg = copy(_gzyg[1])
-        g2 = similar(g)
+        end;
+        gzyg = copy(_gzyg[1]);
+        g2 = similar(g);
         valgrad!(g2, sc, x, p)
         @test g2 ≈ gzyg
     end
@@ -95,16 +95,16 @@ SquaredLoss"""
     scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
     @test sprint((io,t) -> show(io,t), scd) == """
 SimpleChain with the following layers:
-TurboDense (static(24), static(8)) with bias.
+TurboDense static(8) with bias.
 Activation layer applying: tanh
 Dropout(p=0.2)
-TurboDense (static(8), static(2)) with bias.
+TurboDense static(2) with bias.
 SquaredLoss"""
   
     valgrad!(g, scd, x, p)
-    offset = 2SimpleChains.align(first(scd.layers).dims[2] * size(x, 2) * sizeof(T))
+    offset = 2SimpleChains.align(first(scd.layers).output * size(x, 2) * sizeof(T))
     si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
-    m = SimpleChains.StrideArray(SimpleChains.PtrArray(SimpleChains.stridedpointer(reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset), si), (size(x, 2) * 8,), Val((true,))), scd.memory)
+    m = SimpleChains.StrideArray(SimpleChains.PtrArray(SimpleChains.stridedpointer(reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset), si), (size(x, 2) * 8,), Val((true,))), scd.memory);
 
     gfdd = ForwardDiff.gradient(p) do p
         off = 8 * 24
@@ -127,7 +127,7 @@ SquaredLoss"""
         0.5mapreduce(+, vec(l2), y.data) do xi, yi
             abs2(xi - yi)
         end
-    end
+    end;
     if T === Float64
       @test g ≈ gfdd
     else
@@ -146,24 +146,24 @@ SquaredLoss"""
     @test iszero(countallocations!(g, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, p))
     # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 
-    td = TurboDense{true}(tanh, (static(24), static(8)))
-    pd = dual.(p)
-    xd = dual.(x)
+    td = TurboDense{true}(tanh, static(8));
+    pd = dual.(p);
+    xd = dual.(x);
 
-    pdd = dual.(pd)
-    xdd = dual.(xd)
+    pdd = dual.(pd);
+    xdd = dual.(xd);
 
-    pu = Vector{UInt8}(undef, first(SimpleChains.output_size(Val(eltype(xdd)), td, size(x))))
+    pu = Vector{UInt8}(undef, first(SimpleChains.output_size(Val(eltype(xdd)), td, size(x))));
 
-    Ad = reshape(view(pd, 1:8*24), (8, 24))
-    bd = view(pd, 1+8*24:8*25)
-    ld = tanh.(Ad * x .+ bd)
-    ld_d = tanh.(Ad * xd .+ bd)
+    Ad = reshape(view(pd, 1:8*24), (8, 24));
+    bd = view(pd, 1+8*24:8*25);
+    ld = tanh.(Ad * x .+ bd);
+    ld_d = tanh.(Ad * xd .+ bd);
 
-    Add = reshape(view(pdd, 1:8*24), (8, 24))
-    bdd = view(pdd, 1+8*24:8*25)
-    ldd = tanh.(Add * x .+ bdd)
-    ldd_dd = tanh.(Add * xdd .+ bdd)
+    Add = reshape(view(pdd, 1:8*24), (8, 24));
+    bdd = view(pdd, 1+8*24:8*25);
+    ldd = tanh.(Add * x .+ bdd);
+    ldd_dd = tanh.(Add * xdd .+ bdd);
     if T === Float64
         GC.@preserve pd pu begin
             @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
@@ -182,26 +182,26 @@ SquaredLoss"""
         end
     end
     @testset "training" begin
-        p .= randn.() .* 100
+        p .= randn.() .* 100;
         # small penalties since we don't care about overfitting here
         vg1 = valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p)
-        SimpleChains.train!(g, p, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, SimpleChains.ADAM(), 1000)
-        @test valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p) < vg1
-        p .= randn.() .* 100
-        vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p)
-        SimpleChains.train!(g, p, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, SimpleChains.ADAM(), 1000)
-        @test FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p) < vg2
+        SimpleChains.train!(g, p, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, SimpleChains.ADAM(), 1000);
+        @test valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p) < vg1;
+        p .= randn.() .* 100;
+        vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p);
+        SimpleChains.train!(g, p, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, SimpleChains.ADAM(), 1000);
+        @test FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p) < vg2;
     end
     @testset "vector of targets" begin
-        p .= randn.() .* 100
-        ys = [@. y + 0.1randn() for _ in 1:1000]
+        p .= randn.() .* 100;
+        ys = [@. y + 0.1randn() for _ in 1:1000];
         # small penalties since we don't care about overfitting here
         vg1 = valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p)
-        SimpleChains.train_unbatched!(g, p, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, SimpleChains.ADAM(), ys)
-        @test valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p) < vg1
-        p .= randn.() .* 100
-        vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p)
-        SimpleChains.train_unbatched!(g, p, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, SimpleChains.ADAM(), ys)
+        SimpleChains.train_unbatched!(g, p, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, SimpleChains.ADAM(), ys);
+        @test valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p) < vg1;
+        p .= randn.() .* 100;
+        vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p);
+        SimpleChains.train_unbatched!(g, p, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, SimpleChains.ADAM(), ys);
         @test FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p) < vg2
 
     end

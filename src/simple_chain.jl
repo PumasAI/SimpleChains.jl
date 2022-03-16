@@ -140,14 +140,16 @@ end
 end
 @inline _try_static(::StaticInt{I}, ::StaticInt{I}) where {I} = StaticInt{I}()
 
-@inline _try_static(::Tuple{}, ::Tuple{}) = ()
+@inline _try_static(::Tuple{}, ::Tuple{Vararg}) = ()
 @inline function _try_static(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
   (
     _try_static(first(x), first(y)),
     _try_static(Base.tail(x), Base.tail(y))...
    )
 end
-
+@inline function _try_static(j::Integer, i::Tuple{I,Vararg}) where {I}
+    (_try_static(j, first(i)), Base.tail(i)...)
+end
 chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, id) = id
 function chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, ::Nothing)
   throw(ArgumentError("SimpleChains without an explicitly provided InputDim require manually providing it when calling `init_params`"))

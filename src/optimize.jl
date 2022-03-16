@@ -55,6 +55,7 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
   fl = Base.front(layers);
   ll = last(layers);
   optoff = optmemsize(opt, p)
+  sx = ArrayInterface.size(X)
   resize_memory!(layers, memory, X, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   GC.@preserve p g memory begin
@@ -62,7 +63,7 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
     for y ∈ t
       layers_y = (fl..., ll(y))
       chain_valgrad_entry!(pg, X, layers_y, pp, pm)
-      apply_penalty!(g, pen, p)
+      apply_penalty!(g, pen, p, sx)
       update!(opt, optbuffer, p, g)
     end
   end
@@ -71,6 +72,7 @@ end
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
   chn = getchain(_chn)
   pen = getpenalty(_chn)
+  sx = ArrayInterface.size(X)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
   resize_memory!(layers, memory, X, optoff)
@@ -79,7 +81,7 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::I
     pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
       chain_valgrad_entry!(pg, X, layers, pp, pm)
-      apply_penalty!(g, pen, p)
+      apply_penalty!(g, pen, p, sx)
       update!(opt, optbuffer, p, g)
     end
   end
@@ -110,12 +112,16 @@ end
   mₖ, nₖ = LoopVectorization.matmul_params(RS, RC, CLS; M, K, N, W)
   StaticInt(nₖ)
 end
-@inline function batch_size(layers::Tuple{L,Vararg}, N::Integer, ::Val{T}) where {T,L<:TurboDense}
-  id, od = getfield(getfield(layers,1), :dims) # (od × id) * (id x N)
+@inline function batch_size(
+  layers::Tuple{L,Vararg}, argsz::Tuple{I,J}, ::Val{T}
+) where {T,L<:TurboDense,I,J}
+  id, N = argsz
+  od = first(layers).output
+  # id, od = getfield(getfield(layers,1), :dims) # (od × id) * (id x N)
   turbo_dense_batch_size(id, od, N, VectorizationBase.pick_vector_width(T), VectorizationBase.register_size(), VectorizationBase.register_count(), VectorizationBase.cache_linesize())
 end
-@inline batch_size(layers::Tuple{L,Vararg}, N::Integer, ::Val{T}) where {L,T} = batch_size(Base.tail(layers), N, Val(T))
-@inline batch_size(layers::Tuple{}, ::Integer, ::Val{T}) where {T} = Static(18)
+@inline batch_size(layers::Tuple{L,Vararg}, argsz::Tuple, ::Val{T}) where {L,T} = batch_size(Base.tail(layers), argsz, Val(T))
+@inline batch_size(::Tuple{}, ::Tuple, ::Val{T}) where {T} = Static(18)
 
 @inline view_slice_last(X::AbstractArray{<:Any,1}, r) = view(X, r)
 @inline view_slice_last(X::AbstractArray{<:Any,2}, r) = view(X, :, r)
@@ -129,11 +135,12 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   optoff = optmemsize(opt, p)
   resize_memory!(layers, memory, X, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  N = ArrayInterface.size(X)[end]
-  N_bs = batch_size(layers, N, Val(promote_type(eltype(p), eltype(X))))
+  sx = ArrayInterface.size(X) 
+  N = sx[end]
+  N_bs = batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X))))
   d, r = divrem(N, N_bs)
-  Ssize = (Base.front(ArrayInterface.size(X))..., N_bs)
-  Ssize_rem = (Base.front(ArrayInterface.size(X))..., r)
+  Ssize = (Base.front(sx)..., N_bs)
+  Ssize_rem = (Base.front(sx)..., r)
   GC.@preserve p g memory begin
     pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
@@ -144,7 +151,7 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
           Xp = PtrArray(stridedpointer(Xd), Ssize, StrideArraysCore.val_dense_dims(Xd))
           chain_valgrad_entry!(pg, Xp, layers, pp, pm)
         end
-        apply_penalty!(g, pen, p)
+        apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
         doff += N_bs
       end
@@ -154,7 +161,7 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
           Xp = PtrArray(stridedpointer(Xd), Ssize_rem, StrideArraysCore.val_dense_dims(Xd))
           chain_valgrad_entry!(pg, Xp, layers, pp, pm)
         end
-        apply_penalty!(g, pen, p)
+        apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
       end
     end
