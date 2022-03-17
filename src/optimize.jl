@@ -50,19 +50,20 @@ end
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
   chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
   fl = Base.front(layers);
   ll = last(layers);
   optoff = optmemsize(opt, p)
-  sx = ArrayInterface.size(X)
-  resize_memory!(layers, memory, X, optoff)
+  sx = ArrayInterface.size(pX)
+  resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  GC.@preserve p g memory begin
+  GC.@preserve p g memory X begin
     pg = pointer(g); pp = pointer(p)
     for y ∈ t
       layers_y = (fl..., ll(y))
-      chain_valgrad_entry!(pg, X, layers_y, pp, pm)
+      chain_valgrad_entry!(pg, pX, layers_y, pp, pm)
       apply_penalty!(g, pen, p, sx)
       update!(opt, optbuffer, p, g)
     end
@@ -71,16 +72,17 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
 end
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
   chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
-  sx = ArrayInterface.size(X)
+  sx = ArrayInterface.size(pX)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  resize_memory!(layers, memory, X, optoff)
+  resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  GC.@preserve p g memory begin
+  GC.@preserve p g memory X begin
     pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
-      chain_valgrad_entry!(pg, X, layers, pp, pm)
+      chain_valgrad_entry!(pg, pX, layers, pp, pm)
       apply_penalty!(g, pen, p, sx)
       update!(opt, optbuffer, p, g)
     end
@@ -130,37 +132,34 @@ end
 @inline view_slice_last(X::AbstractArray{<:Any,5}, r) = view(X, :, :, :, :, r)
 function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  resize_memory!(layers, memory, X, optoff)
+  resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  sx = ArrayInterface.size(X) 
+  sx = ArrayInterface.size(pX) 
   N = sx[end]
   N_bs = batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X))))
   d, r = divrem(N, N_bs)
   Ssize = (Base.front(sx)..., N_bs)
   Ssize_rem = (Base.front(sx)..., r)
-  GC.@preserve p g memory begin
+  GC.@preserve p g memory X begin
     pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
       doff = 0
       for d in 1:d
-        GC.@preserve X begin
-          Xd = view_slice_last(X, doff+1:doff+N_bs)
-          Xp = PtrArray(stridedpointer(Xd), Ssize, StrideArraysCore.val_dense_dims(Xd))
-          chain_valgrad_entry!(pg, Xp, layers, pp, pm)
-        end
+        Xd = view_slice_last(pX, doff+1:doff+N_bs)
+        Xp = PtrArray(stridedpointer(Xd), Ssize, StrideArraysCore.val_dense_dims(Xd))
+        chain_valgrad_entry!(pg, Xp, layers, pp, pm)
         apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
         doff += N_bs
       end
       if r ≠ 0
-        GC.@preserve X begin
-          Xd = view_slice_last(X, doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]))
-          Xp = PtrArray(stridedpointer(Xd), Ssize_rem, StrideArraysCore.val_dense_dims(Xd))
-          chain_valgrad_entry!(pg, Xp, layers, pp, pm)
-        end
+        Xd = view_slice_last(pX, doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]))
+        Xp = PtrArray(stridedpointer(Xd), Ssize_rem, StrideArraysCore.val_dense_dims(Xd))
+        chain_valgrad_entry!(pg, Xp, layers, pp, pm)
         apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
       end

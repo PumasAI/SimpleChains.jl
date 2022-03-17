@@ -182,6 +182,11 @@ function init_params(Λ::SimpleChain, ::Type{T}) where {T}
   init_params(Λ, nothing, T)
 end
 
+maybe_static_size_arg(_, arg) = arg
+function maybe_static_size_arg(s::Tuple, arg::Array)
+  PtrArray(pointer(arg), _try_static(s, size(arg)))
+end
+
 """
 Allowed destruction:
 
@@ -198,11 +203,13 @@ function valgrad!(g, c::SimpleChain, arg, params)
   verify_arg(c, arg)
   @unpack layers, memory = c
   resize_memory!(layers, memory, arg)
-  unsafe_valgrad!(g, layers, params, memory, arg)
+  GC.@preserve arg begin
+    unsafe_valgrad!(g, layers, params, memory, maybe_static_size_arg(c.inputdim, arg))
+  end
 end
 
 function unsafe_valgrad!(g, layers, params, memory::Vector{UInt8}, arg)
-  GC.@preserve g params memory begin
+  GC.@preserve g params memory arg begin
     # @show pointer(g) pointer(params) pointer(memory)
     chain_valgrad_entry!(pointer(g), arg, layers, pointer(params), pointer(memory))
   end
@@ -238,11 +245,12 @@ function valgrad(sc, arg, params::AbstractVector{T}) where {T}
   c = getchain(sc)
   @unpack layers, memory = c
   off = align(resize_memory!(layers, memory, arg))
-  GC.@preserve memory begin
+  parg = maybe_static_size_arg(c.inputdim, arg)
+  GC.@preserve memory arg begin
     g = PtrArray(reinterpret(Ptr{T}, pointer(memory)+off), (static_length(params),))
     l = Base.FastMath.add_fast(
-      unsafe_valgrad!(g, layers, params, memory, arg),
-      apply_penalty!(g, getpenalty(sc), params, size(arg))
+      unsafe_valgrad!(g, layers, params, memory, parg),
+      apply_penalty!(g, getpenalty(sc), params, size(parg))
     )
   end
   return l, StrideArraysCore.StrideArray(g, memory)

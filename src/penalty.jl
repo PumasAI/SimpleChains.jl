@@ -24,9 +24,6 @@ function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
     apply_penalty!(g, Λ, params, size(arg))
   )
 end
-# function unsafe_valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
-#   Base.FastMath.add_fast(unsafe_valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
-# end
 
 _penalty_applied_to_sc(_::IO, ::Nothing) = nothing
 function _penalty_applied_to_sc(io::IO, sc::SimpleChain)
