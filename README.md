@@ -18,12 +18,14 @@ x = rand(24, 200); # 24 inputs per 200 observations
 y = StrideArray{Float64}(undef, (static(2),200)) .= randn.() .* 10;
 
 schain = SimpleChain(
-  static(24), (
-  TurboDense{true}(tanh, static(8)), # 24 x 8 dense layer with bias and `tanh` activation
-  SimpleChains.Dropout(0.2), # dropout layer
-  TurboDense{false}(identity, static(2)), # 8 x 2 dense layer without bias and `identity` activation
-  SquaredLoss(y) # squared error loss function
-));
+  static(24), # input dimension (optional)
+  (
+    TurboDense{true}(tanh, static(8)), # dense layer with bias that maps to 8 outputs and applies `tanh` activation
+    SimpleChains.Dropout(0.2), # dropout layer
+    TurboDense{false}(identity, static(2)), # dense layer without bias that maps to 2 outputs and `identity` activation
+    SquaredLoss(y)
+  ) # squared error loss function
+);
 
 p = randn(SimpleChains.numparam(schain)); # something like glorot would probably be a better way to initialize
 g = similar(p);

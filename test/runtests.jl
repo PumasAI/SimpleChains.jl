@@ -8,12 +8,19 @@ dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
 dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
 @testset "SimpleChains.jl" begin
-
-  scbase = SimpleChain(static(24), (Activation(abs2), TurboDense{true}(tanh, static(8)), TurboDense{true}(identity, static(2))))
-  # static(24), 
-  scdbase = SimpleChain((TurboDense{true}(tanh, static(8)), Dropout(0.2), TurboDense{true}(identity, static(2))))
+  @test isempty(Test.detect_unbound_args(SimpleChains))
+  @test isempty(Test.detect_ambiguities(SimpleChains))
   
-for T in (Float32, Float64)
+  for T in (Float32, Float64)
+
+    if T === Float32 # test construction using tuples
+      scbase = SimpleChain(static(24), (Activation(abs2), TurboDense{true}(tanh, static(8)), TurboDense{true}(identity, static(2)))) # test inputdim
+      scdbase = SimpleChain((TurboDense{true}(tanh, static(8)), Dropout(0.2), TurboDense{true}(identity, static(2)))) # test inputdim unknown
+    else # test construction using `Vararg`
+      scbase = SimpleChain(static(24), Activation(abs2), TurboDense{true}(tanh, static(8)), TurboDense{true}(identity, static(2))) # test inputdim
+      scdbase = SimpleChain(TurboDense{true}(tanh, static(8)), Dropout(0.2), TurboDense{true}(identity, static(2))) # test inputdim unknown
+    end
+    
     x = rand(T, 24, 199);
 
     y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10;
@@ -102,7 +109,7 @@ TurboDense static(2) with bias.
 SquaredLoss"""
   
     valgrad!(g, scd, x, p)
-    offset = 2SimpleChains.align(first(scd.layers).output * size(x, 2) * sizeof(T))
+    offset = 2SimpleChains.align(first(scd.layers).outputdim * size(x, 2) * sizeof(T))
     si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
     m = SimpleChains.StrideArray(SimpleChains.PtrArray(SimpleChains.stridedpointer(reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset), si), (size(x, 2) * 8,), Val((true,))), scd.memory);
 

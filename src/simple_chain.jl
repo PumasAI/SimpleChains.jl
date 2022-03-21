@@ -1,6 +1,6 @@
 
 struct InputDimUnknown end
-const InputDim=Union{InputDimUnknown,Integer,Tuple{Vararg{Integer}}}
+const InputDim=Union{InputDimUnknown,Tuple{Vararg{Integer}}}
 
 struct SimpleChain{N,I<:InputDim,L<:Tuple{Vararg{Any,N}}}
   inputdim::I
@@ -31,12 +31,11 @@ end
 =#
 chain_input_dims(c::SimpleChain) = c.inputdim
 
-function SimpleChain(input_dim::InputDim, l::Vararg)
-  SimpleChain(input_dim, l, UInt8[])
-end
-function SimpleChain(input_dim::InputDim, l::Tuple)
-  SimpleChain(input_dim, l, UInt8[])
-end
+SimpleChain(input_dim::Integer, l::Vararg) = SimpleChain((input_dim,), l, UInt8[])
+SimpleChain(input_dim::Integer, l::Tuple) = SimpleChain((input_dim,), l, UInt8[])
+SimpleChain(input_dim::InputDim, l::Vararg) = SimpleChain(input_dim, l, UInt8[])
+SimpleChain(input_dim::InputDim, l::Tuple) = SimpleChain(input_dim, l, UInt8[])
+
 SimpleChain(l::Vararg) = SimpleChain(InputDimUnknown(), l, UInt8[])
 SimpleChain(l::Tuple) = SimpleChain(InputDimUnknown(), l, UInt8[])
 
@@ -68,10 +67,9 @@ Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers...,l),
 # output_size must be defined to return the total size of all outputs
 output_size(::Val{T}, x::Tuple{}, _) where {T} = 0
 function output_size(::Val{T}, x::Tuple{X}, s1) where {T,X}
-  b, _ = output_size(Val{T}(), getfield(x,1), s1)
-  b
+  first(output_size(Val{T}(), getfield(x,1), s1))
 end
-function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1) where {T,X1,X2}
+function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple) where {T,X1,X2}
   # Main._a[] = (T, x, s1)
   b, s2 = output_size(Val{T}(), getfield(x,1), s1)
   b + output_size(Val{T}(), Base.tail(x), s2)
@@ -87,8 +85,8 @@ function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
 end
 parameter_free(x) = numparam(x) == 0
 
-@inline function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractVecOrMat{T}, additional = static(0)) where {T}
-  d = output_size(Val(T), layers, ArrayInterface.size(arg)) + additional
+@inline function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractArray{T}, additional = static(0)) where {T}
+  d = output_size(Val(T), layers, size(arg)) + additional
   d2 = 2d
   d2 > length(memory) && resize!(memory, d2)
   d
@@ -110,8 +108,9 @@ end
 function (c::SimpleChain)(arg, params)
   verify_arg(c, arg)
   @unpack layers, memory = c
-  resize_memory!(layers, memory, arg)
-  unsafe_chain(layers, params, memory, arg)
+  parg = maybe_static_size_arg(c.inputdim, arg)
+  resize_memory!(layers, memory, parg)
+  GC.@preserve arg unsafe_chain(layers, params, memory, parg)
 end
 function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
   GC.@preserve params memory _chain(arg, layers, pointer(params), pointer(memory))
@@ -140,7 +139,7 @@ end
 end
 @inline _try_static(::StaticInt{I}, ::StaticInt{I}) where {I} = StaticInt{I}()
 
-@inline _try_static(::Tuple{}, ::Tuple{Vararg}) = ()
+@inline _try_static(::Tuple{}, x::Tuple{Vararg}) = x
 @inline function _try_static(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
   (
     _try_static(first(x), first(y)),
@@ -150,13 +149,13 @@ end
 @inline function _try_static(j::Integer, i::Tuple{I,Vararg}) where {I}
     (_try_static(j, first(i)), Base.tail(i)...)
 end
-chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, id) = id
+chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, inputdim::Tuple{Vararg{Integer}}) = inputdim
 function chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, ::Nothing)
   throw(ArgumentError("SimpleChains without an explicitly provided InputDim require manually providing it when calling `init_params`"))
 end
 chain_input_dims(chn::SimpleChain, ::Nothing) = chain_input_dims(chn)
-function chain_input_dims(chn::SimpleChain, id::InputDim)
-  _try_static(chain_input_dims(chn), id)
+function chain_input_dims(chn::SimpleChain, inputdim::Tuple{Vararg{Integer}})
+  _try_static(chain_input_dims(chn), inputdim)
 end
 
 function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
@@ -202,9 +201,10 @@ Thus, the pullback is not allowed to depend on `C`, as it may have been destroye
 function valgrad!(g, c::SimpleChain, arg, params)
   verify_arg(c, arg)
   @unpack layers, memory = c
-  resize_memory!(layers, memory, arg)
+  parg = maybe_static_size_arg(c.inputdim, arg)
+  resize_memory!(layers, memory, parg)
   GC.@preserve arg begin
-    unsafe_valgrad!(g, layers, params, memory, maybe_static_size_arg(c.inputdim, arg))
+    unsafe_valgrad!(g, layers, params, memory, parg)
   end
 end
 
@@ -244,8 +244,8 @@ end
 function valgrad(sc, arg, params::AbstractVector{T}) where {T}
   c = getchain(sc)
   @unpack layers, memory = c
-  off = align(resize_memory!(layers, memory, arg))
   parg = maybe_static_size_arg(c.inputdim, arg)
+  off = align(resize_memory!(layers, memory, parg))
   GC.@preserve memory arg begin
     g = PtrArray(reinterpret(Ptr{T}, pointer(memory)+off), (static_length(params),))
     l = Base.FastMath.add_fast(

@@ -104,9 +104,11 @@ end
 #   parameter_free(fl) && return batch_size(Base.tail(layers), Val(T))
 # end
 
-@generated function turbo_dense_batch_size(id::Integer, od::Integer, Nd::Integer, ::StaticInt{W}, ::StaticInt{RS}, ::StaticInt{RC}, ::StaticInt{CLS}) where {W, RS, RC, CLS}
-  Kk = Static.known(id)
-  Mk = Static.known(od)
+@generated function turbo_dense_batch_size(
+  indputdim::Integer, outputdim::Integer, Nd::Integer, ::StaticInt{W}, ::StaticInt{RS}, ::StaticInt{RC}, ::StaticInt{CLS}
+) where {W, RS, RC, CLS}
+  Kk = Static.known(indputdim)
+  Mk = Static.known(outputdim)
   Nk = Static.known(Nd)
   M = Mk === nothing ? 1024 : Mk
   K = Kk === nothing ? 1024 : Kk
@@ -117,10 +119,13 @@ end
 @inline function batch_size(
   layers::Tuple{L,Vararg}, argsz::Tuple{I,J}, ::Val{T}
 ) where {T,L<:TurboDense,I,J}
-  id, N = argsz
-  od = first(layers).output
+  inputdim, N = argsz
+  outputdim = first(layers).outputdim
   # id, od = getfield(getfield(layers,1), :dims) # (od × id) * (id x N)
-  turbo_dense_batch_size(id, od, N, VectorizationBase.pick_vector_width(T), VectorizationBase.register_size(), VectorizationBase.register_count(), VectorizationBase.cache_linesize())
+  turbo_dense_batch_size(
+    inputdim, outputdim, N, VectorizationBase.pick_vector_width(T),
+    VectorizationBase.register_size(), VectorizationBase.register_count(), VectorizationBase.cache_linesize()
+  )
 end
 @inline batch_size(layers::Tuple{L,Vararg}, argsz::Tuple, ::Val{T}) where {L,T} = batch_size(Base.tail(layers), argsz, Val(T))
 @inline batch_size(::Tuple{}, ::Tuple, ::Val{T}) where {T} = Static(18)
@@ -136,9 +141,9 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
+  sx = ArrayInterface.size(pX) 
   resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  sx = ArrayInterface.size(pX) 
   N = sx[end]
   N_bs = batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X))))
   d, r = divrem(N, N_bs)

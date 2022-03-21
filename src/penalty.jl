@@ -136,7 +136,7 @@ Applies `frontpen` to all but the last layer, applying `lastpen` to the last lay
 "Last layer" here ignores the loss function, i.e. if the last element of the chain is a loss layer,
 the then `lastpen` applies to the layer preceding this.
 """
-struct FrontLastPenalty{NN, P1<:AbstractPenalty{Nothing}, P2<:AbstractPenalty{Nothing}} <: AbstractPenalty{NN}
+struct FrontLastPenalty{NN<:Union{SimpleChain,Nothing}, P1<:AbstractPenalty{Nothing}, P2<:AbstractPenalty{Nothing}} <: AbstractPenalty{NN}
   chn::NN
   front::P1
   last::P2
