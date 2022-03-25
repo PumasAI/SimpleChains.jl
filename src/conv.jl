@@ -65,7 +65,6 @@ function convlayer!(f::F, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}
     end
     C[j₁, j₂, o] = f(s)
   end
-  C
 end
 function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,4}) where {F}
   C = zero_offsets(_C)
@@ -74,7 +73,6 @@ function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}
   for d ∈ axes(C,4)
     convlayer!(f, view(C,:,:,:,d), view(A,:,:,:,d), K)
   end
-  C
 end
 # 3d convolution
 function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,5}) where {F}
@@ -88,7 +86,6 @@ function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}
     end
     C[j₁, j₂, j₃, o] = f(s)
   end
-  C
 end
 function convlayer!(f::F, _C::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5}, _K::AbstractArray{<:Any,5}) where {F}
   C = zero_offsets(_C)
@@ -97,7 +94,6 @@ function convlayer!(f::F, _C::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5}
   for d ∈ axes(C,4)
     convlayer!(f, view(C,:,:,:,:,d), view(A,:,:,:,:,d), K)
   end
-  C
 end
 
 # 2d convolution
@@ -115,13 +111,13 @@ function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,3}, _C::AbstractArray{<:
     C[j₁, j₂, o] = c
     ∂C[j₁, j₂, o] = ∂c
   end
-  C
 end
 function convlayer!(f::F, ∂C::AbstractArray{<:Any,4}, C::AbstractArray{<:Any,4}, A::AbstractArray{<:Any,4}, K::AbstractArray{<:Any,4}) where {F}
   for d ∈ axes(C,4)
     convlayer!(f, view(∂C,:,:,:,d), view(C,:,:,:,d), view(A,:,:,:,d), K)
+    # d == first(axes(C,4)) && @show view(∂C,:,:,:,d)
   end
-  C
+  # @show view(∂C,:,:,:,first(axes(∂C,4)))
 end
 
 # 3d convolution
@@ -139,13 +135,11 @@ function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,4}, _C::AbstractArray{<:
     C[j₁, j₂, j₃, o] = c
     ∂C[j₁, j₂, j₃, o] = ∂c
   end
-  C
 end
 function convlayer!(f::F, ∂C::AbstractArray{<:Any,5}, C::AbstractArray{<:Any,5}, A::AbstractArray{<:Any,5}, K::AbstractArray{<:Any,5}) where {F}
   for d ∈ axes(C,4)
     convlayer!(f, view(∂C,:,:,:,:,d), view(C,:,:,:,:,d), view(A,:,:,:,:,d), K)
   end
-  C
 end
 
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,2}, _Cadj::AbstractArray{<:Any,2})
@@ -159,7 +153,6 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,2
     end
     Kadj[k₁, i, o] = s
   end
-  Kadj
 end
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _Cadj::AbstractArray{<:Any,3})
   Cadj = zero_offsets(_Cadj)
@@ -172,7 +165,6 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3
     end
     Kadj[k₁, i, o] = s
   end
-  Kadj
 end
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,3}, _Cadj::AbstractArray{<:Any,3})
   Cadj = zero_offsets(_Cadj)
@@ -185,7 +177,6 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,3
     end
     Kadj[k₁, k₂, i, o] = s
   end
-  Kadj
 end
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
   Cadj = zero_offsets(_Cadj)
@@ -198,7 +189,6 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4
     end
     Kadj[k₁, k₂, i, o] = s
   end
-  Kadj
 end
 
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
@@ -212,7 +202,6 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,4
     end
     Kadj[k₁, k₂, k₃, i, o] = s
   end
-  Kadj
 end
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5}, _Cadj::AbstractArray{<:Any,5})
   Cadj = zero_offsets(_Cadj)
@@ -225,7 +214,6 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5
     end
     Kadj[k₁, k₂, k₃, i, o] = s
   end
-  Kadj
 end
 
 # Cadj is padded??
@@ -251,7 +239,6 @@ function convlayeradjA!(
     end
     Aadj[j0, i] = s
   end
-  Aadj
 end
 function convlayeradjA!(
   _Aadj::AbstractArray{<:Any,3},
@@ -275,7 +262,6 @@ function convlayeradjA!(
       Aadj[j0, i, d] = s
     end
   end
-  Aadj
 end
 function convlayeradjA!(
   _Aadj::AbstractArray{<:Any,3},
@@ -299,7 +285,6 @@ function convlayeradjA!(
       end
     Aadj[j0, j1, i] = s
   end
-  Aadj
 end
 function convlayeradjA!(
   _Aadj::AbstractArray{<:Any,4},
@@ -325,7 +310,6 @@ function convlayeradjA!(
       Aadj[j0, j1, i, d] = s
     end
   end
-  Aadj
 end
 
 #=
@@ -384,7 +368,6 @@ function convlayeradjA!(
       end
     Aadj[j0, j1, j2, i] = s
   end
-  Aadj
 end
 function convlayeradjA!(
   _Aadj::AbstractArray{<:Any,5},
@@ -412,7 +395,6 @@ function convlayeradjA!(
       Aadj[j0, j1, j2, i, d] = s
     end
   end
-  Aadj
 end
 
 struct Conv{F,D<:Tuple{Vararg{Integer}},I<:Integer,O<:Integer}
@@ -432,7 +414,7 @@ fused_fun(c) = _fused_fun(c, fast_fuse(c))
 
 _unfused_fun(_, ::True) = identity
 _unfused_fun(c, ::False) = getfield(c,:f)
-unfused_fun(c) = Activation(_fused_fun(c, fast_fuse(c)))
+unfused_fun(c) = Activation(_unfused_fun(c, fast_fuse(c)))
 
 dimsum(c::Conv) = ArrayInterface.reduce_tup(+,c.dim)
 dimprod(c::Conv) = ArrayInterface.reduce_tup(*,c.dim)
@@ -450,15 +432,27 @@ end
 @inline bsub(x::Tuple{T}, y::Number) where {T} = (only(x) - y,)
 @inline bsub(x::Tuple{T0,T1,Vararg}, y::Number) where {T0,T1} = (first(x) - y, bsub(Base.tail(x), y)...)
 
+@inline badd(::Tuple{}, ::Number) = ()
+@inline badd(x::Tuple{T}, y::Number) where {T} = (only(x) + y,)
+@inline badd(x::Tuple{T0,T1,Vararg}, y::Number) where {T0,T1} = (first(x) + y, badd(Base.tail(x), y)...)
+
 function getoutputdim(c::Conv{F,D}, inputdim::Tuple{Vararg{Integer,N}}) where {F,N,D<:Tuple{Vararg{Integer,N}}}
-  bsub(map(+, inputdim, c.dim), static(1))
+  badd(map(-, inputdim, c.dim), static(1))
 end
 function getoutputdim(c::Conv{F,D}, inputdim::Tuple{Vararg{Integer,N0}}) where {F,N0,N1,D<:Tuple{Vararg{Integer,N1}}}
-  (getoutputdim(c, Base.front(inputdim))..., last(inputdim))
+  if N1+1 == N0
+    (getoutputdim(c, Base.front(inputdim))..., c.outputdim)
+  else
+    @assert N1+2 == N0
+    (getoutputdim(c, Base.front(inputdim))..., last(inputdim))
+  end
 end
 
+
+numparam(c::Conv) = dimprod(c)*c.inputdim*c.outputdim
+parameter_free(::Conv) = false
 function numparam(c::Conv, inputdim::Tuple{Vararg{Integer}})
-  dimprod(c)*c.inputdim*c.outputdim, getoutputdim(c, inputdim)
+  numparam(c), getoutputdim(c, inputdim)
 end
 
 function getparams(c::Conv, p::Ptr{T}) where {T}
@@ -498,7 +492,7 @@ function get∂C(::F, outputdim, ∂Cp::Ptr{T}, ::False) where {F,T}
 end
 function get∂C(::typeof(relu), outputdim, ∂Cp::Ptr)
   ∂C = PtrArray(Ptr{Bit}(∂Cp), outputdim)
-  ∂Cp += align((length(∂C) + 7) >>> 3)
+  ∂Cp += align((last(StrideArraysCore.strides(∂C))>>>3)*last(outputdim))
   ∂C, ∂Cp
 end
 function get∂C(::typeof(identity), _, ∂Cp::Ptr)
@@ -512,6 +506,7 @@ function (c::Conv)(A::AbstractArray{T0}, p::Ptr{T1}, pu::Ptr{UInt8}) where {T0,T
   K, p = getparams(c, p)
   convlayer!(fused_fun(c), C, A, K)
   call!(C, unfused_fun(c), p, Ptr{UInt8}(pu2))
+  C, p, Ptr{UInt8}(pu2)
 end
 
 function valgrad_layer!(pg::Ptr{T}, c::Conv{typeof(identity)}, A, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
@@ -519,7 +514,7 @@ function valgrad_layer!(pg::Ptr{T}, c::Conv{typeof(identity)}, A, p::Ptr{T}, pu:
   R, pu3 = alloc_return(outputdim, Ptr{T}(pu))
   K, p2 = getparams(c, p)
   convlayer!(identity, R, A, K)
-  pg + dimprod(c)*sizeof(T), R, p2, Ptr{UInt8}(pu3)
+  pg + length(K)*sizeof(T), R, p2, Ptr{UInt8}(pu3)
 end
 function valgrad_layer!(pg::Ptr{T}, c::Conv, A, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
   outputdim = getoutputdim(c, size(A))
@@ -527,9 +522,9 @@ function valgrad_layer!(pg::Ptr{T}, c::Conv, A, p::Ptr{T}, pu::Ptr{UInt8}) where
   ∂C, pu2 = get∂C(c.f, outputdim, Ptr{T}(pu))
   C, pu3 = alloc_return(outputdim, Ptr{T}(pu2))
   K, p2 = getparams(c, p)
-  convlayer!(fused_fun(c), ∂C, C, A, K)
+  convlayer!(∂(fused_fun(c)), ∂C, C, A, K)
   _valgrad_layer!(
-    ∂C, C, pg + dimprod(c)*sizeof(T),
+    ∂C, C, pg + length(K)*sizeof(T),
     unfused_fun(c), C, p2, Ptr{UInt8}(pu3)
   )
 end
@@ -550,7 +545,8 @@ function pullback_param!(pg::Ptr{T}, c::Conv, C̄, A, ::Ptr{T}, pu::Ptr{UInt8}) 
   _pullback_param!(pg, c, C̄, A, pu)
 end
 function _pullback_param!(pg::Ptr{T}, c::Conv, C̄, A, pu::Ptr{UInt8}) where {T}
-  upate_C̄!(c.f, C̄, first(get∂C(c.f, C̄, pu)))
+  ∂C = first(get∂C(c.f, size(C̄), Ptr{T}(pu)))
+  update_C̄!(c.f, C̄, ∂C)
   convlayeradjK!(first(getparams(c, pg)), A, C̄)
   return
 end

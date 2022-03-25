@@ -216,13 +216,65 @@ SquaredLoss"""
     end
   end
   @testset "Convolution" begin
-    scconv = SimpleChain( Conv(relu, (3,3), 1, 4) ) # test inputdim unknown
-    x = rand(Float32, 28, 28, 1, 200);
-    y = rand(Float32, 26, 26, 4, 200);
+    function clt(f, x, K)
+      d1 = size(x,1) - size(K,1) + 1
+      d2 = size(x,2) - size(K,2) + 1
+      closuresshouldntbeabletomutatebindings = Array{Base.promote_eltype(x,K)}(
+        undef, d1, d2, size(K,4), size(x,4)
+      )
+      SimpleChains.convlayer!(f, closuresshouldntbeabletomutatebindings, x, K)
+      return closuresshouldntbeabletomutatebindings
+    end
+
+    function convlayertest(x, y, K)
+      closuresshouldntbeabletomutatebindings = clt(relu, x, K)
+      δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y);
+      0.5*(δ'δ)
+    end
+    function convlayertest(x, y, K0, K1)
+      closuresshouldntbeabletomutatebindings = tanh.(clt(identity, clt(relu, x, K0), K1))
+      δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y);
+      0.5*(δ'δ)
+    end
+    
+    scconv = SimpleChain(
+      Conv(relu, (3,3), 1, 4)
+    #  Conv(tanh, (5,5), 4, 3)
+    )
+    batch = 2
+    x = rand(Float32, 28, 28, 1, batch);
+    y = rand(Float32, 26, 26, 4, batch);
     scconvl = SimpleChains.add_loss(scconv, SquaredLoss(y))
     p = SimpleChains.init_params(scconvl, size(x));
-    scconv(x)
+    K,p2 = SimpleChains.getparams(first(scconv.layers), pointer(p));
+    refloss = convlayertest(x, y, K)
+    @test scconvl(x, p) ≈ refloss
+    g = similar(p);
+    @test valgrad!(g, scconvl, x, p) ≈ refloss
 
+    gK = ForwardDiff.gradient(k -> convlayertest(x,y,k), K);
+    @test Float32.(vec(gK)) ≈ g
+
+    
+    scconv2 = SimpleChain(
+      Conv(relu, (3,3), 1, 4), # fast_fuse == true
+      Conv(tanh, (5,5), 4, 3) # fast_fuse == false
+    )
+    z = rand(Float32, 22, 22, 3, batch);
+    scconv2l = SimpleChains.add_loss(scconv2, SquaredLoss(z));
+    p = SimpleChains.init_params(scconv2l, size(x));
+    K0, p2 = SimpleChains.getparams((scconv2.layers)[1], pointer(p));
+    K1, p3 = SimpleChains.getparams((scconv2.layers)[2], p2);
+    refloss = convlayertest(x, z, K0, K1)
+    @test scconv2l(x, p) ≈ refloss
+    g = similar(p);
+    @test valgrad!(g, scconv2l, x, p) ≈ refloss
+
+    gK0 = ForwardDiff.gradient(k -> convlayertest(x,z,k,K1), K0);
+    gK1 = ForwardDiff.gradient(k -> convlayertest(x,z,K0,k), K1);
+    @show typeof(gK0) typeof(gK1)
+    @test vcat(Float32.(vec(gK0)),Float32.(vec(gK1))) ≈ g
+    
   end
 end
 Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped

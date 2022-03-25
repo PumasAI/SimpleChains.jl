@@ -167,6 +167,11 @@ end
   ∂fx = getfield(ForwardDiff.partials(dx).values,1)
   fx, ∂fx
 end
+@inline function (fw::ForwardDiffElementwise{typeof(relu)})(x)
+  y = zero(x)
+  m = x < y
+  ifelse(m, y, x), ~m
+end
 # overloadable
 @inline ∂(f::F) where {F} = ForwardDiffElementwise{F}(f)
 
@@ -185,8 +190,9 @@ function get∂C(::TurboDense, C::AbstractArray{T}, ∂Cp::Ptr{UInt8}, ::False) 
   ∂C, ∂Cp
 end
 function get∂C(::TurboDense{B,D,typeof(relu)}, C::AbstractArray, ∂Cp::Ptr{UInt8}) where {B,D}
-  ∂C = PtrArray(reinterpret(Ptr{Bit}, ∂Cp), size(C))
-  ∂Cp += align((length(∂C) + 7) >>> 3)
+  outputdim = size(C)
+  ∂C = PtrArray(reinterpret(Ptr{Bit}, ∂Cp), outputdim)
+  ∂Cp += align((last(StrideArraysCore.strides(∂C))>>>3)*last(outputdim))
   ∂C, ∂Cp
 end
 function get∂C(
@@ -380,15 +386,15 @@ function matrix_view(::TurboDense{true}, A)
   K = Kp1 - StaticInt(1)
   view(A, :, static(1):K)
 end
-upate_C̄!(::typeof(identity), #=C̄=#_, #=∂C=#__) = nothing
-function upate_C̄!(::F, C̄, ∂C) where {F}
+update_C̄!(::typeof(identity), #=C̄=#_, #=∂C=#__) = nothing
+function update_C̄!(::F, C̄, ∂C) where {F}
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
   end
 end
 function pullback_param!(pg::Ptr{T}, td::TurboDense{O}, C̄, B, ::Ptr{T}, pu::Ptr{UInt8}) where {T,O}
   # Ā = C̄ * B'
-  upate_C̄!(td.f, C̄, first(get∂C(td, C̄, pu)))
+  update_C̄!(td.f, C̄, first(get∂C(td, C̄, pu)))
   Ā, __  = getparams(td, pg, size(B,StaticInt(1)))
   dense_param_update!(td, Ā, C̄, B)
   return nothing
