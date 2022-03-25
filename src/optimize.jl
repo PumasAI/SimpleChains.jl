@@ -50,19 +50,21 @@ end
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
   chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
   fl = Base.front(layers);
   ll = last(layers);
   optoff = optmemsize(opt, p)
-  resize_memory!(layers, memory, X, optoff)
+  sx = ArrayInterface.size(pX)
+  resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  GC.@preserve p g memory begin
+  GC.@preserve p g memory X begin
     pg = pointer(g); pp = pointer(p)
     for y ∈ t
       layers_y = (fl..., ll(y))
-      chain_valgrad_entry!(pg, X, layers_y, pp, pm)
-      apply_penalty!(g, pen, p)
+      chain_valgrad_entry!(pg, pX, layers_y, pp, pm)
+      apply_penalty!(g, pen, p, sx)
       update!(opt, optbuffer, p, g)
     end
   end
@@ -70,16 +72,18 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
 end
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
   chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
+  sx = ArrayInterface.size(pX)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  resize_memory!(layers, memory, X, optoff)
+  resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  GC.@preserve p g memory begin
+  GC.@preserve p g memory X begin
     pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
-      chain_valgrad_entry!(pg, X, layers, pp, pm)
-      apply_penalty!(g, pen, p)
+      chain_valgrad_entry!(pg, pX, layers, pp, pm)
+      apply_penalty!(g, pen, p, sx)
       update!(opt, optbuffer, p, g)
     end
   end
@@ -100,9 +104,11 @@ end
 #   parameter_free(fl) && return batch_size(Base.tail(layers), Val(T))
 # end
 
-@generated function turbo_dense_batch_size(id::Integer, od::Integer, Nd::Integer, ::StaticInt{W}, ::StaticInt{RS}, ::StaticInt{RC}, ::StaticInt{CLS}) where {W, RS, RC, CLS}
-  Kk = Static.known(id)
-  Mk = Static.known(od)
+@generated function turbo_dense_batch_size(
+  indputdim::Integer, outputdim::Integer, Nd::Integer, ::StaticInt{W}, ::StaticInt{RS}, ::StaticInt{RC}, ::StaticInt{CLS}
+) where {W, RS, RC, CLS}
+  Kk = Static.known(indputdim)
+  Mk = Static.known(outputdim)
   Nk = Static.known(Nd)
   M = Mk === nothing ? 1024 : Mk
   K = Kk === nothing ? 1024 : Kk
@@ -110,12 +116,19 @@ end
   mₖ, nₖ = LoopVectorization.matmul_params(RS, RC, CLS; M, K, N, W)
   StaticInt(nₖ)
 end
-@inline function batch_size(layers::Tuple{L,Vararg}, N::Integer, ::Val{T}) where {T,L<:TurboDense}
-  id, od = getfield(getfield(layers,1), :dims) # (od × id) * (id x N)
-  turbo_dense_batch_size(id, od, N, VectorizationBase.pick_vector_width(T), VectorizationBase.register_size(), VectorizationBase.register_count(), VectorizationBase.cache_linesize())
+@inline function batch_size(
+  layers::Tuple{L,Vararg}, argsz::Tuple{I,J}, ::Val{T}
+) where {T,L<:TurboDense,I,J}
+  inputdim, N = argsz
+  outputdim = first(layers).outputdim
+  # id, od = getfield(getfield(layers,1), :dims) # (od × id) * (id x N)
+  turbo_dense_batch_size(
+    inputdim, outputdim, N, VectorizationBase.pick_vector_width(T),
+    VectorizationBase.register_size(), VectorizationBase.register_count(), VectorizationBase.cache_linesize()
+  )
 end
-@inline batch_size(layers::Tuple{L,Vararg}, N::Integer, ::Val{T}) where {L,T} = batch_size(Base.tail(layers), N, Val(T))
-@inline batch_size(layers::Tuple{}, ::Integer, ::Val{T}) where {T} = Static(18)
+@inline batch_size(layers::Tuple{L,Vararg}, argsz::Tuple, ::Val{T}) where {L,T} = batch_size(Base.tail(layers), argsz, Val(T))
+@inline batch_size(::Tuple{}, ::Tuple, ::Val{T}) where {T} = Static(18)
 
 @inline view_slice_last(X::AbstractArray{<:Any,1}, r) = view(X, r)
 @inline view_slice_last(X::AbstractArray{<:Any,2}, r) = view(X, :, r)
@@ -124,37 +137,35 @@ end
 @inline view_slice_last(X::AbstractArray{<:Any,5}, r) = view(X, :, :, :, :, r)
 function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  resize_memory!(layers, memory, X, optoff)
+  sx = ArrayInterface.size(pX) 
+  resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
-  N = ArrayInterface.size(X)[end]
-  N_bs = batch_size(layers, N, Val(promote_type(eltype(p), eltype(X))))
+  N = sx[end]
+  N_bs = batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X))))
   d, r = divrem(N, N_bs)
-  Ssize = (Base.front(ArrayInterface.size(X))..., N_bs)
-  Ssize_rem = (Base.front(ArrayInterface.size(X))..., r)
-  GC.@preserve p g memory begin
+  Ssize = (Base.front(sx)..., N_bs)
+  Ssize_rem = (Base.front(sx)..., r)
+  GC.@preserve p g memory X begin
     pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
       doff = 0
       for d in 1:d
-        GC.@preserve X begin
-          Xd = view_slice_last(X, doff+1:doff+N_bs)
-          Xp = PtrArray(stridedpointer(Xd), Ssize, StrideArraysCore.val_dense_dims(Xd))
-          chain_valgrad_entry!(pg, Xp, layers, pp, pm)
-        end
-        apply_penalty!(g, pen, p)
+        Xd = view_slice_last(pX, doff+1:doff+N_bs)
+        Xp = PtrArray(stridedpointer(Xd), Ssize, StrideArraysCore.val_dense_dims(Xd))
+        chain_valgrad_entry!(pg, Xp, layers, pp, pm)
+        apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
         doff += N_bs
       end
       if r ≠ 0
-        GC.@preserve X begin
-          Xd = view_slice_last(X, doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]))
-          Xp = PtrArray(stridedpointer(Xd), Ssize_rem, StrideArraysCore.val_dense_dims(Xd))
-          chain_valgrad_entry!(pg, Xp, layers, pp, pm)
-        end
-        apply_penalty!(g, pen, p)
+        Xd = view_slice_last(pX, doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]))
+        Xp = PtrArray(stridedpointer(Xd), Ssize_rem, StrideArraysCore.val_dense_dims(Xd))
+        chain_valgrad_entry!(pg, Xp, layers, pp, pm)
+        apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
       end
     end

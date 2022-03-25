@@ -17,12 +17,15 @@ x = rand(24, 200); # 24 inputs per 200 observations
 # 2 responses each per 200 observations
 y = StrideArray{Float64}(undef, (static(2),200)) .= randn.() .* 10;
 
-schain = SimpleChain((
-  TurboDense{true}(tanh, (static(24),static(8))), # 24 x 8 dense layer with bias and `tanh` activation
-  SimpleChains.Dropout(0.2), # dropout layer
-  TurboDense{false}(identity, (static(8),static(2))), # 8 x 2 dense layer without bias and `identity` activation
-  SquaredLoss(y) # squared error loss function
-));
+schain = SimpleChain(
+  static(24), # input dimension (optional)
+  (
+    TurboDense{true}(tanh, static(8)), # dense layer with bias that maps to 8 outputs and applies `tanh` activation
+    SimpleChains.Dropout(0.2), # dropout layer
+    TurboDense{false}(identity, static(2)), # dense layer without bias that maps to 2 outputs and `identity` activation
+    SquaredLoss(y)
+  ) # squared error loss function
+);
 
 p = randn(SimpleChains.numparam(schain)); # something like glorot would probably be a better way to initialize
 g = similar(p);
@@ -50,33 +53,30 @@ end
 
 Benchmark results:
 ```julia
-julia> # Entirely in place evaluation
-       @benchmark valgrad!($g, $schain, $x, $p) # dropout active
-BenchmarkTools.Trial:
-  memory estimate:  0 bytes
-  allocs estimate:  0
-  --------------
-  minimum time:     7.254 μs (0.00% GC)
-  median time:      7.318 μs (0.00% GC)
-  mean time:        7.328 μs (0.00% GC)
-  maximum time:     18.084 μs (0.00% GC)
-  --------------
-  samples:          10000
-  evals/sample:     4
+julia> @benchmark valgrad!($g, $schain, $x, $p) # dropout active
+BechmarkTools.Trial: 10000 samples with 6 evaluations.
+ Range (min … max):  5.274 μs …  33.075 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     5.657 μs               ┊ GC (median):    0.00%
+ Time  (mean ± σ):   5.646 μs ± 349.777 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+  ▄       ▂       ▁▆       ▃█▂       ▃▁ ▂
+  █▆▁▁▁▁▁▁██▁▄▅▁▁▁██▇▁▁▃▄▅▄███▆▇▅▄▆▆▆█████▇▆▆▅▆▆▆▆▅▅▅▄▅▅▄▄▁▅▃▄▃▄▄▄▃
+  5.27 μs         Histogram: log(frequency) by time         6.22 μs (top 1%)
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
   
 julia> @benchmark gradient(Flux.params($chain)) do
          Flux.mse($chain($x), $ya)
        end
-BenchmarkTools.Trial:
-  memory estimate:  184.52 KiB
-  allocs estimate:  368
-  --------------
-  minimum time:     121.267 μs (0.00% GC)
-  median time:      126.493 μs (0.00% GC)
-  mean time:        138.602 μs (6.95% GC)
-  maximum time:     5.276 ms (95.47% GC)
-  --------------
-  samples:          10000
-  evals/sample:     1
+BechmarkTools.Trial: 10000 samples with 1 evaluations.
+ Range (min … max):   83.674 μs …   4.865 ms  ┊ GC (min … max): 0.00% … 93.21%
+ Time  (median):      96.430 μs               ┊ GC (median):    0.00%
+ Time  (mean ± σ):   106.897 μs ± 197.689 μs  ┊ GC (mean ± σ):  7.96% ±  4.22%
+
+             ▁▂▅▆▆▄▆█▅
+  ▁▁▂▂▃▃▄▅▆▆▇██████████▆▄▃▃▃▃▃▃▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+  83.7 μs            Histogram: frequency by time              136 μs (top 1%)
+
+ Memory estimate: 182.55 KiB, allocs estimate: 316.
 ```
 

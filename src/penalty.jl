@@ -13,14 +13,17 @@ abstract type AbstractPenalty{NN<:Union{SimpleChain,Nothing}} end
 const Chain = Union{AbstractPenalty{<:SimpleChain},SimpleChain}
 
 function (Λ::AbstractPenalty{<:SimpleChain})(arg, params)
-  Base.FastMath.add_fast(getchain(Λ)(arg, params), apply_penalty(Λ, params))
+  Base.FastMath.add_fast(
+    getchain(Λ)(arg, params),
+    apply_penalty(Λ, params, size(arg))
+  )
 end
 function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
-  Base.FastMath.add_fast(valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
+  Base.FastMath.add_fast(
+    valgrad!(g, getchain(Λ), arg, params),
+    apply_penalty!(g, Λ, params, size(arg))
+  )
 end
-# function unsafe_valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
-#   Base.FastMath.add_fast(unsafe_valgrad!(g, getchain(Λ), arg, params), apply_penalty!(g, Λ, params))
-# end
 
 _penalty_applied_to_sc(_::IO, ::Nothing) = nothing
 function _penalty_applied_to_sc(io::IO, sc::SimpleChain)
@@ -39,10 +42,15 @@ UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:layers}) = getfield(getc
 UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:memory}) = getfield(getchain(c), :memory)
 
 Base.front(Λ::AbstractPenalty) = Base.front(getchain(Λ))
-numparam(Λ::AbstractPenalty) = numparam(getchain(Λ))
+numparam(Λ::AbstractPenalty, id=nothing) = numparam(getchain(Λ), id)
+
 remove_loss(Λ::AbstractPenalty) = remove_loss(getchain(Λ))
-init_params(Λ::AbstractPenalty, ::Type{T} = Float32) where {T} = init_params!(getchain(Λ), Vector{T}(undef, numparam(Λ)))
-init_params!(Λ::AbstractPenalty, x) = init_params!(getchain(Λ), x)
+
+init_params(Λ::AbstractPenalty, id=nothing, ::Type{T} = Float32) where {T} = init_params!(getchain(Λ), Vector{T}(undef, numparam(Λ)), id)
+
+init_params(Λ::AbstractPenalty, ::Type{T}) where {T} = init_params!(Λ, nothing, T)
+
+init_params!(Λ::AbstractPenalty, x, id=nothing) = init_params!(getchain(Λ), x, id)
 
 target(c::AbstractPenalty) = target(getchain(c))
 
@@ -51,13 +59,15 @@ struct NoPenalty{NN} <: AbstractPenalty{NN}
 end
 getchain(p::NoPenalty) = getfield(p,:chn)
 NoPenalty() = NoPenalty(nothing)
-apply_penalty(::NoPenalty) = Static.Zero()
+apply_penalty(::NoPenalty, _) = Static.Zero()
 apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
 (::NoPenalty)(chn::SimpleChain) = NoPenalty(chn)
 getpenalty(sc::SimpleChain) = NoPenalty(sc)
 getpenalty(Λ::AbstractPenalty) = Λ
 getλ(::NoPenalty) = nothing
 
+@inline apply_penalty(Λ, p, _) = apply_penalty(Λ, p)
+@inline apply_penalty!(g, Λ, p, _) = apply_penalty!(g, Λ, p)
 
 struct L1Penalty{NN,T} <: AbstractPenalty{NN}
   chn::NN
@@ -126,7 +136,7 @@ Applies `frontpen` to all but the last layer, applying `lastpen` to the last lay
 "Last layer" here ignores the loss function, i.e. if the last element of the chain is a loss layer,
 the then `lastpen` applies to the layer preceding this.
 """
-struct FrontLastPenalty{NN, P1<:AbstractPenalty{Nothing}, P2<:AbstractPenalty{Nothing}} <: AbstractPenalty{NN}
+struct FrontLastPenalty{NN<:Union{SimpleChain,Nothing}, P1<:AbstractPenalty{Nothing}, P2<:AbstractPenalty{Nothing}} <: AbstractPenalty{NN}
   chn::NN
   front::P1
   last::P2
@@ -149,21 +159,21 @@ function split_front_last(c::SimpleChain)
 end
 split_front_last(l::Tuple, x) = (l, x)
 split_front_last(l::Tuple, ::AbstractLoss) = (Base.front(l), last(l))
-function front_last_param_lens(c::SimpleChain)
-  f, l = split_front_last(c)
-  _numparam(0, f), numparam(l)
+function front_param_lens(c::SimpleChain, id)
+  f, _ = split_front_last(c)
+  _numparam(0, f, id)
 end
 
-@inline function apply_penalty(Λ::FrontLastPenalty{<:SimpleChain}, param)
-  f, _ = front_last_param_lens(getchain(Λ))
+@inline function apply_penalty(Λ::FrontLastPenalty{<:SimpleChain}, param, id)
+  f = front_param_lens(getchain(Λ), id)
   
   Base.FastMath.add_fast(
     apply_penalty(Λ.front, view(param, 1:f)),
     apply_penalty(Λ.last, view(param, f+1:length(param)))
   )
 end
-@inline function apply_penalty!(grad, Λ::FrontLastPenalty{<:SimpleChain}, param)
-  f, _ = front_last_param_lens(getchain(Λ))
+@inline function apply_penalty!(grad, Λ::FrontLastPenalty{<:SimpleChain}, param, id)
+  f = front_param_lens(getchain(Λ), id)
   fr = 1:f
   lr = 1+f:length(param)
   Base.FastMath.add_fast(

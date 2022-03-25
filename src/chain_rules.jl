@@ -76,10 +76,11 @@ end
 function valgrad_noloss(sc, arg, params::AbstractVector{T}) where {T}
   c = getchain(sc)
   @unpack layers, memory = c
-  off = align(resize_memory!(layers, memory, arg, length(arg)*sizeof(eltype(arg))))
-  GC.@preserve memory begin
+  parg = maybe_static_size_arg(c.inputdim, arg)
+  off = align(resize_memory!(layers, memory, parg, length(parg)*sizeof(eltype(parg))))
+  GC.@preserve arg memory begin
     g = PtrArray(reinterpret(Ptr{T}, pointer(memory)+off), (static_length(params),))
-    l, pullback = unsafe_valgrad_pullback!(g, layers, params, memory, arg)
+    l, pullback = unsafe_valgrad_pullback!(g, layers, params, memory, parg)
   end
   return StrideArraysCore.StrideArray(l, memory), pullback
 end

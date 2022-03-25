@@ -2,7 +2,12 @@ abstract type AbstractLoss{Y} end
 
 has_loss(sc::SimpleChain) = last(sc.layers) isa AbstractLoss
 function add_loss(sc::SimpleChain, l::AbstractLoss)
-  has_loss(sc) ? SimpleChain((Base.front(sc.layers)...,l), sc.memory) : SimpleChain((sc.layers...,l), sc.memory)
+  id = chain_input_dims(sc)
+  if has_loss(sc)
+    SimpleChain(id, (Base.front(sc.layers)...,l), sc.memory)
+  else
+    SimpleChain(id, (sc.layers...,l), sc.memory)
+  end
 end
 function remove_loss(sc::SimpleChain)
   has_loss(sc) ? Base.front(sc) : sc
@@ -15,7 +20,7 @@ _iterate_over_losses(_) = false
 iterate_over_losses(sc) = _iterate_over_losses(target(sc))
 
 parameter_free(::AbstractLoss) = true
-numparam(::AbstractLoss) = 0
+numparam(::AbstractLoss, _) = 0, 1
 function output_size(::Val{T}, sl::AbstractLoss{<:AbstractArray{<:AbstractArray}}, s) where {T}
   align(length(first(target(sl))) * static_sizeof(T)), static_sizeof(T)
 end
@@ -27,7 +32,7 @@ end
 (::SquaredLoss)(y) = SquaredLoss(y)
 SquaredLoss() = SquaredLoss(nothing)
 target(sl::SquaredLoss) = getfield(sl, :y)
-init_params!(::AbstractLoss, p) = p
+init_params!(::AbstractLoss, p, _) = p, 1
 
 squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
 
