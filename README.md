@@ -58,11 +58,6 @@ BechmarkTools.Trial: 10000 samples with 6 evaluations.
  Range (min … max):  5.274 μs …  33.075 μs  ┊ GC (min … max): 0.00% … 0.00%
  Time  (median):     5.657 μs               ┊ GC (median):    0.00%
  Time  (mean ± σ):   5.646 μs ± 349.777 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
-
-  ▄       ▂       ▁▆       ▃█▂       ▃▁ ▂
-  █▆▁▁▁▁▁▁██▁▄▅▁▁▁██▇▁▁▃▄▅▄███▆▇▅▄▆▆▆█████▇▆▆▅▆▆▆▆▅▅▅▄▅▅▄▄▁▅▃▄▃▄▄▄▃
-  5.27 μs         Histogram: log(frequency) by time         6.22 μs (top 1%)
-
  Memory estimate: 0 bytes, allocs estimate: 0.
   
 julia> @benchmark gradient(Flux.params($chain)) do
@@ -72,11 +67,6 @@ BechmarkTools.Trial: 10000 samples with 1 evaluations.
  Range (min … max):   83.674 μs …   4.865 ms  ┊ GC (min … max): 0.00% … 93.21%
  Time  (median):      96.430 μs               ┊ GC (median):    0.00%
  Time  (mean ± σ):   106.897 μs ± 197.689 μs  ┊ GC (mean ± σ):  7.96% ±  4.22%
-
-             ▁▂▅▆▆▄▆█▅
-  ▁▁▂▂▃▃▄▅▆▆▇██████████▆▄▃▃▃▃▃▃▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
-  83.7 μs            Histogram: frequency by time              136 μs (top 1%)
-
  Memory estimate: 182.55 KiB, allocs estimate: 316.
 ```
 

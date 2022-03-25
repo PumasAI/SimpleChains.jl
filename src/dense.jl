@@ -47,13 +47,6 @@ function output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
   g2 = prod(outputdim)
   align(static_sizeof(T) * g1) + 2align(static_sizeof(T) * g2), outputdim
 end
-fast_fuse(::typeof(relu)) = True()
-fast_fuse(::typeof(abs)) = True()
-fast_fuse(::typeof(abs2)) = True()
-fast_fuse(::typeof(Base.FastMath.abs_fast)) = True()
-fast_fuse(::typeof(Base.FastMath.abs2_fast)) = True()
-fast_fuse(::typeof(identity)) = True()
-fast_fuse(_) = False()
 fast_fuse(td::TurboDense) = fast_fuse(getfield(td,:f))
 
 function getparams(td::TurboDense{false}, p::Ptr{T}, inputdim::Integer) where {T}
@@ -196,9 +189,14 @@ function get∂C(::TurboDense{B,D,typeof(relu)}, C::AbstractArray, ∂Cp::Ptr{UI
   ∂Cp += align((length(∂C) + 7) >>> 3)
   ∂C, ∂Cp
 end
-get∂C(::TurboDense{B,D,typeof(identity)}, ::AbstractArray, ∂Cp::Ptr{UInt8}) where {B,D} = (nothing, ∂Cp)
+function get∂C(
+  ::TurboDense{B,D,typeof(identity)}, ::AbstractArray, ∂Cp::Ptr{UInt8}
+) where {B,D}
+  (nothing, ∂Cp)
+end
 
-# generic
+
+
 function dense!(f::F, ∂C::AbstractArray{T1,N}, C::AbstractArray{T2,N}, A::AbstractMatrix, B::AbstractArray{T3,N}, ::True) where {F,T1<:Base.HWReal,T2<:Base.HWReal,T3<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -365,9 +363,9 @@ function alloc_return_B_dense(B::AbstractArray{T}, pu::Ptr{UInt8}, input_dim) wh
   B̄ = PtrArray(sp, (input_dim, size(B, static(2))), StrideArraysCore.val_dense_dims(B))
   B̄, pu + align(length(B̄)*sizeof(T))
 end
-function pullback!(pg::Ptr{T}, td::TurboDense{O}, _C̄, B, p::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T,O}
+function pullback!(pg::Ptr{T}, td::TurboDense{O}, C̄, B, p::Ptr{T}, pu::Ptr{UInt8}, pu2::Ptr{UInt8}) where {T,O}
   # Start with 4-arg `pulback!` to update `∂C`
-  C̄ = pullback_param!(pg, td, _C̄, B, p, pu) # Ā = C̄ * B'
+  pullback_param!(pg, td, C̄, B, p, pu) # Ā = C̄ * B'
   # Now 5-arg
   # B̄ = A' * C̄
   intput_dims = size(B, StaticInt(1))
@@ -382,19 +380,18 @@ function matrix_view(::TurboDense{true}, A)
   K = Kp1 - StaticInt(1)
   view(A, :, static(1):K)
 end
-upate_C̄!(#=C̄=#_, #=∂C=#__, td::TurboDense{B,D,typeof(identity)}) where {B,D} = nothing
-function upate_C̄!(C̄, ∂C, ::TurboDense{B,D}) where {B,D}
+upate_C̄!(::typeof(identity), #=C̄=#_, #=∂C=#__) = nothing
+function upate_C̄!(::F, C̄, ∂C) where {F}
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
   end
 end
 function pullback_param!(pg::Ptr{T}, td::TurboDense{O}, C̄, B, ::Ptr{T}, pu::Ptr{UInt8}) where {T,O}
   # Ā = C̄ * B'
-  ∂C, _ = get∂C(td, C̄, pu)
-  upate_C̄!(C̄, ∂C, td)
+  upate_C̄!(td.f, C̄, first(get∂C(td, C̄, pu)))
   Ā, __  = getparams(td, pg, size(B,StaticInt(1)))
   dense_param_update!(td, Ā, C̄, B)
-  C̄
+  return nothing
 end
 function dense_param_update!(::TurboDense{true}, Ā, C̄, B)
   Kp1 = ArrayInterface.size(Ā, StaticInt(2))
