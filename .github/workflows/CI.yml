@@ -1,22 +1,28 @@
 name: CI
 on:
-  - push
-  - pull_request
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+    tags: '*'
+defaults:
+  run:
+    shell: bash
 jobs:
-  test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+  coverage:
+    name: coverage=true/Julia ${{ matrix.version }}/${{ matrix.os }}/${{ matrix.arch }}/${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '1'
-          - '1.5'
-          - 'nightly'
-        os:
-          - ubuntu-latest
         arch:
           - x64
+        os:
+          - ubuntu-latest
+        version:
+          - 'nightly' # automatically expands to the latest stable 1.x release of Julia
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
@@ -35,6 +41,14 @@ jobs:
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        with:
+          coverage: true
+        env:
+          JULIA_NUM_THREADS: 2
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v1
+        with:
+          file: lcov.info
   docs:
     name: Documentation
     runs-on: ubuntu-latest
@@ -50,16 +64,30 @@ jobs:
             Pkg.instantiate()'
         env:
           JULIA_PKG_SERVER: ""
+      - run: julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+          JULIA_PKG_SERVER: ""
+  doctests:
+    name: Doctests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1'
       - run: |
           julia --project=docs -e '
-            using Documenter: DocMeta, doctest
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+        env:
+          JULIA_PKG_SERVER: ""
+      - run: |
+          julia --project=docs -e '
+            using Documenter: doctest
             using SimpleChains
-            DocMeta.setdocmeta!(SimpleChains, :DocTestSetup, :(using SimpleChains); recursive=true)
             doctest(SimpleChains)'
         env:
           JULIA_PKG_SERVER: ""
-      - run: julia --project=docs docs/make.jl
-        env:
-          JULIA_PKG_SERVER: ""
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
