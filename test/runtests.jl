@@ -55,8 +55,7 @@ SquaredLoss"""
         # typename doesn't work on 1.5
         @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
     end
-
-    p = SimpleChains.init_params(sc, T);
+    p = SimpleChains.init_params(scflp, T);
     g = similar(p);
     @test_throws ArgumentError sc(rand(T,23,2), p)
     @test_throws ArgumentError sc(rand(T,23), p)
