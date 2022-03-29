@@ -46,9 +46,7 @@ numparam(Λ::AbstractPenalty, id=nothing) = numparam(getchain(Λ), id)
 
 remove_loss(Λ::AbstractPenalty) = remove_loss(getchain(Λ))
 
-init_params(Λ::AbstractPenalty, id=nothing, ::Type{T} = Float32) where {T} = init_params!(getchain(Λ), Vector{T}(undef, numparam(Λ)), id)
-
-init_params(Λ::AbstractPenalty, ::Type{T}) where {T} = init_params!(Λ, nothing, T)
+init_params(Λ::AbstractPenalty, id=nothing, ::Type{T} = Float32) where {T} = init_params(getchain(Λ), id, T)
 
 init_params!(Λ::AbstractPenalty, x, id=nothing) = init_params!(getchain(Λ), x, id)
 
