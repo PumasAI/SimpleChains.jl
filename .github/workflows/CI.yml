@@ -22,7 +22,7 @@ jobs:
         os:
           - ubuntu-latest
         version:
-          - 'nightly' # automatically expands to the latest stable 1.x release of Julia
+          - 'nightly' # coverage fast on nightly
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
@@ -49,6 +49,41 @@ jobs:
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info
+  nocoverage:
+    name: coverage=true/Julia ${{ matrix.version }}/${{ matrix.os }}/${{ matrix.arch }}/${{ github.event_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x64
+        os:
+          - ubuntu-latest
+        version:
+          - '1.6'
+          - '1'
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: actions/cache@v1
+        env:
+          cache-name: cache-artifacts
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-test-${{ env.cache-name }}-
+            ${{ runner.os }}-test-
+            ${{ runner.os }}-
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          coverage: false
+        env:
+          JULIA_NUM_THREADS: 2
   docs:
     name: Documentation
     runs-on: ubuntu-latest
