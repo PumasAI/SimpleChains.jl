@@ -54,6 +54,18 @@ function Base.show(io::IO, sc::SimpleChain)
   _show(io, sc.layers)
 end
 
+function outputdim(x::Tuple{X}, s1) where {X}
+  last(output_size(Val{Float32}(), getfield(x,1), s1))
+end
+function outputdim(x::Tuple{X1,X2,Vararg}, s1::Tuple) where {X1,X2}
+  # Main._a[] = (T, x, s1)
+  _, s2 = output_size(Val{Float32}(), getfield(x,1), s1)
+  outputdim(Base.tail(x), s2)
+end
+function outputdim(sc::SimpleChain, id = nothing)
+  inputdim = chain_input_dims(sc, id)
+  outputdim(sc.layers, inputdim)
+end
 
 """
   Base.front(c::SimpleChain)
@@ -62,6 +74,7 @@ Useful for popping off a loss layer.
 """
 Base.front(c::SimpleChain) = SimpleChain(chain_input_dims(c), Base.front(c.layers), c.memory)
 Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers...,l), c.memory)
+
 
 
 # output_size must be defined to return the total size of all outputs

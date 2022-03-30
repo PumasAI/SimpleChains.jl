@@ -1,0 +1,35 @@
+
+
+function logsoftmax!(z, m, y::AbstractMatrix)
+  @turbo for i = eachindex(m)
+    mi = typemin(eltype(y))
+    for j = axes(y,1)
+      mi = max(mi, y[j,i])
+    end
+    m[i] = mi
+  end
+  @turbo for j = axes(y,2)
+    mj = m[j]
+    s = zero(eltype(m))
+    for i = axes(y,1)
+      yij = y[i,j]
+      zij = mj == Inf ? (yij == Inf ? zero(eltype(y)) : -Inf) : yij - m[j]
+      z[i,j] = zij
+      s += exp(zij)
+    end
+    m[j] = s
+  end
+  @turbo for i = eachindex(m)
+    m[i] = log(m[i])
+  end
+  @turbo for j = axes(z,2), i = axes(z,1)
+    z[i,j] -= m[j]
+  end
+end
+function logsoftmax(y::AbstractMatrix)
+  m = similar(y, size(y,2))
+  z = similar(y)
+  logsoftmax!(z, m, y)
+  return z
+end
+

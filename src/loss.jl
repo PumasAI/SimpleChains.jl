@@ -40,7 +40,7 @@ Base.show(io::IO, ::SquaredLoss) = print(io, "SquaredLoss")
 
 function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
-  g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), StrideArraysCore.val_dense_dims(arg))
+  g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
   s = zero(T)
   @turbo for i ∈ eachindex(g)
     δ = arg[i] - y[i]
@@ -75,7 +75,7 @@ Base.show(io::IO, ::AbsoluteLoss) = print(io, "AbsoluteLoss")
 
 function chain_valgrad!(__, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, _::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
-  g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), StrideArraysCore.val_dense_dims(arg))
+  g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
   s = zero(eltype(g))
   @turbo for i ∈ eachindex(g)
     δ = arg[i] - y[i]
@@ -104,4 +104,44 @@ function (sl::AbstractLoss{<:AbstractArray{<:AbstractArray}})(arg, p, pu)
   return s, p, pu
 end
 
+struct TransformedCrossEntropyLoss{Y<:AbstractMatrix}
+  trfy::Y
+end
+function (tcel::TransformedCrossEntropyLoss)(arg, p, pu)
+  trfy = tcel.trfy
+  s = zero(Base.promote_eltype(arg, trfy))
+  @turbo for i = eachindex(arg)
+    s -= arg[i] * trfy[i]
+  end
+  s / size(trfy,2), p, pu
+end
+function chain_valgrad!(
+  __, arg::AbstractArray{T},
+  layers::Tuple{TransformedCrossEntropyLoss},
+  _::Ptr, pu::Ptr{UInt8}
+) where {T}
+  
+  trfy = getfield(getfield(layers, 1), :logy)
+  g = PtrArray(stridedpointer(Ptr{T}(pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
+  s = zero(eltype(g))
+  Ninv = -inv(size(trfy,2))
+  @turbo for i ∈ eachindex(g)
+    trfyi = Ninv * trfy[i]
+    s += arg[i] * trfyi
+    g[i] = trfyi
+  end
+  return s, g, pu + sizeof(T)*length(g)
+end
+
+function CrossEntropyLoss(y)
+  logy = similar(y)
+  ϵ = eps(eltype(y))
+  @turbo for i = eachindex(y)
+    logy[i] = log(y[i] + ϵ)
+  end
+  TransformedCrossEntropyLoss(logy)
+end
+function LogitCrossEntropyLoss(y)
+  TransformedCrossEntropyLoss(logsoftmax(y))
+end
 

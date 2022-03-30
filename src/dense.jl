@@ -14,7 +14,7 @@ TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, t)
 function TurboDense{B}(::Integer, ::Integer) where {B}
   throw(ArgumentError("TurboDense{$B} requires one integer (output dim) and one function argument."))
 end
-TurboDense(a, b) = TurboDense{true}(a, b)
+TurboDense(f, d) = TurboDense{true}(f, static(d))
 
 function Base.show(io::IO, td::TurboDense{B}) where {B}
   w = B ? "with" : "without"

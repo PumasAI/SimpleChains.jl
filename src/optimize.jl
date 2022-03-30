@@ -155,7 +155,7 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
       doff = 0
       for d in 1:d
         Xd = view_slice_last(pX, doff+1:doff+N_bs)
-        Xp = PtrArray(stridedpointer(Xd), Ssize, StrideArraysCore.val_dense_dims(Xd))
+        Xp = PtrArray(stridedpointer(Xd), Ssize, VectorizationBase.val_dense_dims(Xd))
         chain_valgrad_entry!(pg, Xp, layers, pp, pm)
         apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
@@ -163,7 +163,7 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
       end
       if r ≠ 0
         Xd = view_slice_last(pX, doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]))
-        Xp = PtrArray(stridedpointer(Xd), Ssize_rem, StrideArraysCore.val_dense_dims(Xd))
+        Xp = PtrArray(stridedpointer(Xd), Ssize_rem, VectorizationBase.val_dense_dims(Xd))
         chain_valgrad_entry!(pg, Xp, layers, pp, pm)
         apply_penalty!(g, pen, p, sx)
         update!(opt, optbuffer, p, g)
@@ -172,7 +172,6 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   end
   p
 end
-train_batched(chn::Chain) = train_batched!(init_params(chn), chn)
 
 _isstochastic(::Tuple{}) = false
 function _isstochastic(x::Tuple{T,Vararg}) where {T}
