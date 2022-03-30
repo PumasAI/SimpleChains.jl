@@ -98,11 +98,27 @@ function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
 end
 parameter_free(x) = numparam(x) == 0
 
-@inline function resize_memory!(layers, memory::Vector{UInt8}, arg::AbstractArray{T}, additional = static(0)) where {T}
-  d = output_size(Val(T), layers, size(arg)) + additional
-  d2 = 2d
+@inline function resize_memory!(
+  layers,
+  memory::Vector{UInt8},
+  arg::AbstractArray{T},
+  additional = static(0)
+) where {T}
+  d = output_size(Val(T), layers, size(arg))*nthread + additional
+  d2 = (2d)
   d2 > length(memory) && resize!(memory, d2)
   d
+end
+@inline function resize_memory!(
+  layers,
+  memory::Vector{UInt8},
+  arg::AbstractArray{T},
+  additional, nthread
+) where {T}
+  base_mem_per_thread = 2output_size(Val(T), layers, size(arg))
+  mem_total = additional + base_mem_per_thread*nthread
+  mem_total > length(memory) && resize!(memory, mem_total)
+  base_mem_per_thread
 end
 
 matches(::InputDimUnknown, _) = true

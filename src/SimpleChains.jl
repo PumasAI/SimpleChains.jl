@@ -5,7 +5,8 @@ using UnPack, VectorizationBase, ArrayInterface, Polyester, SLEEFPirates, Stride
 using ArrayInterface: size, axes, StrideIndex, contiguous_axis, stride_rank, static_length, static_first, static_last, static_step, indices, offsets
 using SIMDTypes: Bit
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
-using HostCPUFeatures: static_sizeof
+using HostCPUFeatures: static_sizeof, register_size, register_count
+using CPUSummary: cache_linesize
 using LayoutPointers: bytestrideindex, stridedpointer
 using IfElse: ifelse
 import ChainRulesCore

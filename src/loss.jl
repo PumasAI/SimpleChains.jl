@@ -34,20 +34,24 @@ SquaredLoss() = SquaredLoss(nothing)
 target(sl::SquaredLoss) = getfield(sl, :y)
 init_params!(::AbstractLoss, p, _) = p, 1
 
+function Base.getindex(sl::SquaredLoss, r)
+  SquaredLoss(view(target(sl), r))
+end
+
 squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
 
 Base.show(io::IO, ::SquaredLoss) = print(io, "SquaredLoss")
 
-function chain_valgrad!(pg, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
+function chain_valgrad!(_, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
-  g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
+  # g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
   s = zero(T)
-  @turbo for i ∈ eachindex(g)
+  @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
-    g[i] = δ
+    arg[i] = δ
     s += δ*δ
   end
-  return T(0.5)*s, g, pu + sizeof(T)*length(g)
+  return T(0.5)*s, arg, pu# + sizeof(T)*length(g)
 end
 function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg, p, pu)
   y = getfield(sl, :y)
@@ -72,18 +76,20 @@ absolute_loss(chn::SimpleChain, y) = add_loss(chn, AbsoluteLoss(y))
 
 Base.show(io::IO, ::AbsoluteLoss) = print(io, "AbsoluteLoss")
 
-
+function Base.getindex(sl::AbsoluteLoss, r)
+  AbsoluteLoss(view(target(sl), r))
+end
 function chain_valgrad!(__, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, _::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
-  g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
-  s = zero(eltype(g))
-  @turbo for i ∈ eachindex(g)
+  # g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
+  s = zero(eltype(arg))
+  @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
     pos = δ > zero(T)
-    g[i] = ifelse(pos, one(T), -one(T))
+    arg[i] = ifelse(pos, one(T), -one(T))
     s += ifelse(pos, δ, -δ)
   end
-  return s, g, pu + sizeof(T)*length(g)
+  return s, arg, pu
 end
 
 function (sl::AbsoluteLoss{<:AbstractArray{<:Number}})(arg, p, pu)
@@ -104,44 +110,46 @@ function (sl::AbstractLoss{<:AbstractArray{<:AbstractArray}})(arg, p, pu)
   return s, p, pu
 end
 
-struct TransformedCrossEntropyLoss{Y<:AbstractMatrix}
-  trfy::Y
+
+struct LogitCrossEntropyLoss{Y<:AbstractVector{UInt32}}
+  y::Y
 end
-function (tcel::TransformedCrossEntropyLoss)(arg, p, pu)
-  trfy = tcel.trfy
-  s = zero(Base.promote_eltype(arg, trfy))
-  @turbo for i = eachindex(arg)
-    s -= arg[i] * trfy[i]
+LogitCrossEntropyLoss() = LogitCrossEntropyLoss(nothing)
+target(sl::LogitCrossEntropyLoss) = getfield(sl, :y)
+
+function (lcel::LogitCrossEntropyLoss)(arg::AbstractArray{T}, p::Ptr, pu) where {T}
+  y = lcel.y
+  N = length(y)
+  m = PtrArray(Ptr{T}(pu), (N,))
+  unnormalized_logsoftmax!(arg, m, arg)
+  s = zero(T)
+  @turbo for i = eachindex(y)
+    s -= arg[y[i],i] - m[i]
   end
-  s / size(trfy,2), p, pu
+  s / N, p, pu
 end
 function chain_valgrad!(
   __, arg::AbstractArray{T},
-  layers::Tuple{TransformedCrossEntropyLoss},
+  layers::Tuple{LogitCrossEntropyLoss},
   _::Ptr, pu::Ptr{UInt8}
 ) where {T}
-  
-  trfy = getfield(getfield(layers, 1), :logy)
-  g = PtrArray(stridedpointer(Ptr{T}(pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
-  s = zero(eltype(g))
-  Ninv = -inv(size(trfy,2))
-  @turbo for i ∈ eachindex(g)
-    trfyi = Ninv * trfy[i]
-    s += arg[i] * trfyi
-    g[i] = trfyi
-  end
-  return s, g, pu + sizeof(T)*length(g)
-end
-
-function CrossEntropyLoss(y)
-  logy = similar(y)
-  ϵ = eps(eltype(y))
+  y = getfield(getfield(layers, 1), :y)
+  N = length(y)
+  m = PtrArray(Ptr{T}(pu), (N,))
+  logsoftmax!(arg, m, arg)
+  s = zero(T)
   @turbo for i = eachindex(y)
-    logy[i] = log(y[i] + ϵ)
+    s -= arg[y[i],i]
   end
-  TransformedCrossEntropyLoss(logy)
+  Ninv = inv(T(N))
+  @turbo for i = eachindex(arg)
+    arg[i] = exp(arg[i])*Ninv
+  end
+  @turbo for i = eachindex(y)
+    arg[y[i],i] -= Ninv
+  end
+  return s*Ninv, arg, pu
 end
-function LogitCrossEntropyLoss(y)
-  TransformedCrossEntropyLoss(logsoftmax(y))
+function Base.getindex(sl::LogitCrossEntropyLoss, r)
+  LogitCrossEntropyLoss(view(target(sl), r))
 end
-

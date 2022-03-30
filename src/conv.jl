@@ -421,7 +421,7 @@ _unfused_fun(c, ::False) = getfield(c,:f)
 unfused_fun(c) = Activation(_unfused_fun(c, fast_fuse(c)))
 
 dimsum(c::Conv) = ArrayInterface.reduce_tup(+,c.dim)
-dimprod(c::Conv) = ArrayInterface.reduce_tup(*,c.dim)
+dimprod(c::Conv) = tsprod(c.dim)
 
 function Base.show(io::IO, c::Conv)
   print(io, "Conv $(c.dim) mapping to $(c.outputdim)")

@@ -48,7 +48,46 @@ end
   return (mt,vt,βp), pu
 end
 
-function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
+
+function update!(
+  g::AbstractVector, opt, Xp, layers, pen, sx, p, pm, optbuffer, _
+)
+  chain_valgrad_entry!(pointer(g), Xp, layers, pointer(p), pm)
+  apply_penalty!(g, pen, p, sx)
+  update!(opt, optbuffer, p, g)
+end
+function chain_valgrad_thread!((g, Xp, layers, p, pm), start, stop, mpt)
+  batchsize = size(Xp,ndims(Xp))
+  off = start-1
+  nt = size(g,static(2))
+  goff = stride(g,2)*sizeof(eltype(g))*off
+  moff = mpt*off
+  f = ((off*batchsize) ÷ nt) + 1
+  l = (stop*batchsize) ÷ nt
+  Xpv = view_slice_last(Xp, f:l)
+  newlayers = (Base.front(layers)..., last(layers)[f:l])
+  chain_valgrad_entry!(pointer(g)+goff, Xpv, newlayers, pointer(p), pm+moff)
+end
+function update!(
+  g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, mpt
+)
+  nthread = size(g,static(2))
+  Polyester.batch(
+    chain_valgrad_thread!,
+    (nthread, nthread),
+    g, Xp, layers, p, pm, mpt
+  )
+  @turbo for t = 2:nthread, i = axes(g,1)
+    g[i,1] += g[i,t]
+  end
+  apply_penalty!(g, pen, p, sx)
+  update!(opt, optbuffer, p, g)
+end
+
+
+function train_unbatched!(
+  g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray
+)
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
@@ -57,15 +96,12 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
   ll = last(layers);
   optoff = optmemsize(opt, p)
   sx = ArrayInterface.size(pX)
-  resize_memory!(layers, memory, pX, optoff)
+  mpt = resize_memory!(layers, memory, pX, optoff, size(g,static(2)))
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   GC.@preserve p g memory X begin
-    pg = pointer(g); pp = pointer(p)
     for y ∈ t
       layers_y = (fl..., ll(y))
-      chain_valgrad_entry!(pg, pX, layers_y, pp, pm)
-      apply_penalty!(g, pen, p, sx)
-      update!(opt, optbuffer, p, g)
+      update!(g, opt, pX, layers_y, pen, sx, p, pm, optbuffer, mpt)
     end
   end
   p
@@ -77,14 +113,11 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::I
   sx = ArrayInterface.size(pX)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  resize_memory!(layers, memory, pX, optoff)
+  mpt = resize_memory!(layers, memory, pX, optoff, size(g,static(2)))
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   GC.@preserve p g memory X begin
-    pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
-      chain_valgrad_entry!(pg, pX, layers, pp, pm)
-      apply_penalty!(g, pen, p, sx)
-      update!(opt, optbuffer, p, g)
+      update!(g, opt, pX, layers, pen, sx, p, pm, optbuffer, mpt)
     end
   end
   p
@@ -124,11 +157,12 @@ end
   # id, od = getfield(getfield(layers,1), :dims) # (od × id) * (id x N)
   turbo_dense_batch_size(
     inputdim, outputdim, N, VectorizationBase.pick_vector_width(T),
-    VectorizationBase.register_size(), VectorizationBase.register_count(), VectorizationBase.cache_linesize()
+    register_size(), register_count(), cache_linesize()
   )
 end
 @inline batch_size(layers::Tuple{L,Vararg}, argsz::Tuple, ::Val{T}) where {L,T} = batch_size(Base.tail(layers), argsz, Val(T))
 @inline batch_size(::Tuple{}, ::Tuple, ::Val{T}) where {T} = Static(18)
+
 
 @inline view_slice_last(X::AbstractArray{<:Any,1}, r) = view(X, r)
 @inline view_slice_last(X::AbstractArray{<:Any,2}, r) = view(X, :, r)
@@ -142,31 +176,24 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
   sx = ArrayInterface.size(pX) 
-  resize_memory!(layers, memory, pX, optoff)
+  mpt = resize_memory!(layers, memory, pX, optoff, size(g,static(2)))
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   N = sx[end]
-  N_bs = batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X))))
+  N_bs = batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X)))) * size(g,static(2))
   d, r = divrem(N, N_bs)
-  Ssize = (Base.front(sx)..., N_bs)
-  Ssize_rem = (Base.front(sx)..., r)
+  d += r != 0
+  r = ifelse(r != 0, r, N_bs)
   GC.@preserve p g memory X begin
-    pg = pointer(g); pp = pointer(p)
     for _ ∈ 1:iters
       doff = 0
-      for d in 1:d
-        Xd = view_slice_last(pX, doff+1:doff+N_bs)
-        Xp = PtrArray(stridedpointer(Xd), Ssize, VectorizationBase.val_dense_dims(Xd))
-        chain_valgrad_entry!(pg, Xp, layers, pp, pm)
-        apply_penalty!(g, pen, p, sx)
-        update!(opt, optbuffer, p, g)
-        doff += N_bs
-      end
-      if r ≠ 0
-        Xd = view_slice_last(pX, doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]))
-        Xp = PtrArray(stridedpointer(Xd), Ssize_rem, VectorizationBase.val_dense_dims(Xd))
-        chain_valgrad_entry!(pg, Xp, layers, pp, pm)
-        apply_penalty!(g, pen, p, sx)
-        update!(opt, optbuffer, p, g)
+      while true
+        doffnext = doff + N_bs
+        batchstop::Int = min(doffnext,N)
+        Xd = view_slice_last(pX, doff+1:batchstop)
+        newlayers = (Base.front(layers)..., last(layers)[doff+1:batchstop])
+        update!(g, opt, Xd, newlayers, pen, sx, p, pm, optbuffer, mpt)
+        doff = doffnext
+        doff >= N && break
       end
     end
   end
