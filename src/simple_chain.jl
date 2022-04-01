@@ -104,7 +104,7 @@ parameter_free(x) = numparam(x) == 0
   arg::AbstractArray{T},
   additional = static(0)
 ) where {T}
-  d = output_size(Val(T), layers, size(arg))*nthread + additional
+  d = output_size(Val(T), layers, size(arg)) + additional
   d2 = (2d)
   d2 > length(memory) && resize!(memory, d2)
   d

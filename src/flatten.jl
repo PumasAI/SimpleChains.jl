@@ -4,6 +4,7 @@ struct Flatten{N} end
 Flatten(N) = Flatten{convert(Int,N)::Int}()
 @generated _dec(::Flatten{N}) where {N} = Flatten{N-1}()
 
+init_params!(::Flatten, p, id) = p, id
 parameter_free(::Flatten) = true
 
 getoutputdim(::Flatten{1}, inputdim) = inputdim

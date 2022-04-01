@@ -35,7 +35,7 @@ target(sl::SquaredLoss) = getfield(sl, :y)
 init_params!(::AbstractLoss, p, _) = p, 1
 
 function Base.getindex(sl::SquaredLoss, r)
-  SquaredLoss(view(target(sl), r))
+  SquaredLoss(view_slice_last(target(sl), r))
 end
 
 squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
@@ -77,7 +77,7 @@ absolute_loss(chn::SimpleChain, y) = add_loss(chn, AbsoluteLoss(y))
 Base.show(io::IO, ::AbsoluteLoss) = print(io, "AbsoluteLoss")
 
 function Base.getindex(sl::AbsoluteLoss, r)
-  AbsoluteLoss(view(target(sl), r))
+  AbsoluteLoss(view_slice_last(target(sl), r))
 end
 function chain_valgrad!(__, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, _::Ptr, pu::Ptr{UInt8}) where {T}
   y = getfield(getfield(layers, 1), :y)
@@ -116,6 +116,7 @@ struct LogitCrossEntropyLoss{Y<:AbstractVector{UInt32}}
 end
 LogitCrossEntropyLoss() = LogitCrossEntropyLoss(nothing)
 target(sl::LogitCrossEntropyLoss) = getfield(sl, :y)
+(::LogitCrossEntropyLoss)(Y::AbstractVector{UInt32}) = LogitCrossEntropyLoss(Y)
 
 function (lcel::LogitCrossEntropyLoss)(arg::AbstractArray{T}, p::Ptr, pu) where {T}
   y = lcel.y

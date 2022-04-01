@@ -1,5 +1,6 @@
 
 tsprod(x) = ArrayInterface.reduce_tup(*, x)
+tsprod(::Tuple{}) = static(1)
 
 function maximum_turbo!(m, y)
   @turbo for i = eachindex(m)

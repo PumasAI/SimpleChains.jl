@@ -8,6 +8,7 @@ function output_size(::Val{T}, ::MaxPool{D}, inputdim::Tuple) where {T,D}
   outdim = getoutputdim(MaxPool{D}(), inputdim)
   align(sizeof(T)*ArrayInterface.reduce_tup(*, outdim)), outdim
 end
+init_params!(::MaxPool, p, id) = p, id
 
 _maxpooloutputdim(::Tuple{}, inputdim) = inputdim
 function _maxpooloutputdim(d::Tuple{StaticInt,Vararg{StaticInt}}, inputdim)

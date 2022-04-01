@@ -8,7 +8,9 @@ using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
 using HostCPUFeatures: static_sizeof, register_size, register_count
 using CPUSummary: cache_linesize
 using LayoutPointers: bytestrideindex, stridedpointer
+using ManualMemory: preserve_buffer
 using IfElse: ifelse
+import Random
 import ChainRulesCore
 import ForwardDiff
 

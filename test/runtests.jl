@@ -238,15 +238,15 @@ SquaredLoss"""
     end
     
     scconv = SimpleChain(
-      Conv(relu, (3,3), 1, 4)
+      Conv(relu, (3,3), 4)
     #  Conv(tanh, (5,5), 4, 3)
     )
     batch = 2
     x = rand(Float32, 28, 28, 1, batch);
     y = rand(Float32, 26, 26, 4, batch);
     scconvl = SimpleChains.add_loss(scconv, SquaredLoss(y))
-    p = SimpleChains.init_params(scconvl, size(x));
-    K,p2 = SimpleChains.getparams(first(scconv.layers), pointer(p));
+    p = @inferred(SimpleChains.init_params(scconvl, size(x)));
+    K,p2 = @inferred(SimpleChains.getparams(first(scconv.layers), pointer(p), size(x)));
     refloss = convlayertest(x, y, K)
     @test scconvl(x, p) ≈ refloss
     g = similar(p);
@@ -257,24 +257,75 @@ SquaredLoss"""
 
     
     scconv2 = SimpleChain(
-      Conv(relu, (3,3), 1, 4), # fast_fuse == true
-      Conv(tanh, (5,5), 4, 3) # fast_fuse == false
+      Conv(relu, (3,3), 4), # fast_fuse == true
+      Conv(tanh, (5,5), 3)  # fast_fuse == false
     )
     z = rand(Float32, 22, 22, 3, batch);
-    scconv2l = SimpleChains.add_loss(scconv2, SquaredLoss(z));
-    p = SimpleChains.init_params(scconv2l, size(x));
-    K0, p2 = SimpleChains.getparams((scconv2.layers)[1], pointer(p));
-    K1, p3 = SimpleChains.getparams((scconv2.layers)[2], p2);
+    scconv2l = @inferred(SimpleChains.add_loss(scconv2, SquaredLoss(z)));
+    p = @inferred(SimpleChains.init_params(scconv2l, size(x)));
+    K0, p2 = @inferred(SimpleChains.getparams((scconv2.layers)[1], pointer(p), size(x)));
+    K1, p3 = @inferred(SimpleChains.getparams((scconv2.layers)[2], p2, (1,1,4,1)));
     refloss = convlayertest(x, z, K0, K1)
-    @test scconv2l(x, p) ≈ refloss
+    @test @inferred(scconv2l(x, p)) ≈ refloss
     g = similar(p);
-    @test valgrad!(g, scconv2l, x, p) ≈ refloss
+    @test @inferred(valgrad!(g, scconv2l, x, p)) ≈ refloss
 
     gK0 = ForwardDiff.gradient(k -> convlayertest(x,z,k,K1), K0);
     gK1 = ForwardDiff.gradient(k -> convlayertest(x,z,K0,k), K1);
-    @show typeof(gK0) typeof(gK1)
+    # @show typeof(gK0) typeof(gK1)
     @test vcat(Float32.(vec(gK0)),Float32.(vec(gK1))) ≈ g
     
+  end
+  @testset "MaxPool" begin
+    using Test, ForwardDiff
+    A = rand(8, 8, 2);
+    firstmax = max(A[1,1,1],A[1,2,1],A[2,1,1],A[2,2,1]);
+    # test duplicates
+    A[1,1,1] = firstmax;
+    A[2,1,1] = firstmax;
+    # B = similar(A, (4,4,2));
+    mp = MaxPool(2,2);
+
+    d = rand(SimpleChains.getoutputdim(mp, size(A))...)
+    function maxpool(A, mp)
+      B = similar(A, SimpleChains.getoutputdim(mp, size(A)))
+      SimpleChains.maxpool!(B, A, mp)
+      return B
+    end
+    dot(a,b) = sum(a .* b)
+    g = ForwardDiff.gradient(Base.Fix2(dot,d) ∘ Base.Fix2(maxpool,mp), A)
+    Ac = copy(A);
+    SimpleChains.∂maxpool!(Ac, d, mp)
+    firstfdg = (g[1,1,1], g[1,2,1], g[2,1,1], g[2,2,1])
+    firstcfg = (Ac[1,1,1], Ac[1,2,1], Ac[2,1,1], Ac[2,2,1])
+    @test sum(iszero, firstfdg) == 3
+    @test sum(iszero, firstcfg) == 3
+    @test maximum(firstfdg) == maximum(firstcfg)
+    (g[1,1,1], g[1,2,1], g[2,1,1], g[2,2,1]) = firstcfg
+    @test Ac == g
+  end
+  @testset "LeNet" begin
+    N = 20;
+    nclasses = 10;
+    x = randn(28, 28, 1, N);
+    lenet = SimpleChain(
+      (static(28),static(28),static(1)),
+      Conv(relu, (5,5), 6),
+      MaxPool(2, 2),
+      Conv(relu, (5,5), 16),
+      MaxPool(2, 2),
+      Flatten(3),
+      TurboDense(relu, 120),
+      TurboDense(relu, 84),
+      TurboDense(identity, nclasses)
+    )
+    SimpleChains.outputdim(lenet, size(x))
+    # y = 
+    # d = Simple
+    p = SimpleChains.init_params(lenet, size(x))
+    lenet(x, p)
+    g = similar(p);
+    valgrad!(g, lenet, p, x)
   end
 end
 Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
