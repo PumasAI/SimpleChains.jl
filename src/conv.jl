@@ -4,145 +4,164 @@ using StrideArraysCore.LayoutPointers: zero_offsets
 # conv functions
 
 # 1d convolution
-function convlayer!(f::F, _C::AbstractArray{<:Any,2}, _A::AbstractArray{<:Any,2}, _K::AbstractArray{<:Any,3}) where {F}
+function convlayer!(f::F, _C::AbstractArray{<:Any,2}, _A::AbstractArray{<:Any,2}, _K::AbstractArray{<:Any,3}, _b) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   
   @turbo for j₁ ∈ axes(C,1), o ∈ axes(K,3)
     s = zero(eltype(C))
     for k₁ ∈ axes(K,1), i ∈ axes(K,2)
       s += A[j₁ + k₁, i] * K[k₁, i, o]
     end
-    C[j₁, o] = f(s)
+    C[j₁, o] = f(s + b[o])
   end
 end
-function convlayer!(f::F, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,3}) where {F}
+function convlayer!(f::F, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,3}, _b) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   
   for d ∈ axes(C,4)
-    convlayer!(f, view(C,:,:,d), view(A,:,:,d), K)
+    convlayer!(f, view(C,:,:,d), view(A,:,:,d), K, b)
   end
 end
-function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,2}, _C::AbstractArray{<:Any,2}, _A::AbstractArray{<:Any,2}, _K::AbstractArray{<:Any,3}) where {F}
+function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,2}, _C::AbstractArray{<:Any,2}, _A::AbstractArray{<:Any,2}, _K::AbstractArray{<:Any,3}, _b) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   
   @turbo for j₁ ∈ axes(C,1), o ∈ axes(K,3)
     s = zero(eltype(C))
     for k₁ ∈ axes(K,1), i ∈ axes(K,2)
       s += A[j₁ + k₁, i] * K[k₁, i, o]
     end
-    Cjo, ∂Cjo = ∂f(s)
+    Cjo, ∂Cjo = ∂f(s + b[o])
     C[j₁, o] = Cjo
     ∂C[j₁, o] = ∂Cjo
   end
 end
-function convlayer!(f::F, _∂C::AbstractArray{<:Any,3}, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,3}) where {F}
+function convlayer!(f::F, _∂C::AbstractArray{<:Any,3}, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,3}, _b) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   
   for d ∈ axes(C,4)
-    convlayer!(f, view(∂C,:,:,d), view(C,:,:,d), view(A,:,:,d), K)
+    convlayer!(f, view(∂C,:,:,d), view(C,:,:,d), view(A,:,:,d), K, b)
   end
 end
 
 # 2d convolution
-function convlayer!(f::F, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,4}) where {F}
+function convlayer!(f::F, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,4}, _b) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   @turbo for j₁ ∈ axes(C,1), j₂ ∈ axes(C,2), o ∈ axes(K,4)
     s = zero(eltype(C))
     for k₁ ∈ axes(K,1), k₂ ∈ axes(K,2), i ∈ axes(K,3)
       s += A[j₁ + k₁, j₂ + k₂, i] * K[k₁, k₂, i, o]
     end
-    C[j₁, j₂, o] = f(s)
+    C[j₁, j₂, o] = f(s + b[o])
   end
 end
-function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,4}) where {F}
+function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,4}, _b) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   for d ∈ axes(C,4)
-    convlayer!(f, view(C,:,:,:,d), view(A,:,:,:,d), K)
+    convlayer!(f, view(C,:,:,:,d), view(A,:,:,:,d), K, b)
   end
 end
 # 3d convolution
-function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,5}) where {F}
+function convlayer!(f::F, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,5}, _b) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   @turbo for j₁ ∈ axes(C,1), j₂ ∈ axes(C,2), j₃ ∈ axes(C,3), o ∈ axes(K,5)
     s = zero(eltype(C))
     for k₁ ∈ axes(K,1), k₂ ∈ axes(K,2), k₃ ∈ axes(K,3), i ∈ axes(K,4)
       s += A[j₁ + k₁, j₂ + k₂, j₃ + k₃ - 1, i] * K[k₁, k₂, k₃, i, o]
     end
-    C[j₁, j₂, j₃, o] = f(s)
+    C[j₁, j₂, j₃, o] = f(s + b[o])
   end
 end
-function convlayer!(f::F, _C::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5}, _K::AbstractArray{<:Any,5}) where {F}
+function convlayer!(f::F, _C::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5}, _K::AbstractArray{<:Any,5}, _b) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   for d ∈ axes(C,4)
-    convlayer!(f, view(C,:,:,:,:,d), view(A,:,:,:,:,d), K)
+    convlayer!(f, view(C,:,:,:,:,d), view(A,:,:,:,:,d), K, b)
   end
 end
 
 # 2d convolution
-function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,3}, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,4}) where {F}
+function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,3}, _C::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _K::AbstractArray{<:Any,4}, _b) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   @turbo for j₁ ∈ axes(C,1), j₂ ∈ axes(C,2), o ∈ axes(K,4)
     s = zero(eltype(C))
     for k₁ ∈ axes(K,1), k₂ ∈ axes(K,2), i ∈ axes(K,3)
       s += A[j₁ + k₁, j₂ + k₂, i] * K[k₁, k₂, i, o]
     end
-    c, ∂c = ∂f(s)
+    c, ∂c = ∂f(s + b[o])
     C[j₁, j₂, o] = c
     ∂C[j₁, j₂, o] = ∂c
   end
 end
-function convlayer!(f::F, ∂C::AbstractArray{<:Any,4}, C::AbstractArray{<:Any,4}, A::AbstractArray{<:Any,4}, K::AbstractArray{<:Any,4}) where {F}
+function convlayer!(f::F, ∂C::AbstractArray{<:Any,4}, C::AbstractArray{<:Any,4}, A::AbstractArray{<:Any,4}, K::AbstractArray{<:Any,4}, b) where {F}
   for d ∈ axes(C,4)
-    convlayer!(f, view(∂C,:,:,:,d), view(C,:,:,:,d), view(A,:,:,:,d), K)
+    convlayer!(f, view(∂C,:,:,:,d), view(C,:,:,:,d), view(A,:,:,:,d), K, b)
     # d == first(axes(C,4)) && @show view(∂C,:,:,:,d)
   end
   # @show view(∂C,:,:,:,first(axes(∂C,4)))
 end
 
 # 3d convolution
-function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,4}, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,5}) where {F}
+function convlayer!(∂f::F, _∂C::AbstractArray{<:Any,4}, _C::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _K::AbstractArray{<:Any,5}, _b) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   K = zero_offsets(_K)
+  b = zero_offsets(_b)
   @turbo for j₁ ∈ axes(C,1), j₂ ∈ axes(C,2), j₃ ∈ axes(C,3), o ∈ axes(K,5)
     s = zero(eltype(C))
     for k₁ ∈ axes(K,1), k₂ ∈ axes(K,2), k₃ ∈ axes(K,3), i ∈ axes(K,4)
       s += A[j₁ + k₁, j₂ + k₂, j₃ + k₃ - 1, i] * K[k₁, k₂, k₃, i, o]
     end
-    c, ∂c = ∂f(s)
+    c, ∂c = ∂f(s + b[o])
     C[j₁, j₂, j₃, o] = c
     ∂C[j₁, j₂, j₃, o] = ∂c
   end
 end
-function convlayer!(f::F, ∂C::AbstractArray{<:Any,5}, C::AbstractArray{<:Any,5}, A::AbstractArray{<:Any,5}, K::AbstractArray{<:Any,5}) where {F}
+function convlayer!(f::F, ∂C::AbstractArray{<:Any,5}, C::AbstractArray{<:Any,5}, A::AbstractArray{<:Any,5}, K::AbstractArray{<:Any,5}, b) where {F}
   for d ∈ axes(C,4)
-    convlayer!(f, view(∂C,:,:,:,:,d), view(C,:,:,:,:,d), view(A,:,:,:,:,d), K)
+    convlayer!(f, view(∂C,:,:,:,:,d), view(C,:,:,:,:,d), view(A,:,:,:,:,d), K, b)
   end
 end
 
-function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,2}, _Cadj::AbstractArray{<:Any,2})
+function convbadjoint!(badj::AbstractVector, Cadj::AbstractArray{<:Any,2})
+  @turbo for o ∈ eachindex(badj)
+    s = zero(eltype(badj))
+    for j ∈ axes(Cadj,1)
+      s += Cadj[j, o]
+    end
+    badj[o] = s
+  end
+end
+function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _badj, _A::AbstractArray{<:Any,2}, _Cadj::AbstractArray{<:Any,2})
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
@@ -153,8 +172,18 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,2
     end
     Kadj[k₁, i, o] = s
   end
+  convbadjoint!(zero_offsets(_badj), Cadj)
 end
-function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3}, _Cadj::AbstractArray{<:Any,3})
+function convbadjoint!(badj::AbstractVector, Cadj::AbstractArray{<:Any,3})
+  @turbo for o ∈ eachindex(badj)
+    s = zero(eltype(badj))
+    for j ∈ axes(Cadj,1), d ∈ axes(Cadj,3)
+      s += Cadj[j, o, d]
+    end
+    badj[o] = s
+  end
+end
+function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _badj, _A::AbstractArray{<:Any,3}, _Cadj::AbstractArray{<:Any,3})
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
@@ -165,8 +194,9 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _A::AbstractArray{<:Any,3
     end
     Kadj[k₁, i, o] = s
   end
+  convbadjoint!(zero_offsets(_badj), Cadj)
 end
-function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,3}, _Cadj::AbstractArray{<:Any,3})
+function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _badj, _A::AbstractArray{<:Any,3}, _Cadj::AbstractArray{<:Any,3})
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
@@ -177,8 +207,9 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,3
     end
     Kadj[k₁, k₂, i, o] = s
   end
+  convbadjoint!(zero_offsets(_badj), Flatten{2}()(Cadj))
 end
-function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
+function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _badj, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
@@ -189,9 +220,10 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _A::AbstractArray{<:Any,4
     end
     Kadj[k₁, k₂, i, o] = s
   end
+  convbadjoint!(zero_offsets(_badj), Flatten{2}()(Cadj))
 end
 
-function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
+function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _badj, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
@@ -202,8 +234,9 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,4
     end
     Kadj[k₁, k₂, k₃, i, o] = s
   end
+  convbadjoint!(zero_offsets(_badj), Flatten{3}()(Cadj))
 end
-function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5}, _Cadj::AbstractArray{<:Any,5})
+function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _badj, _A::AbstractArray{<:Any,5}, _Cadj::AbstractArray{<:Any,5})
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
@@ -214,6 +247,7 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _A::AbstractArray{<:Any,5
     end
     Kadj[k₁, k₂, k₃, i, o] = s
   end
+  convbadjoint!(zero_offsets(_badj), Flatten{3}()(Cadj))
 end
 
 # Cadj is padded??
@@ -467,12 +501,16 @@ end
 
 parameter_free(::Conv) = false
 function numparam(c::Conv, inputdim::Tuple{Vararg{Integer}})
-  ArrayInterface.reduce_tup(*, paramdim(c, inputdim)), getoutputdim(c, inputdim)
+  nK = ArrayInterface.reduce_tup(*, paramdim(c, inputdim))
+  nb = c.outputdim
+  nK + nb, getoutputdim(c, inputdim)
 end
 
 function getparams(c::Conv, p::Ptr{T}, inputdim::Tuple{Vararg{Integer}}) where {T}
   K = PtrArray(p, paramdim(c, inputdim))
-  K, p + sizeof(T) * length(K)
+  p += sizeof(T) * length(K)
+  b = PtrArray(p, (c.outputdim,))
+  (K, b), p + sizeof(T) * length(b)
 end
 
 function output_size(::Val{T}, c::Conv, inputdim::Tuple) where {T}
@@ -519,8 +557,8 @@ function (c::Conv)(A::AbstractArray{T0}, p::Ptr{T1}, pu::Ptr{UInt8}) where {T0,T
   sz = size(A)
   outputdim = getoutputdim(c, sz)
   C, pu2 = alloc_return(outputdim, Ptr{T}(pu))
-  K, p = getparams(c, p, sz)
-  convlayer!(fused_fun(c), C, A, K)
+  (K, b), p = getparams(c, p, sz)
+  convlayer!(fused_fun(c), C, A, K, b)
   call!(C, unfused_fun(c), p, Ptr{UInt8}(pu2))
   C, p, Ptr{UInt8}(pu2)
 end
@@ -529,8 +567,8 @@ function valgrad_layer!(pg::Ptr{T}, c::Conv{typeof(identity)}, A, p::Ptr{T}, pu:
   sz = size(A)
   outputdim = getoutputdim(c, sz)
   R, pu3 = alloc_return(outputdim, Ptr{T}(pu))
-  K, p2 = getparams(c, p, sz)
-  convlayer!(identity, R, A, K)
+  (K, b), p2 = getparams(c, p, sz)
+  convlayer!(identity, R, A, K, b)
   pg + length(K)*sizeof(T), R, p2, Ptr{UInt8}(pu3)
 end
 function valgrad_layer!(pg::Ptr{T}, c::Conv, A, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
@@ -539,8 +577,8 @@ function valgrad_layer!(pg::Ptr{T}, c::Conv, A, p::Ptr{T}, pu::Ptr{UInt8}) where
   # we want to allocate ∂C in front of C
   ∂C, pu2 = get∂C(c.f, outputdim, Ptr{T}(pu))
   C, pu3 = alloc_return(outputdim, Ptr{T}(pu2))
-  K, p2 = getparams(c, p, sz)
-  convlayer!(∂(fused_fun(c)), ∂C, C, A, K)
+  (K, b), p2 = getparams(c, p, sz)
+  convlayer!(∂(fused_fun(c)), ∂C, C, A, K, b)
   _valgrad_layer!(
     ∂C, C, pg + length(K)*sizeof(T),
     unfused_fun(c), C, p2, Ptr{UInt8}(pu3)
@@ -565,7 +603,8 @@ end
 function _pullback_param!(pg::Ptr{T}, c::Conv, C̄, A, pu::Ptr{UInt8}) where {T}
   ∂C = first(get∂C(c.f, size(C̄), Ptr{T}(pu)))
   update_C̄!(c.f, C̄, ∂C)
-  convlayeradjK!(first(getparams(c, pg, size(A))), A, C̄)
+  (K, b), _ = getparams(c, pg, size(A))
+  convlayeradjK!(K, b, A, C̄)
   return
 end
 

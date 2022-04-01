@@ -94,6 +94,7 @@ end
 _numparam(s, ::Tuple{}, _) = s
 function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
   np, od = numparam(getfield(layers, 1), id)
+  @show np
   _numparam(s + np, Base.tail(layers), od)
 end
 parameter_free(x) = numparam(x) == 0
