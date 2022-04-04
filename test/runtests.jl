@@ -21,9 +21,9 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
         scbase = SimpleChain(static(24), Activation(abs2), TurboDense{true}(tanh, static(8)), TurboDense{true}(identity, static(2))) # test inputdim
         scdbase = SimpleChain(TurboDense{true}(tanh, static(8)), Dropout(0.2), TurboDense{true}(identity, static(2))) # test inputdim unknown
       end
-    
+
       x = rand(T, 24, 199);
-      
+
       y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10;
       sc = SimpleChains.add_loss(scbase, SquaredLoss(y))
 
@@ -65,7 +65,7 @@ SquaredLoss"""
       @test_throws ArgumentError valgrad!(g, sc, rand(T,23,2), p)
       @test_throws ArgumentError valgrad!(g, sc, rand(T,23), p)
       valgrad!(g, scflp, x, p)
-      if VERSION < v"1.9-DEV" # TODO: remove check when Zygote stops segfaulting on 1.8-DEV 
+      if VERSION < v"1.9-DEV" # TODO: remove check when Zygote stops segfaulting on 1.8-DEV
         @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)[1]
         _gzyg = Zygote.gradient(p) do p
             0.5 * sum(abs2, Base.front(sc)(x, p) .- y)
@@ -108,7 +108,7 @@ Activation layer applying: tanh
 Dropout(p=0.2)
 TurboDense static(2) with bias.
 SquaredLoss"""
-  
+
       valgrad!(g, scd, x, p)
       offset = 2SimpleChains.align(first(scd.layers).outputdim * size(x, 2) * sizeof(T))
       si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
@@ -161,7 +161,7 @@ SquaredLoss"""
       pdd = dual.(pd);
       xdd = dual.(xd);
 
-      pu = Vector{UInt8}(undef, first(SimpleChains.output_size(Val(eltype(xdd)), td, size(x))));
+      pu = Vector{UInt8}(undef, first(SimpleChains.layer_output_size(Val(eltype(xdd)), td, size(x))));
 
       Ad = reshape(view(pd, 1:8*24), (8, 24));
       bd = view(pd, 1+8*24:8*25);
@@ -216,27 +216,28 @@ SquaredLoss"""
     end
   end
   @testset "Convolution" begin
-    function clt(f, x, K)
+    function clt(f, x, K, b)
       d1 = size(x,1) - size(K,1) + 1
       d2 = size(x,2) - size(K,2) + 1
-      closuresshouldntbeabletomutatebindings = Array{Base.promote_eltype(x,K)}(
+      closuresshouldntbeabletomutatebindings = Array{Base.promote_eltype(x,K,b)}(
         undef, d1, d2, size(K,4), size(x,4)
       )
-      SimpleChains.convlayer!(f, closuresshouldntbeabletomutatebindings, x, K)
+      SimpleChains.convlayer!(f, closuresshouldntbeabletomutatebindings, x, K, b)
       return closuresshouldntbeabletomutatebindings
     end
 
-    function convlayertest(x, y, K)
-      closuresshouldntbeabletomutatebindings = clt(relu, x, K)
+    function convlayertest(x, y, K, b)
+      closuresshouldntbeabletomutatebindings = clt(relu, x, K, b)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y);
       0.5*(δ'δ)
     end
-    function convlayertest(x, y, K0, K1)
-      closuresshouldntbeabletomutatebindings = tanh.(clt(identity, clt(relu, x, K0), K1))
+    function convlayertest(x, y, K0, b0, K1, b1)
+      csbamb = clt(identity, clt(relu, x, K0, b0), K1, b1)
+      closuresshouldntbeabletomutatebindings = tanh.(csbamb)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y);
       0.5*(δ'δ)
     end
-    
+
     scconv = SimpleChain(
       Conv(relu, (3,3), 4)
     #  Conv(tanh, (5,5), 4, 3)
@@ -246,16 +247,23 @@ SquaredLoss"""
     y = rand(Float32, 26, 26, 4, batch);
     scconvl = SimpleChains.add_loss(scconv, SquaredLoss(y))
     p = @inferred(SimpleChains.init_params(scconvl, size(x)));
-    K,p2 = @inferred(SimpleChains.getparams(first(scconv.layers), pointer(p), size(x)));
-    refloss = convlayertest(x, y, K)
+    (K,b),p2 = @inferred(SimpleChains.getparams(first(scconv.layers), pointer(p), size(x)));
+    refloss = convlayertest(x, y, K, b)
     @test scconvl(x, p) ≈ refloss
     g = similar(p);
     @test valgrad!(g, scconvl, x, p) ≈ refloss
 
-    gK = ForwardDiff.gradient(k -> convlayertest(x,y,k), K);
-    @test Float32.(vec(gK)) ≈ g
+    # gK = ForwardDiff.gradient(k -> convlayertest(x,y,k, b), K);
+    # @test Float32.(vec(gK)) ≈ g
+    gpfd = ForwardDiff.gradient(p) do p
+      K = copy(reshape(@view(p[1:36]),(3,3,1,4)))
+      b = p[37:end]
+      convlayertest(x,y,K,b)
+    end;
+    @test gpfd ≈ g
 
-    
+
+
     scconv2 = SimpleChain(
       Conv(relu, (3,3), 4), # fast_fuse == true
       Conv(tanh, (5,5), 3)  # fast_fuse == false
@@ -263,18 +271,20 @@ SquaredLoss"""
     z = rand(Float32, 22, 22, 3, batch);
     scconv2l = @inferred(SimpleChains.add_loss(scconv2, SquaredLoss(z)));
     p = @inferred(SimpleChains.init_params(scconv2l, size(x)));
-    K0, p2 = @inferred(SimpleChains.getparams((scconv2.layers)[1], pointer(p), size(x)));
-    K1, p3 = @inferred(SimpleChains.getparams((scconv2.layers)[2], p2, (1,1,4,1)));
-    refloss = convlayertest(x, z, K0, K1)
+    (K0,b0), p2 = @inferred(SimpleChains.getparams((scconv2.layers)[1], pointer(p), size(x)));
+    (K1,b1), p3 = @inferred(SimpleChains.getparams((scconv2.layers)[2], p2, (1,1,4,1)));
+    refloss = convlayertest(x, z, K0, b0, K1, b1)
     @test @inferred(scconv2l(x, p)) ≈ refloss
     g = similar(p);
     @test @inferred(valgrad!(g, scconv2l, x, p)) ≈ refloss
 
-    gK0 = ForwardDiff.gradient(k -> convlayertest(x,z,k,K1), K0);
-    gK1 = ForwardDiff.gradient(k -> convlayertest(x,z,K0,k), K1);
+    gK0 = ForwardDiff.gradient(k -> convlayertest(x,z,k, b0,K1,b1), K0);
+    gb0 = ForwardDiff.gradient(b -> convlayertest(x,z,K0,b, K1,b1), b0);
+    gK1 = ForwardDiff.gradient(k -> convlayertest(x,z,K0,b0,k, b1), K1);
+    gb1 = ForwardDiff.gradient(b -> convlayertest(x,z,K0,b0,K1,b ), b1);
     # @show typeof(gK0) typeof(gK1)
-    @test vcat(Float32.(vec(gK0)),Float32.(vec(gK1))) ≈ g
-    
+    @test Float32.(vcat(vec(gK0),gb0,vec(gK1),gb1)) ≈ g
+
   end
   @testset "MaxPool" begin
     using Test, ForwardDiff
@@ -310,17 +320,17 @@ SquaredLoss"""
     x = randn(28, 28, 1, N);
     lenet = SimpleChain(
       (static(28),static(28),static(1)),
-      Conv(relu, (5,5), 6),
-      MaxPool(2, 2),
-      Conv(relu, (5,5), 16),
-      MaxPool(2, 2),
+      SimpleChains.Conv(SimpleChains.relu, (5,5), 6),
+      SimpleChains.MaxPool(2, 2),
+      SimpleChains.Conv(SimpleChains.relu, (5,5), 16),
+      SimpleChains.MaxPool(2, 2),
       Flatten(3),
-      TurboDense(relu, 120),
-      TurboDense(relu, 84),
+      TurboDense(SimpleChains.relu, 120),
+      TurboDense(SimpleChains.relu, 84),
       TurboDense(identity, nclasses)
     )
     SimpleChains.outputdim(lenet, size(x))
-    # y = 
+    # y =
     # d = Simple
     p = SimpleChains.init_params(lenet, size(x))
     lenet(x, p)
@@ -329,4 +339,3 @@ SquaredLoss"""
   end
 end
 Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
-

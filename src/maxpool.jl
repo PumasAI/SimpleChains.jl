@@ -4,11 +4,10 @@ MaxPool(x::Tuple{Vararg{Integer}}) = MaxPool{map(Int,x)}()
 MaxPool(x::Vararg{Integer}) = MaxPool{map(Int,x)}()
 
 parameter_free(::MaxPool) = true
-function output_size(::Val{T}, ::MaxPool{D}, inputdim::Tuple) where {T,D}
+function layer_output_size(::Val{T}, ::MaxPool{D}, inputdim::Tuple) where {T,D}
   outdim = getoutputdim(MaxPool{D}(), inputdim)
   align(sizeof(T)*ArrayInterface.reduce_tup(*, outdim)), outdim
 end
-init_params!(::MaxPool, p, id) = p, id
 
 _maxpooloutputdim(::Tuple{}, inputdim) = inputdim
 function _maxpooloutputdim(d::Tuple{StaticInt,Vararg{StaticInt}}, inputdim)
@@ -19,6 +18,7 @@ end
 function getoutputdim(::MaxPool{D}, inputdim) where {D}
   _maxpooloutputdim(map(StaticInt, D), inputdim)
 end
+init_params!(::MaxPool{D}, p, id) where {D} = p, getoutputdim(MaxPool{D}(), id)
 
 numparam(mp::MaxPool, inputdim) = 0, getoutputdim(mp, inputdim)
 

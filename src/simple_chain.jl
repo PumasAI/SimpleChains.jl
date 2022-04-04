@@ -55,11 +55,11 @@ function Base.show(io::IO, sc::SimpleChain)
 end
 
 function outputdim(x::Tuple{X}, s1) where {X}
-  last(output_size(Val{Float32}(), getfield(x,1), s1))
+  last(layer_output_size(Val{Float32}(), getfield(x,1), s1))
 end
 function outputdim(x::Tuple{X1,X2,Vararg}, s1::Tuple) where {X1,X2}
   # Main._a[] = (T, x, s1)
-  _, s2 = output_size(Val{Float32}(), getfield(x,1), s1)
+  _, s2 = layer_output_size(Val{Float32}(), getfield(x,1), s1)
   outputdim(Base.tail(x), s2)
 end
 function outputdim(sc::SimpleChain, id = nothing)
@@ -75,18 +75,6 @@ Useful for popping off a loss layer.
 Base.front(c::SimpleChain) = SimpleChain(chain_input_dims(c), Base.front(c.layers), c.memory)
 Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers...,l), c.memory)
 
-
-
-# output_size must be defined to return the total size of all outputs
-output_size(::Val{T}, x::Tuple{}, _) where {T} = 0
-function output_size(::Val{T}, x::Tuple{X}, s1) where {T,X}
-  first(output_size(Val{T}(), getfield(x,1), s1))
-end
-function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple) where {T,X1,X2}
-  # Main._a[] = (T, x, s1)
-  b, s2 = output_size(Val{T}(), getfield(x,1), s1)
-  b + output_size(Val{T}(), Base.tail(x), s2)
-end
 function numparam(c::SimpleChain, id = nothing)
   _id = chain_input_dims(c, id)
   _numparam(0, c.layers, _id)
@@ -94,7 +82,6 @@ end
 _numparam(s, ::Tuple{}, _) = s
 function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
   np, od = numparam(getfield(layers, 1), id)
-  @show np
   _numparam(s + np, Base.tail(layers), od)
 end
 parameter_free(x) = numparam(x) == 0
@@ -142,14 +129,35 @@ function (c::SimpleChain)(arg, params)
   resize_memory!(layers, memory, parg)
   GC.@preserve arg unsafe_chain(layers, params, memory, parg)
 end
-function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
+@inline function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
   GC.@preserve params memory _chain(arg, layers, pointer(params), pointer(memory))
 end
-_chain(arg, ::Tuple{}, p::Ptr, pu::Ptr{UInt8}) = arg
-_chain(arg, l::Tuple{T}, p::Ptr, pu::Ptr{UInt8}) where {T} = getfield(getfield(l,1)(arg, p, pu), 1)
-function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
-  res, p, pu = getfield(l,1)(arg, p, pu)
-  _chain(res, Base.tail(l), p, pu)
+
+for i = 0:10
+  f = i == 10 ? :_chain : Symbol("_chain$(i)")
+  g = i == 10 ? :_chain0 : (i == 9 ? :_chain : Symbol("_chain$(i+1)"))
+  @eval begin
+    @inline $f(arg, ::Tuple{}, p::Ptr, pu::Ptr{UInt8}) = arg
+    @inline $f(arg, l::Tuple{T}, p::Ptr, pu::Ptr{UInt8}) where {T} =
+      getfield(getfield(l, 1)(arg, p, pu), 1)
+    @inline function $f(
+      arg,
+      l::Tuple{T1,T2,Vararg},
+      p::Ptr,
+      pu::Ptr{UInt8},
+    ) where {T1,T2}
+      res, p, pu = getfield(l, 1)(arg, p, pu)
+      $g(res, Base.tail(l), p, pu)
+    end
+    @inline $f(::Val{T}, x::Tuple{}, _) where {T} = 0
+    @inline function ($f(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
+      first(layer_output_size(Val{T}(), getfield(x,1), s1))
+    end
+    @inline function ($f(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
+      b, s2 = layer_output_size(Val{T}(), getfield(x,1), s1)
+      b + $g(Val{T}(), Base.tail(x), s2)
+    end
+  end
 end
 
 @inline function _try_static(i::Integer, j::Integer)
@@ -195,6 +203,7 @@ function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
   return x
 end
 function init_params!(layers::Tuple, p::Ptr, id)
+  pold = p
   p, od = init_params!(first(layers), p, id)
   init_params!(Base.tail(layers), p, od)
 end

@@ -124,9 +124,7 @@ end
 function convlayer!(f::F, ∂C::AbstractArray{<:Any,4}, C::AbstractArray{<:Any,4}, A::AbstractArray{<:Any,4}, K::AbstractArray{<:Any,4}, b) where {F}
   for d ∈ axes(C,4)
     convlayer!(f, view(∂C,:,:,:,d), view(C,:,:,:,d), view(A,:,:,:,d), K, b)
-    # d == first(axes(C,4)) && @show view(∂C,:,:,:,d)
   end
-  # @show view(∂C,:,:,:,first(axes(∂C,4)))
 end
 
 # 3d convolution
@@ -152,8 +150,10 @@ function convlayer!(f::F, ∂C::AbstractArray{<:Any,5}, C::AbstractArray{<:Any,5
   end
 end
 
-function convbadjoint!(badj::AbstractVector, Cadj::AbstractArray{<:Any,2})
-  @turbo for o ∈ eachindex(badj)
+function convbadjoint!(_badj::AbstractVector, _Cadj::AbstractArray{<:Any,2})
+  badj = zero_offsets(_badj)
+  Cadj = zero_offsets(_Cadj)
+  @turbo for o ∈ axes(Cadj,2)
     s = zero(eltype(badj))
     for j ∈ axes(Cadj,1)
       s += Cadj[j, o]
@@ -172,10 +172,12 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _badj, _A::AbstractArray{
     end
     Kadj[k₁, i, o] = s
   end
-  convbadjoint!(zero_offsets(_badj), Cadj)
+  convbadjoint!(_badj, Cadj)
 end
-function convbadjoint!(badj::AbstractVector, Cadj::AbstractArray{<:Any,3})
-  @turbo for o ∈ eachindex(badj)
+function convbadjoint!(_badj::AbstractVector, _Cadj::AbstractArray{<:Any,3})
+  badj = zero_offsets(_badj)
+  Cadj = zero_offsets(_Cadj)
+  @turbo for o ∈ axes(Cadj,2)
     s = zero(eltype(badj))
     for j ∈ axes(Cadj,1), d ∈ axes(Cadj,3)
       s += Cadj[j, o, d]
@@ -194,7 +196,7 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,3}, _badj, _A::AbstractArray{
     end
     Kadj[k₁, i, o] = s
   end
-  convbadjoint!(zero_offsets(_badj), Cadj)
+  convbadjoint!(_badj, Cadj)
 end
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _badj, _A::AbstractArray{<:Any,3}, _Cadj::AbstractArray{<:Any,3})
   Cadj = zero_offsets(_Cadj)
@@ -207,7 +209,7 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _badj, _A::AbstractArray{
     end
     Kadj[k₁, k₂, i, o] = s
   end
-  convbadjoint!(zero_offsets(_badj), Flatten{2}()(Cadj))
+  convbadjoint!(_badj, Flatten{2}()(Cadj))
 end
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _badj, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
   Cadj = zero_offsets(_Cadj)
@@ -220,7 +222,7 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,4}, _badj, _A::AbstractArray{
     end
     Kadj[k₁, k₂, i, o] = s
   end
-  convbadjoint!(zero_offsets(_badj), Flatten{2}()(Cadj))
+  convbadjoint!(_badj, Flatten{2}()(Cadj))
 end
 
 function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _badj, _A::AbstractArray{<:Any,4}, _Cadj::AbstractArray{<:Any,4})
@@ -234,9 +236,10 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _badj, _A::AbstractArray{
     end
     Kadj[k₁, k₂, k₃, i, o] = s
   end
-  convbadjoint!(zero_offsets(_badj), Flatten{3}()(Cadj))
+  convbadjoint!(_badj, Flatten{3}()(Cadj))
 end
-function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _badj, _A::AbstractArray{<:Any,5}, _Cadj::AbstractArray{<:Any,5})
+function
+  convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _badj, _A::AbstractArray{<:Any,5}, _Cadj::AbstractArray{<:Any,5})
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
@@ -247,7 +250,7 @@ function convlayeradjK!(_Kadj::AbstractArray{<:Any,5}, _badj, _A::AbstractArray{
     end
     Kadj[k₁, k₂, k₃, i, o] = s
   end
-  convbadjoint!(zero_offsets(_badj), Flatten{3}()(Cadj))
+  convbadjoint!(_badj, Flatten{3}()(Cadj))
 end
 
 # Cadj is padded??
@@ -513,17 +516,20 @@ function getparams(c::Conv, p::Ptr{T}, inputdim::Tuple{Vararg{Integer}}) where {
   (K, b), p + sizeof(T) * length(b)
 end
 
-function output_size(::Val{T}, c::Conv, inputdim::Tuple) where {T}
+function layer_output_size(::Val{T}, c::Conv, inputdim::Tuple) where {T}
   g1, outputdim = numparam(c, inputdim)
   g2 = prod(outputdim)
   align(static_sizeof(T) * g1) + 2align(static_sizeof(T) * g2), outputdim
 end
 
 function init_params!(c::Conv, p, inputdim)
-  K, p = getparams(c, p, inputdim)
+  (K,b), p2 = getparams(c, p, inputdim)
   gn = Base.FastMath.sqrt_fast(eltype(K)(length(c.dim)/dimsum(c)))
   randn!(local_rng(), K, static(0), static(0), gn)
-  return p, getoutputdim(c, inputdim)
+  @turbo for i = eachindex(b)
+    b[i] = 0
+  end
+  return p2, getoutputdim(c, inputdim)
 end
 
 function alloc_return(outputdim, p)
@@ -569,7 +575,7 @@ function valgrad_layer!(pg::Ptr{T}, c::Conv{typeof(identity)}, A, p::Ptr{T}, pu:
   R, pu3 = alloc_return(outputdim, Ptr{T}(pu))
   (K, b), p2 = getparams(c, p, sz)
   convlayer!(identity, R, A, K, b)
-  pg + length(K)*sizeof(T), R, p2, Ptr{UInt8}(pu3)
+  pg + (length(K) + length(b))*sizeof(T), R, p2, Ptr{UInt8}(pu3)
 end
 function valgrad_layer!(pg::Ptr{T}, c::Conv, A, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
   sz = size(A)
@@ -580,7 +586,7 @@ function valgrad_layer!(pg::Ptr{T}, c::Conv, A, p::Ptr{T}, pu::Ptr{UInt8}) where
   (K, b), p2 = getparams(c, p, sz)
   convlayer!(∂(fused_fun(c)), ∂C, C, A, K, b)
   _valgrad_layer!(
-    ∂C, C, pg + length(K)*sizeof(T),
+    ∂C, C, pg + (length(K)+length(b))*sizeof(T),
     unfused_fun(c), C, p2, Ptr{UInt8}(pu3)
   )
 end
@@ -594,7 +600,7 @@ function _pullback!(pg::Ptr{T}, c::Conv, C̄, A, p::Ptr{T}, pu::Ptr{UInt8}) wher
   return
 end
 function _pullback_A!(c::Conv, C̄, A, p::Ptr{T}) where {T}
-  convlayeradjA!(A, first(getparams(c, p, size(A))), C̄) # overwrite A
+  convlayeradjA!(A, first(first(getparams(c, p, size(A)))), C̄) # overwrite A
   return
 end
 function pullback_param!(pg::Ptr{T}, c::Conv, C̄, A, ::Ptr{T}, pu::Ptr{UInt8}) where {T}
@@ -603,8 +609,8 @@ end
 function _pullback_param!(pg::Ptr{T}, c::Conv, C̄, A, pu::Ptr{UInt8}) where {T}
   ∂C = first(get∂C(c.f, size(C̄), Ptr{T}(pu)))
   update_C̄!(c.f, C̄, ∂C)
-  (K, b), _ = getparams(c, pg, size(A))
-  convlayeradjK!(K, b, A, C̄)
+  (gK, gb), _ = getparams(c, pg, size(A))
+  convlayeradjK!(gK, gb, A, C̄)
   return
 end
 

@@ -9,8 +9,8 @@ struct TurboDense{B,I<:Integer,F}
   outputdim::I
 end
 
-TurboDense{B}(f::F, t::I) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, t)
-TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, t)
+TurboDense{B}(f::F, t::I) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
+TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
 function TurboDense{B}(::Integer, ::Integer) where {B}
   throw(ArgumentError("TurboDense{$B} requires one integer (output dim) and one function argument."))
 end
@@ -42,7 +42,7 @@ end
 _numparam(d::TurboDense{false}, inputdim::Integer) = inputdim * d.outputdim
 _numparam(d::TurboDense{true}, inputdim::Integer) = (inputdim + 1)*d.outputdim
 parameter_free(::TurboDense) = false
-function output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
+function layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
   g1, outputdim = numparam(td, inputdim)
   g2 = prod(outputdim)
   align(static_sizeof(T) * g1) + 2align(static_sizeof(T) * g2), outputdim

@@ -14,8 +14,8 @@ import Random
 import ChainRulesCore
 import ForwardDiff
 
-# using LoopVectorization
-macro turbo(args...); esc(Base.tail(args)); end
+using LoopVectorization
+# macro turbo(args...); esc(last(args)); end
 
 export SimpleChain, TurboDense, Dropout, Activation, Conv, MaxPool, Flatten,
   AbsoluteLoss, SquaredLoss, relu, static, StrideArray, valgrad!, valgrad,

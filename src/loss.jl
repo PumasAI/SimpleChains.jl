@@ -21,11 +21,14 @@ iterate_over_losses(sc) = _iterate_over_losses(target(sc))
 
 parameter_free(::AbstractLoss) = true
 numparam(::AbstractLoss, _) = 0, 1
-function output_size(::Val{T}, sl::AbstractLoss{<:AbstractArray{<:AbstractArray}}, s) where {T}
+function layer_output_size(
+  ::Val{T}, sl::AbstractLoss{<:AbstractArray{<:AbstractArray}}, s
+) where {T}
   align(length(first(target(sl))) * static_sizeof(T)), static_sizeof(T)
 end
-output_size(::Val{T}, sl::AbstractLoss, s) where {T} = align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
-
+function layer_output_size(::Val{T}, sl::AbstractLoss, s) where {T}
+    align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
+end
 struct SquaredLoss{Y} <: AbstractLoss{Y}
   y::Y
 end

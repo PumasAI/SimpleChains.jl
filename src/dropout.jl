@@ -46,7 +46,7 @@ function getpcmp(::StaticInt{W}, ::StaticInt{WU}, x::UInt32, ::False) where {W,W
   (x % UInt64) << 32
 end
 
-output_size(::Val{T}, d::Dropout, s) where {T} = align((prod(s)+7) & -8), s
+layer_output_size(::Val{T}, d::Dropout, s) where {T} = align((prod(s)+7) & -8), s
 
 function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
   si = StrideIndex{1,(1,),1}((StaticInt(1),), (StaticInt(0),))

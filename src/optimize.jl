@@ -227,7 +227,7 @@ end
   Kk = Static.known(indputdim)
   Mk = Static.known(outputdim)
   Nk = Static.known(Nd)
-  M = Mk === nothing ? 1024 : Mk
+  M = Mk === norunthing ? 1024 : Mk
   K = Kk === nothing ? 1024 : Kk
   N = Nk === nothing ? 1024 : Nk
   mₖ, nₖ = LoopVectorization.matmul_params(RS, RC, CLS; M, K, N, W)
