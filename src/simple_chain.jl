@@ -1,6 +1,6 @@
 
 struct InputDimUnknown end
-const InputDim=Union{InputDimUnknown,Tuple{Vararg{Integer}}}
+const InputDim = Union{InputDimUnknown,Tuple{Vararg{Integer}}}
 
 struct SimpleChain{N,I<:InputDim,L<:Tuple{Vararg{Any,N}}}
   inputdim::I
@@ -55,11 +55,11 @@ function Base.show(io::IO, sc::SimpleChain)
 end
 
 function outputdim(x::Tuple{X}, s1) where {X}
-  last(layer_output_size(Val{Float32}(), getfield(x,1), s1))
+  last(layer_output_size(Val{Float32}(), getfield(x, 1), s1))
 end
 function outputdim(x::Tuple{X1,X2,Vararg}, s1::Tuple) where {X1,X2}
   # Main._a[] = (T, x, s1)
-  _, s2 = layer_output_size(Val{Float32}(), getfield(x,1), s1)
+  _, s2 = layer_output_size(Val{Float32}(), getfield(x, 1), s1)
   outputdim(Base.tail(x), s2)
 end
 function outputdim(sc::SimpleChain, id = nothing)
@@ -72,8 +72,9 @@ end
 
 Useful for popping off a loss layer.
 """
-Base.front(c::SimpleChain) = SimpleChain(chain_input_dims(c), Base.front(c.layers), c.memory)
-Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers...,l), c.memory)
+Base.front(c::SimpleChain) =
+  SimpleChain(chain_input_dims(c), Base.front(c.layers), c.memory)
+Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers..., l), c.memory)
 
 function numparam(c::SimpleChain, id = nothing)
   _id = chain_input_dims(c, id)
@@ -90,7 +91,7 @@ parameter_free(x) = numparam(x) == 0
   layers,
   memory::Vector{UInt8},
   arg::AbstractArray{T},
-  additional = static(0)
+  additional = static(0),
 ) where {T}
   d = output_size(Val(T), layers, size(arg)) + additional
   d2 = (2d)
@@ -101,10 +102,11 @@ end
   layers,
   memory::Vector{UInt8},
   arg::AbstractArray{T},
-  additional, nthread
+  additional,
+  nthread,
 ) where {T}
   base_mem_per_thread = 2output_size(Val(T), layers, size(arg))
-  mem_total = additional + base_mem_per_thread*nthread
+  mem_total = additional + base_mem_per_thread * nthread
   mem_total > length(memory) && resize!(memory, mem_total)
   base_mem_per_thread
 end
@@ -136,26 +138,23 @@ end
 for i = 0:10
   f = i == 10 ? :_chain : Symbol("_chain$(i)")
   g = i == 10 ? :_chain0 : (i == 9 ? :_chain : Symbol("_chain$(i+1)"))
+  fo = i == 10 ? :output_size : Symbol("_output_size$(i)")
+  go = i == 10 ? :_output_size0 : (i == 9 ? :output_size : Symbol("_output_size$(i+1)"))
   @eval begin
     @inline $f(arg, ::Tuple{}, p::Ptr, pu::Ptr{UInt8}) = arg
     @inline $f(arg, l::Tuple{T}, p::Ptr, pu::Ptr{UInt8}) where {T} =
       getfield(getfield(l, 1)(arg, p, pu), 1)
-    @inline function $f(
-      arg,
-      l::Tuple{T1,T2,Vararg},
-      p::Ptr,
-      pu::Ptr{UInt8},
-    ) where {T1,T2}
+    @inline function $f(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
       res, p, pu = getfield(l, 1)(arg, p, pu)
       $g(res, Base.tail(l), p, pu)
     end
-    @inline $f(::Val{T}, x::Tuple{}, _) where {T} = 0
-    @inline function ($f(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
-      first(layer_output_size(Val{T}(), getfield(x,1), s1))
+    @inline $fo(::Val{T}, x::Tuple{}, _) where {T} = 0
+    @inline function ($fo(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
+      first(layer_output_size(Val{T}(), getfield(x, 1), s1))
     end
-    @inline function ($f(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
-      b, s2 = layer_output_size(Val{T}(), getfield(x,1), s1)
-      b + $g(Val{T}(), Base.tail(x), s2)
+    @inline function ($fo(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
+      b, s2 = layer_output_size(Val{T}(), getfield(x, 1), s1)
+      b + $go(Val{T}(), Base.tail(x), s2)
     end
   end
 end
@@ -179,17 +178,19 @@ end
 
 @inline _try_static(::Tuple{}, x::Tuple{Vararg}) = x
 @inline function _try_static(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
-  (
-    _try_static(first(x), first(y)),
-    _try_static(Base.tail(x), Base.tail(y))...
-   )
+  (_try_static(first(x), first(y)), _try_static(Base.tail(x), Base.tail(y))...)
 end
 @inline function _try_static(j::Integer, i::Tuple{I,Vararg}) where {I}
-    (_try_static(j, first(i)), Base.tail(i)...)
+  (_try_static(j, first(i)), Base.tail(i)...)
 end
-chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, inputdim::Tuple{Vararg{Integer}}) = inputdim
+chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, inputdim::Tuple{Vararg{Integer}}) =
+  inputdim
 function chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, ::Nothing)
-  throw(ArgumentError("SimpleChains without an explicitly provided InputDim require manually providing it when calling `init_params`"))
+  throw(
+    ArgumentError(
+      "SimpleChains without an explicitly provided InputDim require manually providing it when calling `init_params`",
+    ),
+  )
 end
 chain_input_dims(chn::SimpleChain, ::Nothing) = chain_input_dims(chn)
 function chain_input_dims(chn::SimpleChain, inputdim::Tuple{Vararg{Integer}})
@@ -211,7 +212,7 @@ init_params!(::Tuple{}, p::Ptr, _) = nothing
 function init_params(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
-  ::Type{T} = Float32
+  ::Type{T} = Float32,
 ) where {T}
   _id = chain_input_dims(Λ, id)
   init_params!(Λ, Vector{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id))
@@ -254,8 +255,14 @@ function unsafe_valgrad!(g, layers, params, memory::Vector{UInt8}, arg)
   end
 end
 
-function chain_valgrad_entry!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {X1,X2}
-  l = getfield(layers,1)
+function chain_valgrad_entry!(
+  pg,
+  arg,
+  layers::Tuple{X1,X2,Vararg},
+  p::Ptr,
+  pu::Ptr{UInt8},
+) where {X1,X2}
+  l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   if parameter_free(l)
     val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
@@ -265,15 +272,21 @@ function chain_valgrad_entry!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::
   end
   return val
 end
-function chain_valgrad!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {X1,X2}
-  l = getfield(layers,1)
+function chain_valgrad!(
+  pg,
+  arg,
+  layers::Tuple{X1,X2,Vararg},
+  p::Ptr,
+  pu::Ptr{UInt8},
+) where {X1,X2}
+  l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
   lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
   return val, lgrad, pu4
 end
 function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where {X}
-  l = getfield(layers,1)
+  l = getfield(layers, 1)
   __, val, _, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   # val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
@@ -286,14 +299,13 @@ function valgrad(sc, arg, params::AbstractVector{T}) where {T}
   parg = maybe_static_size_arg(c.inputdim, arg)
   off = align(resize_memory!(layers, memory, parg))
   GC.@preserve memory arg begin
-    g = PtrArray(reinterpret(Ptr{T}, pointer(memory)+off), (static_length(params),))
+    g = PtrArray(reinterpret(Ptr{T}, pointer(memory) + off), (static_length(params),))
     l = Base.FastMath.add_fast(
       unsafe_valgrad!(g, layers, params, memory, parg),
-      apply_penalty!(g, getpenalty(sc), params, size(parg))
+      apply_penalty!(g, getpenalty(sc), params, size(parg)),
     )
   end
   return l, StrideArraysCore.StrideArray(g, memory)
 end
 
 isstochastic(_) = false
-

@@ -4,9 +4,9 @@ has_loss(sc::SimpleChain) = last(sc.layers) isa AbstractLoss
 function add_loss(sc::SimpleChain, l::AbstractLoss)
   id = chain_input_dims(sc)
   if has_loss(sc)
-    SimpleChain(id, (Base.front(sc.layers)...,l), sc.memory)
+    SimpleChain(id, (Base.front(sc.layers)..., l), sc.memory)
   else
-    SimpleChain(id, (sc.layers...,l), sc.memory)
+    SimpleChain(id, (sc.layers..., l), sc.memory)
   end
 end
 function remove_loss(sc::SimpleChain)
@@ -22,12 +22,14 @@ iterate_over_losses(sc) = _iterate_over_losses(target(sc))
 parameter_free(::AbstractLoss) = true
 numparam(::AbstractLoss, _) = 0, 1
 function layer_output_size(
-  ::Val{T}, sl::AbstractLoss{<:AbstractArray{<:AbstractArray}}, s
+  ::Val{T},
+  sl::AbstractLoss{<:AbstractArray{<:AbstractArray}},
+  s,
 ) where {T}
   align(length(first(target(sl))) * static_sizeof(T)), static_sizeof(T)
 end
 function layer_output_size(::Val{T}, sl::AbstractLoss, s) where {T}
-    align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
+  align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 end
 struct SquaredLoss{Y} <: AbstractLoss{Y}
   y::Y
@@ -45,16 +47,22 @@ squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
 
 Base.show(io::IO, ::SquaredLoss) = print(io, "SquaredLoss")
 
-function chain_valgrad!(_, arg::AbstractArray{T}, layers::Tuple{SquaredLoss}, p::Ptr, pu::Ptr{UInt8}) where {T}
+function chain_valgrad!(
+  _,
+  arg::AbstractArray{T},
+  layers::Tuple{SquaredLoss},
+  p::Ptr,
+  pu::Ptr{UInt8},
+) where {T}
   y = getfield(getfield(layers, 1), :y)
   # g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
     arg[i] = δ
-    s += δ*δ
+    s += δ * δ
   end
-  return T(0.5)*s, arg, pu# + sizeof(T)*length(g)
+  return T(0.5) * s, arg, pu# + sizeof(T)*length(g)
 end
 function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg, p, pu)
   y = getfield(sl, :y)
@@ -62,9 +70,9 @@ function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg, p, pu)
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
-    s += δ*δ
+    s += δ * δ
   end
-  T(0.5)*s, p, pu
+  T(0.5) * s, p, pu
 end
 
 
@@ -82,7 +90,13 @@ Base.show(io::IO, ::AbsoluteLoss) = print(io, "AbsoluteLoss")
 function Base.getindex(sl::AbsoluteLoss, r)
   AbsoluteLoss(view_slice_last(target(sl), r))
 end
-function chain_valgrad!(__, arg::AbstractArray{T}, layers::Tuple{AbsoluteLoss}, _::Ptr, pu::Ptr{UInt8}) where {T}
+function chain_valgrad!(
+  __,
+  arg::AbstractArray{T},
+  layers::Tuple{AbsoluteLoss},
+  _::Ptr,
+  pu::Ptr{UInt8},
+) where {T}
   y = getfield(getfield(layers, 1), :y)
   # g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
   s = zero(eltype(arg))
@@ -114,7 +128,7 @@ function (sl::AbstractLoss{<:AbstractArray{<:AbstractArray}})(arg, p, pu)
 end
 
 
-struct LogitCrossEntropyLoss{Y<:AbstractVector{UInt32}}
+struct LogitCrossEntropyLoss{Y<:AbstractVector{UInt32}} <: AbstractLoss{Y}
   y::Y
 end
 LogitCrossEntropyLoss() = LogitCrossEntropyLoss(nothing)
@@ -127,32 +141,34 @@ function (lcel::LogitCrossEntropyLoss)(arg::AbstractArray{T}, p::Ptr, pu) where 
   m = PtrArray(Ptr{T}(pu), (N,))
   unnormalized_logsoftmax!(arg, m, arg)
   s = zero(T)
-  @turbo for i = eachindex(y)
-    s -= arg[y[i],i] - m[i]
+  @turbo for i in eachindex(y)
+    s -= arg[y[i], i] - m[i]
   end
   s / N, p, pu
 end
 function chain_valgrad!(
-  __, arg::AbstractArray{T},
+  __,
+  arg::AbstractArray{T},
   layers::Tuple{LogitCrossEntropyLoss},
-  _::Ptr, pu::Ptr{UInt8}
+  _::Ptr,
+  pu::Ptr{UInt8},
 ) where {T}
   y = getfield(getfield(layers, 1), :y)
   N = length(y)
   m = PtrArray(Ptr{T}(pu), (N,))
   logsoftmax!(arg, m, arg)
   s = zero(T)
-  @turbo for i = eachindex(y)
-    s -= arg[y[i],i]
+  @turbo for i in eachindex(y)
+    s -= arg[y[i], i]
   end
   Ninv = inv(T(N))
-  @turbo for i = eachindex(arg)
-    arg[i] = exp(arg[i])*Ninv
+  @turbo for i in eachindex(arg)
+    arg[i] = exp(arg[i]) * Ninv
   end
-  @turbo for i = eachindex(y)
-    arg[y[i],i] -= Ninv
+  @turbo for i in eachindex(y)
+    arg[y[i], i] -= Ninv
   end
-  return s*Ninv, arg, pu
+  return s * Ninv, arg, pu
 end
 function Base.getindex(sl::LogitCrossEntropyLoss, r)
   LogitCrossEntropyLoss(view(target(sl), r))
