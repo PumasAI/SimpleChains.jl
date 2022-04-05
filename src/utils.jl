@@ -42,3 +42,15 @@ function logsoftmax(y::AbstractMatrix)
   logsoftmax!(z, m, y)
   return z
 end
+
+nfan() = static(1), static(1)
+nfan(n) = static(1), n
+nfan(n_out, n_in) = n_in, n_out
+function nfan(dims::Vararg{Any,K}) where {K}
+  df = Base.front(dims)
+  dt = Base.tail(df)
+  dff = Base.front(df)
+  dft = Base.tail(df)
+  p = tsprod(dff)
+  p * dft, p * dt
+end
