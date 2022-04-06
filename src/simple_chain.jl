@@ -90,10 +90,10 @@ parameter_free(x) = numparam(x) == 0
 @inline function resize_memory!(
   layers,
   memory::Vector{UInt8},
-  arg::AbstractArray{T},
+  ::Val{T}, sx,
   additional = static(0),
 ) where {T}
-  d = output_size(Val(T), layers, size(arg)) + additional
+  d = output_size(Val(T), layers, sx) + additional
   d2 = (2d)
   d2 > length(memory) && resize!(memory, d2)
   d
@@ -101,14 +101,41 @@ end
 @inline function resize_memory!(
   layers,
   memory::Vector{UInt8},
-  arg::AbstractArray{T},
+  ::Val{T}, sx,
   additional,
+  additional_per_thread,
   nthread,
 ) where {T}
-  base_mem_per_thread = 2output_size(Val(T), layers, size(arg))
+  base_mem_per_thread = 2output_size(Val(T), layers, sx) + additional_per_thread
   mem_total = additional + base_mem_per_thread * nthread
   mem_total > length(memory) && resize!(memory, mem_total)
   base_mem_per_thread
+end
+@inline function resize_memory!(
+  layers,
+  memory::Vector{UInt8},
+  arg::AbstractArray{T},
+  additional = static(0),
+) where {T}
+  resize_memory!(layers, memory, Val(T), size(arg), additional)
+end
+@inline function resize_memory!(
+  layers,
+  memory::Vector{UInt8},
+  arg::AbstractArray{T},
+  additional,
+  additional_per_thread,
+  nthread,
+) where {T}
+  resize_memory!(
+    layers,
+    memory,
+    Val(T),
+    size(arg),
+    additional,
+    additional_per_thread,
+    nthread,
+  )
 end
 
 matches(::InputDimUnknown, _) = true
@@ -198,13 +225,10 @@ function chain_input_dims(chn::SimpleChain, inputdim::Tuple{Vararg{Integer}})
 end
 
 function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
-  GC.@preserve x begin
-    init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
-  end
+  GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
   return x
 end
 function init_params!(layers::Tuple, p::Ptr, id)
-  pold = p
   p, od = init_params!(first(layers), p, id)
   init_params!(Base.tail(layers), p, od)
 end
@@ -267,7 +291,7 @@ function chain_valgrad_entry!(
   if parameter_free(l)
     val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
   else
-    val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+    val, grad, puout = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
     pullback_param!(pg, l, grad, arg, p, pu)
   end
   return val

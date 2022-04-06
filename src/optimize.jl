@@ -28,8 +28,9 @@ function update!(o::ADAM, (mt, vt, βp), x, Δ)
   βp[2] = βp₂ * β₂
   return
 end
-@inline optmemsize(opt::ADAM, p::AbstractVector{T}) where {T} =
-  2align(sizeof(T) * length(p)) + align(1)
+@inline function optmemsize(::ADAM, p::AbstractVector{T}) where {T}
+    2align(sizeof(T) * length(p)) + align(1)
+end
 @inline function optmemory(opt::ADAM, p::AbstractVector{T}, pu::Ptr{UInt8}) where {T}
   memoff = align(sizeof(T) * length(p))
   mt = PtrArray(reinterpret(Ptr{T}, pu), (ArrayInterface.static_length(p),))
@@ -40,7 +41,7 @@ end
     vt[i] = 0
   end
   βp_doesnot_fit_at_end = sizeof(T) * length(p) + 16 > memoff
-  pu_p_memoff = pu + memoff
+  pu_p_memoff = pu + memoff # aligned
   pβp = ifelse(βp_doesnot_fit_at_end, pu_p_memoff, pu + sizeof(T) * length(p))
   pu = pu_p_memoff
   βp = PtrArray(reinterpret(Ptr{Float64}, pβp), (static(2),))
@@ -59,6 +60,7 @@ function update!(g::AbstractVector, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
 end
 function chain_valgrad_thread!((g, Xp, layers, p, pm), start, stop, mpt)
   batchsize = size(Xp, ndims(Xp))
+  start > stop && return nothing
   off = start - 1
   nt = size(g, static(2))
   goff = stride(g, 2) * sizeof(eltype(g)) * off
@@ -68,6 +70,7 @@ function chain_valgrad_thread!((g, Xp, layers, p, pm), start, stop, mpt)
   Xpv = view_slice_last(Xp, f:l)
   newlayers = (Base.front(layers)..., last(layers)[f:l])
   chain_valgrad_entry!(pointer(g) + goff, Xpv, newlayers, pointer(p), pm + moff)
+  return nothing
 end
 function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, mpt)
   nthread = size(g, static(2))
@@ -78,6 +81,7 @@ function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
   apply_penalty!(g, pen, p, sx)
   GC.@preserve gpb update!(opt, optbuffer, p, PtrArray(pointer(g), (length(p),)))
 end
+# note that pstop - pstart = subrangelen, so it is not a closed-closed i
 function shuffle_chain_valgrad_thread!(
   (g, Xp, layers, p, pm, mpt, perm, pstart, pstop),
   start,
@@ -86,7 +90,6 @@ function shuffle_chain_valgrad_thread!(
   # will work over subrange of pstart+1:pstop
   # it is divided into nthread parts...
   subrangelen = pstop - pstart
-  subrangelen > 0 || return
   numthread = size(g, static(2))
   batchsize, r = divrem(subrangelen, numthread)
   off = start - 1
@@ -95,6 +98,7 @@ function shuffle_chain_valgrad_thread!(
 
   fm1 = off * batchsize + pstart + min(r, off)
   lastdim = batchsize + (start <= r)
+  ((lastdim > 0) & (subrangelen > 0)) || return nothing
   l = fm1 + lastdim
 
   loss = last(layers)
@@ -121,7 +125,7 @@ function shuffle_chain_valgrad_thread!(
   ptgt = pointer(tgt)
   GC.@preserve tgtpb Xpb begin
     for i = fm1:l-1
-      j = perm[i+1]
+      j = perm[i+1] # j is zero-based
       # @show i, j
       @simd ivdep for k = 0:Int(tgtlen)-1
         x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
@@ -312,40 +316,47 @@ function train_batched!(
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
   sx = chain_input_dims(chn, size(pX))
-  N = sx[end]
+  N = last(sx)
   # need to shuffle `N`
   tgt = target(chn)
   nthread = size(g, static(2))
-  N_bs =
-    batchsize === nothing ?
-    batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread :
+  N_bs = if batchsize === nothing
+    batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
+  else
     batchsize
+  end
   tgt_batch_len = tsprod(Base.front(size(tgt))) * N_bs
   X_batch_len = tsprod(Base.front(sx)) * N_bs
+  sxb = (Base.front(sx)..., N_bs)
   shuffle_per_thread =
     align(sizeof(eltype(tgt)) * tgt_batch_len) + align(sizeof(eltype(X)) * X_batch_len)
-  shuffle_off = align(sizeof(Int) * N_bs) + shuffle_per_thread * nthread
-  mpt =
-    resize_memory!(layers, memory, pX, optoff + shuffle_off, nthread) + shuffle_per_thread
-  optbuffer, pm = optmemory(opt, p, pointer(memory))
-  perm = PtrArray(Ptr{Int}(pm), (N,))
-  for n = 0:N-1
-    perm[n+1] = n
-  end
-  pm += align(sizeof(Int) * N)
-  d, r = divrem(N, N_bs)
-  d += r != 0
-  r = ifelse(r != 0, r, N_bs)
+  perm_mem = align(sizeof(Int) * N)
+  mpt = resize_memory!(
+    layers,
+    memory,
+    Val(eltype(pX)),
+    sxb,
+    optoff + perm_mem,
+    shuffle_per_thread,
+    nthread,
+  )
   GC.@preserve p g memory X begin
+    optbuffer, pm = optmemory(opt, p, pointer(memory))
+    perm = PtrArray(Ptr{Int}(pm), (N,))
+    pm += perm_mem
+    d, r = divrem(N, N_bs)
+    d += r != 0
+    r = ifelse(r != 0, r, N_bs)
+    @inbounds for n = 0:N-1
+      perm[n+1] = n
+    end
     iter = 0
     while true
       doff = 0
       while true
         doffnext = doff + N_bs
         batchstop::Int = min(doffnext, N)
-        # Xd = view_slice_last(pX, doff+1:batchstop)
-        # newlayers = (Base.front(layers)..., last(layers)[doff+1:batchstop])
-        # shuffle_update!(g, opt, Xd, newlayers, pen, sx, p, pm, optbuffer, mpt, perm)
+        # @show doff:batchstop
         shuffle_update!(
           g,
           opt,

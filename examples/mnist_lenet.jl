@@ -8,11 +8,11 @@ using Flux.Optimise: Optimiser, WeightDecay
 using Flux: onehotbatch, onecold
 using Flux.Losses: logitcrossentropy
 using Statistics, Random
-using Logging: with_logger
-using TensorBoardLogger: TBLogger, tb_overwrite, set_step!, set_step_increment!
-using ProgressMeter: @showprogress
+# using Logging: with_logger
+# using TensorBoardLogger: TBLogger, tb_overwrite, set_step!, set_step_increment!
+# using ProgressMeter: @showprogress
 import MLDatasets
-import BSON
+# import BSON
 using CUDA
 # arguments for the `train` function
 Base.@kwdef mutable struct Args
@@ -117,11 +117,11 @@ function train!(model, args = Args(), opt = ADAM(args.η))
     end
 
     ## LOGGING UTILITIES
-    if args.tblogger
-        tblogger = TBLogger(args.savepath, tb_overwrite)
-        set_step_increment!(tblogger, 0) # 0 auto increment since we manually set_step!
-        # @info "TensorBoard logging at \"$(args.savepath)\""
-    end
+    # if args.tblogger
+    #     tblogger = TBLogger(args.savepath, tb_overwrite)
+    #     set_step_increment!(tblogger, 0) # 0 auto increment since we manually set_step!
+    #     # @info "TensorBoard logging at \"$(args.savepath)\""
+    # end
 
     # function report(epoch)
     #     train = eval_loss_accuracy(train_loader, model, device)
@@ -180,8 +180,7 @@ function eval_loss_accuracy(X, Y, model, p)
   Yoc = onecold(Y) .% UInt32
   mloss = SimpleChains.add_loss(model, SimpleChains.LogitCrossEntropyLoss(Yoc))
   l = mloss(X, p) * size(X)[end]
-  Ŷ = Base.front(mloss)(X, p)
-  acc = sum( onecold(Matrix(Ŷ)) .== Yoc)
+  acc = sum( onecold(Matrix(Base.front(mloss)(X, p))) .== Yoc)
   ntot = size(X)[end]
   return (loss = l/ntot |> round4, acc = acc/ntot*100 |> round4)
 end
@@ -192,7 +191,7 @@ model = LeNet5();
 
 (x, y) = first(train_loader);
 
-p = mapreduce(vec, vcat, Flux.params(model).order);
+@time p = SimpleChains.init_params(lenet, size(x));
 
 @time model(device(x))
 @time lenet(x, p)
@@ -201,13 +200,55 @@ lenetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y.in
 g = similar(p);
 @time valgrad!(g, lenetloss, x, p)
 
+X, Y = train_loader.data;
+lenetfull = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(Y.indices));
+
+G = similar(p, length(p), min(Threads.nthreads(), Sys.CPU_THREADS ÷ 2));
+@time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
+
+Xtest, Ytest = test_loader.data;
+eval_loss_accuracy(X,Y,lenet,p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+
+SimpleChains.init_params!(lenet, p, size(Xtest));
+@time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
+eval_loss_accuracy(X,Y,lenet,p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+
+
+
+lenet.memory .= 0;
+p = SimpleChains.init_params!(lenet, p, size(x));
+@time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
+eval_loss_accuracy(X,Y,lenet,p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+SimpleChains.init_params!(lenet, p, size(x));
+@time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
+eval_loss_accuracy(X,Y,lenet,p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+
+
+
+g0 = similar(g); g1 = similar(g);
+lenetloss.memory .= 0xff;
+@time valgrad!(g0, lenetloss, x, p)
+lenetloss.memory .= 0x00;
+@time valgrad!(g1, lenetloss, x, p)
+g0 == g1
+lenet.memory .= 0;
+p = SimpleChains.init_params!(lenet, p, size(x));
+@time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
+eval_loss_accuracy(X,Y,lenet,p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+p = SimpleChains.init_params!(lenet, p, size(x));
+@time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
+eval_loss_accuracy(X,Y,lenet,p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+
+
+
 @time train!(model)
 eval_loss_accuracy(train_loader, model, device), eval_loss_accuracy(test_loader, model, device)
 
 X, Y = train_loader.data;
 lenetfull = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(Y.indices));
 
-G = similar(p, length(p), Threads.nthreads() ÷ 2);
+
+G = similar(p, length(p), min(Threads.nthreads(), Sys.CPU_THREADS ÷ 2));
 @time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
 
 Xtest, Ytest = test_loader.data;

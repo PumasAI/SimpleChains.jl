@@ -26,7 +26,8 @@ import Random
 import ChainRulesCore
 import ForwardDiff
 
-using LoopVectorization: matmul_params, @turbo
+using LoopVectorization: matmul_params, @turbo, @turbo_debug
+# using LoopVectorization: matmul_params#, @turbo
 # macro turbo(args...); esc(last(args)); end
 
 export SimpleChain,

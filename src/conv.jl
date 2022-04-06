@@ -168,15 +168,18 @@ function convlayer!(
   A = zero_offsets(_A)
   K = zero_offsets(_K)
   b = zero_offsets(_b)
-  @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
+  # FIXME: this seems to be buggy!!! The outer `@turbo` definitely
+  # results in worse accuracy after training
+  for o ∈ axes(K, 4); @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2)
+  # @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
+  # for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
     s = zero(eltype(C))
     for k₁ ∈ axes(K, 1), k₂ ∈ axes(K, 2), i ∈ axes(K, 3)
       s += A[j₁+k₁, j₂+k₂, i] * K[k₁, k₂, i, o]
     end
-    c, ∂c = ∂f(s + b[o])
-    C[j₁, j₂, o] = c
-    ∂C[j₁, j₂, o] = ∂c
-  end
+    C[j₁, j₂, o], ∂C[j₁, j₂, o] = ∂f(s + b[o])
+  end; end
+  # end
 end
 function convlayer!(
   f::F,
@@ -504,7 +507,7 @@ function convlayeradjA2!(
 end
 =#
 
-# generated because `@turbo` prefers literals in indexing expressions
+# generated because `#= @turbo =#` prefers literals in indexing expressions
 function convlayeradjA!(
   _Aadj::AbstractArray{<:Any,4},
   _K::AbstractArray{T,5},
@@ -590,17 +593,6 @@ function Base.show(io::IO, c::Conv)
   end
 end
 
-
-@inline bsub(::Tuple{}, ::Number) = ()
-@inline bsub(x::Tuple{T}, y::Number) where {T} = (only(x) - y,)
-@inline bsub(x::Tuple{T0,T1,Vararg}, y::Number) where {T0,T1} =
-  (first(x) - y, bsub(Base.tail(x), y)...)
-
-@inline badd(::Tuple{}, ::Number) = ()
-@inline badd(x::Tuple{T}, y::Number) where {T} = (only(x) + y,)
-@inline badd(x::Tuple{T0,T1,Vararg}, y::Number) where {T0,T1} =
-  (first(x) + y, badd(Base.tail(x), y)...)
-
 function getoutputdim(
   c::Conv{F,D},
   inputdim::Tuple{Vararg{Integer,N}},
@@ -670,8 +662,7 @@ end
 
 function init_params!(c::Conv, p, inputdim)
   (K, b), p2 = getparams(c, p, inputdim)
-  gn = Base.FastMath.sqrt_fast(eltype(K)(length(c.dim) / dimsum(c)))
-  randn!(local_rng(), K, static(0), static(0), gn)
+  glorot_uniform!(K)
   @turbo for i in eachindex(b)
     b[i] = 0
   end
@@ -712,7 +703,6 @@ function (c::Conv)(A::AbstractArray{T0}, p::Ptr{T1}, pu::Ptr{UInt8}) where {T0,T
   (K, b), p = getparams(c, p, sz)
   convlayer!(fused_fun(c), C, A, K, b)
   call!(C, unfused_fun(c), p, Ptr{UInt8}(pu2))
-  C, p, Ptr{UInt8}(pu2)
 end
 
 function valgrad_layer!(

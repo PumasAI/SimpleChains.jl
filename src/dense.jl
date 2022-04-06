@@ -71,19 +71,17 @@ end
 function _init_params!(td::TurboDense{true}, p, inputdim::Integer)
   W, p = getparams(td, p, inputdim)
   outputdim = td.outputdim
-  lrng = local_rng()
-  gn = Base.FastMath.sqrt_fast(eltype(W)(2 / (inputdim + outputdim)))
-  randn!(lrng, view(W, :, 1:inputdim), static(0), static(0), gn)
-  # randn!(lrng, view(W, :, inputdim+1))
-  fill!(view(W, :, inputdim + 1), 0)
+  glorot_normal!(view(W, :, 1:inputdim))
+  @turbo for i = 1:outputdim
+    W[i,inputdim + 1] = 0
+  end
+  # fill!(view(W, :, inputdim+1), 0)
   return p, outputdim
 end
 function _init_params!(td::TurboDense{false}, p, inputdim::Integer)
   W, p = getparams(td, p, inputdim)
-  outputdim = td.outputdim
-  gn = Base.FastMath.sqrt_fast(eltype(W)(2 / (inputdim + outputdim)))
-  randn!(local_rng(), W, static(0), static(0), gn)
-  return p, outputdim
+  glorot_normal!(W)
+  return p, td.outputdim
 end
 
 function alloc_return(
@@ -446,7 +444,7 @@ function dense!(
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
+  #= @turbo =# for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
       Cmn += A[m, k] * B[k, n]
@@ -534,9 +532,32 @@ function matrix_view(::TurboDense{true}, A)
 end
 update_C̄!(::typeof(identity), _, __) = nothing #=∂C=#
 function update_C̄!(::F, C̄, ∂C) where {F}
+  # ∂C = zero_offsets(_∂C)
+  # C̄ = zero_offsets(_C̄)
+  # for i ∈ eachindex(∂C)
+  #   C̄[i] *= ∂C[i]
+  # end
+  # return
+  # Ccopy = copy(C̄)
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
   end
+  # for i ∈ eachindex(∂C)
+  #   # C̄[i] *= ∂C[i]
+  #   Ccopy[i] *= ∂C[i]
+  # end
+  # if Ccopy != C̄
+  #   Main._a[] = (copy(∂C), Ccopy, copy(C̄))
+  #   # (StrideArraysCore.BitPtrArray{Tuple{Static.StaticInt{84}, Int64}, (true, true), 2, 1, 0, (1, 2), Tuple{Static.StaticInt{1}, Static.StaticInt{88}}, Tuple{Int64, Int64}},
+  #   # StrideArraysCore.PtrArray{Tuple{Static.StaticInt{84}, Int64}, (true, true), Float32, 2, 1, 0, (1, 2), Tuple{Static.StaticInt{4}, Static.StaticInt{336}}, Tuple{Static.StaticInt{1}, Static.StaticInt{1}}})
+  #   Main._b[] = @turbo_debug for i ∈ eachindex(∂C)
+  #     C̄[i] *= ∂C[i]
+  #   end
+  #   for i ∈ eachindex(∂C)
+  #     C̄[i] = Ccopy[i]
+  #     # C̄[i] *= ∂C[i]
+  #   end
+  # end
 end
 function pullback_param!(
   pg::Ptr{T},
