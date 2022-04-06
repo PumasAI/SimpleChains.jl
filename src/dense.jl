@@ -73,7 +73,7 @@ function _init_params!(td::TurboDense{true}, p, inputdim::Integer)
   outputdim = td.outputdim
   glorot_normal!(view(W, :, 1:inputdim))
   @turbo for i = 1:outputdim
-    W[i,inputdim + 1] = 0
+    W[i, inputdim+1] = 0
   end
   # fill!(view(W, :, inputdim+1), 0)
   return p, outputdim
@@ -444,7 +444,7 @@ function dense!(
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  #= @turbo =# for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)  #= @turbo =#
     Cmn = zero(eltype(C))
     for k ∈ 1:K
       Cmn += A[m, k] * B[k, n]
@@ -899,3 +899,4 @@ function dense!(
   matmul!(Cdual, Adual, B, BT())
   dualeval!(f, Cdual)
 end
+
