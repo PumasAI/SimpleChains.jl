@@ -212,7 +212,7 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
   ll = last(layers)
   optoff = optmemsize(opt, p)
   sx = ArrayInterface.size(pX)
-  mpt = resize_memory!(layers, memory, pX, optoff, size(g, static(2)))
+  mpt = resize_memory!(layers, memory, pX, optoff, 0, size(g, static(2)))
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   GC.@preserve p g memory X begin
     for y ∈ t
@@ -229,7 +229,7 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::I
   sx = ArrayInterface.size(pX)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  mpt = resize_memory!(layers, memory, pX, optoff, size(g, static(2)))
+  mpt = resize_memory!(layers, memory, pX, optoff, 0, size(g, static(2)))
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   GC.@preserve p g memory X begin
     for _ ∈ 1:iters
