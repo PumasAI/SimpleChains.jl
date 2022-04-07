@@ -23,7 +23,7 @@ function pullback_layer!(pbl::PullBackLayer, lgrad)
 end
 pullback_layer!(pbl::Ptr{UInt8}, grad) = grad, pbl
 
-struct PullBack{PBL<:PullBackLayer, G, P, M}
+struct PullBack{PBL<:PullBackLayer,G,P,M}
   pbl::PBL
   grad::G
   params::P
@@ -31,23 +31,32 @@ struct PullBack{PBL<:PullBackLayer, G, P, M}
 end
 function (pb::PullBack)(x)
   @unpack pbl, grad, params, memory = pb
-  GC.@preserve grad  params  memory begin
+  GC.@preserve grad params memory begin
     lgrad, pu4 = pullback_layer!(pbl, x)
   end
-  NoTangent(), StrideArraysCore.StrideArray(lgrad, memory), StrideArraysCore.StrideArray(grad, memory)
+  NoTangent(),
+  StrideArraysCore.StrideArray(lgrad, memory),
+  StrideArraysCore.StrideArray(grad, memory)
 end
 
 
 function unsafe_valgrad_pullback!(g, layers, params, memory::Vector{UInt8}, arg)
   GC.@preserve g params memory begin
     # @show pointer(g) pointer(params) pointer(memory)
-    l, pbl = chain_valgrad_pullback!(pointer(g), arg, layers, pointer(params), pointer(memory))
+    l, pbl =
+      chain_valgrad_pullback!(pointer(g), arg, layers, pointer(params), pointer(memory))
   end
   l, PullBack(pbl, g, params, memory)
 end
 
-function chain_valgrad_pullback!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {X1,X2}
-  l = getfield(layers,1)
+function chain_valgrad_pullback!(
+  pg,
+  arg,
+  layers::Tuple{X1,X2,Vararg},
+  p::Ptr,
+  pu::Ptr{UInt8},
+) where {X1,X2}
+  l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
 
   # val, grad, pu3, pbl = chain_valgrad_pullback!(pg2, larg, Base.tail(layers), p2, pu2)
@@ -57,8 +66,14 @@ function chain_valgrad_pullback!(pg, arg, layers::Tuple{X1,X2,Vararg}, p::Ptr, p
   # lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
   # return val, lgrad, pu4
 end
-function chain_valgrad_pullback!(pg, arg, layers::Tuple{X1}, p::Ptr, pu::Ptr{UInt8}) where {X1}
-  l = getfield(layers,1)
+function chain_valgrad_pullback!(
+  pg,
+  arg,
+  layers::Tuple{X1},
+  p::Ptr,
+  pu::Ptr{UInt8},
+) where {X1}
+  l = getfield(layers, 1)
   pg2, val, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
 
   # val, grad, pu3, pbl = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
@@ -77,9 +92,9 @@ function valgrad_noloss(sc, arg, params::AbstractVector{T}) where {T}
   c = getchain(sc)
   @unpack layers, memory = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  off = align(resize_memory!(layers, memory, parg, length(parg)*sizeof(eltype(parg))))
+  off = align(resize_memory!(layers, memory, parg, length(parg) * sizeof(eltype(parg))))
   GC.@preserve arg memory begin
-    g = PtrArray(reinterpret(Ptr{T}, pointer(memory)+off), (static_length(params),))
+    g = PtrArray(reinterpret(Ptr{T}, pointer(memory) + off), (static_length(params),))
     l, pullback = unsafe_valgrad_pullback!(g, layers, params, memory, parg)
   end
   return StrideArraysCore.StrideArray(l, memory), pullback
@@ -91,7 +106,7 @@ end
 function _rrule(sc, arg, params, ::True)
   l, g = valgrad(sc, arg, params)
   # assumes no grad w/ respect to arg
-  pullback = let g=g
+  pullback = let g = g
     l̄ -> begin
       if !isone(l̄)
         @turbo for i ∈ eachindex(g)
@@ -105,7 +120,5 @@ function _rrule(sc, arg, params, ::True)
 end
 
 ChainRulesCore.rrule(sc::AbstractPenalty, arg, params) = _rrule(sc, arg, params, True())
-ChainRulesCore.rrule(sc::SimpleChain, arg, params) = _rrule(sc, arg, params, has_loss_typed(sc))
-
-
-
+ChainRulesCore.rrule(sc::SimpleChain, arg, params) =
+  _rrule(sc, arg, params, has_loss_typed(sc))
