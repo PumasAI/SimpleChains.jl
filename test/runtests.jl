@@ -55,8 +55,7 @@ SquaredLoss"""
         # typename doesn't work on 1.5
         @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
     end
-
-    p = SimpleChains.init_params(sc, T);
+    p = SimpleChains.init_params(scflp, T);
     g = similar(p);
     @test_throws ArgumentError sc(rand(T,23,2), p)
     @test_throws ArgumentError sc(rand(T,23), p)
@@ -98,8 +97,9 @@ SquaredLoss"""
         l + 2.3 * (sum(abs2, A1) + sum(abs2, b1)) + 0.45 * (sum(abs, A2) + sum(abs, b2))
     end
     @test g ≈ gfd
-
     scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
+    @test_throws ArgumentError SimpleChains.init_params(scd, T)
+    @test length(SimpleChains.init_params(scd, size(x), T)) == length(p)
     @test sprint((io,t) -> show(io,t), scd) == """
 SimpleChain with the following layers:
 TurboDense static(8) with bias.
