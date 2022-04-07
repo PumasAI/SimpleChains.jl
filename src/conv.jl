@@ -1,6 +1,4 @@
 
-using StrideArraysCore.LayoutPointers: zero_offsets
-
 # conv functions
 
 # 1d convolution

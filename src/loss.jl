@@ -55,7 +55,6 @@ function chain_valgrad!(
   pu::Ptr{UInt8},
 ) where {T}
   y = getfield(getfield(layers, 1), :y)
-  # g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
@@ -98,7 +97,6 @@ function chain_valgrad!(
   pu::Ptr{UInt8},
 ) where {T}
   y = getfield(getfield(layers, 1), :y)
-  # g = PtrArray(stridedpointer(Base.unsafe_convert(Ptr{T}, pu), bytestrideindex(arg)), size(arg), VectorizationBase.val_dense_dims(arg))
   s = zero(eltype(arg))
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
@@ -201,3 +199,4 @@ function error_count(
   end
   return ntot
 end
+

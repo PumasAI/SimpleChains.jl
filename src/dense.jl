@@ -75,7 +75,6 @@ function _init_params!(td::TurboDense{true}, p, inputdim::Integer)
   @turbo for i = 1:outputdim
     W[i, inputdim+1] = 0
   end
-  # fill!(view(W, :, inputdim+1), 0)
   return p, outputdim
 end
 function _init_params!(td::TurboDense{false}, p, inputdim::Integer)
@@ -261,8 +260,6 @@ function get∂C(
   (nothing, ∂Cp)
 end
 
-
-
 function dense!(
   f::F,
   ∂C::AbstractArray{T1,N},
@@ -444,7 +441,7 @@ function dense!(
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)  #= @turbo =#
+  @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
       Cmn += A[m, k] * B[k, n]
@@ -468,16 +465,6 @@ function dense!(
     C[m, n] = Cmn
   end
 end
-
-# struct DensePullBack{B,D,F,T,AT}
-#   td::TurboDense{B,D,F}
-#   p::Ptr{T}
-#   A::AT
-# end
-
-
-
-
 
 function valgrad_layer!(
   pg::Ptr{T},
@@ -532,32 +519,9 @@ function matrix_view(::TurboDense{true}, A)
 end
 update_C̄!(::typeof(identity), _, __) = nothing #=∂C=#
 function update_C̄!(::F, C̄, ∂C) where {F}
-  # ∂C = zero_offsets(_∂C)
-  # C̄ = zero_offsets(_C̄)
-  # for i ∈ eachindex(∂C)
-  #   C̄[i] *= ∂C[i]
-  # end
-  # return
-  # Ccopy = copy(C̄)
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
   end
-  # for i ∈ eachindex(∂C)
-  #   # C̄[i] *= ∂C[i]
-  #   Ccopy[i] *= ∂C[i]
-  # end
-  # if Ccopy != C̄
-  #   Main._a[] = (copy(∂C), Ccopy, copy(C̄))
-  #   # (StrideArraysCore.BitPtrArray{Tuple{Static.StaticInt{84}, Int64}, (true, true), 2, 1, 0, (1, 2), Tuple{Static.StaticInt{1}, Static.StaticInt{88}}, Tuple{Int64, Int64}},
-  #   # StrideArraysCore.PtrArray{Tuple{Static.StaticInt{84}, Int64}, (true, true), Float32, 2, 1, 0, (1, 2), Tuple{Static.StaticInt{4}, Static.StaticInt{336}}, Tuple{Static.StaticInt{1}, Static.StaticInt{1}}})
-  #   Main._b[] = @turbo_debug for i ∈ eachindex(∂C)
-  #     C̄[i] *= ∂C[i]
-  #   end
-  #   for i ∈ eachindex(∂C)
-  #     C̄[i] = Ccopy[i]
-  #     # C̄[i] *= ∂C[i]
-  #   end
-  # end
 end
 function pullback_param!(
   pg::Ptr{T},
@@ -771,6 +735,85 @@ end
 # TODO: supported `@turbo`-ing nested duals here.
 function matmul!(
   Cdual::AbstractVector{D},
+  _A::AbstractMatrix,
+  Bdual::AbstractVector{D},
+  ::True,
+) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = zero_offsets(reinterpret(reshape, T, Cdual))
+  A = zero_offsets(_A)
+  B = zero_offsets(reinterpret(reshape, T, Bdual))
+  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  K = Kp1 - StaticInt(1)
+  @turbo warn_check_args = false for p ∈ indices((B, C), 1),
+    m ∈ indices((A, C), (1,2))
+
+    Cmn = zero(T)
+    for k ∈ CloseOpen(K)
+      Cmn += A[m, k] * B[p, k]
+    end
+    C[p, m] = Cmn + (A[m, K] * (p == 0))
+  end
+end
+function matmul!(
+  Cdual::AbstractMatrix{D},
+  _A::AbstractMatrix,
+  Bdual::AbstractMatrix{D},
+  ::True,
+) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = zero_offsets(reinterpret(reshape, T, Cdual))
+  A = zero_offsets(_A)
+  B = zero_offsets(reinterpret(reshape, T, Bdual))
+  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  K = Kp1 - StaticInt(1)
+  @turbo warn_check_args = false for p ∈ indices((B, C), 1),
+    n ∈ indices((B, C), 3),
+    m ∈ indices((A, C), (1,2))
+
+    Cmn = zero(T)
+    for k ∈ CloseOpen(K)
+      Cmn += A[m, k] * B[p, k, n]
+    end
+    C[p, m, n] = Cmn + (A[m, K] * (p == 0))
+  end
+end
+function matmul!(
+  Cdual::AbstractVector{D},
+  A::AbstractMatrix,
+  Bdual::AbstractVector{D},
+  ::False,
+) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  B = reinterpret(reshape, T, Bdual)
+  @turbo warn_check_args = false for m ∈ indices((A, C), (1, 2)),
+    p ∈ indices((B, C), 1)
+    Cpmn = zero(T)
+    for k ∈ indices((A, B), 2)
+      Cpmn += A[m, k] * B[p, k]
+    end
+    C[p, m] += Cpmn
+  end
+end
+function matmul!(
+  Cdual::AbstractMatrix{D},
+  A::AbstractMatrix,
+  Bdual::AbstractMatrix{D},
+  ::False,
+) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
+  C = reinterpret(reshape, T, Cdual)
+  B = reinterpret(reshape, T, Bdual)
+  @turbo warn_check_args = false for n ∈ indices((B, C), 3),
+    m ∈ indices((A, C), (1, 2)),
+    p ∈ indices((B, C), 1)
+    Cpmn = zero(T)
+    for k ∈ indices((A, B), 2)
+      Cpmn += A[m, k] * B[p, k, n]
+    end
+    C[p, m, n] += Cpmn
+  end
+end
+
+function matmul!(
+  Cdual::AbstractVector{D},
   Adual::AbstractMatrix{D},
   Bdual::AbstractVector{D},
   ::True,
@@ -789,12 +832,11 @@ function matmul!(
     end
     Cf1[p, m] = Cmn + Af[p, m, Kp1]
   end
-  @turbo warn_check_args = false for n ∈ indices((B, C), 3),
-    m ∈ indices((A, C), 2),
+  @turbo warn_check_args = false for m ∈ indices((A, C), 2),
     p ∈ 1:Pstatic,
     k ∈ 1:K
 
-    C[p+1, m, n] += A[1, m, k] * B[p+1, k, n]
+    C[p+1, m] += A[1, m, k] * B[p+1, k]
   end
 end
 function matmul!(
@@ -847,12 +889,11 @@ function matmul!(
     end
     Cf1[p, m] = Cmn
   end
-  @turbo warn_check_args = false for n ∈ indices((B, C), 3),
-    m ∈ indices((A, C), 2),
+  @turbo warn_check_args = false for m ∈ indices((A, C), 2),
     p ∈ 1:Pstatic,
     k ∈ indices((A, B), (3, 2))
 
-    C[p+1, m, n] += A[1, m, k] * B[p+1, k, n]
+    C[p+1, m] += A[1, m, k] * B[p+1, k]
   end
 end
 
@@ -891,11 +932,11 @@ end
 function dense!(
   f::F,
   Cdual::AbstractArray{D},
-  Adual::AbstractMatrix{D},
+  A::AbstractMatrix,
   B::AbstractArray,
   ::BT,
   ::FF,
 ) where {F,BT,FF,T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  matmul!(Cdual, Adual, B, BT())
+  matmul!(Cdual, A, B, BT())
   dualeval!(f, Cdual)
 end

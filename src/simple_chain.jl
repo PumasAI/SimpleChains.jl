@@ -164,28 +164,20 @@ end
   GC.@preserve params memory _chain(arg, layers, pointer(params), pointer(memory))
 end
 
-for i = 0:10
-  f = i == 10 ? :_chain : Symbol("_chain$(i)")
-  g = i == 10 ? :_chain0 : (i == 9 ? :_chain : Symbol("_chain$(i+1)"))
-  fo = i == 10 ? :output_size : Symbol("_output_size$(i)")
-  go = i == 10 ? :_output_size0 : (i == 9 ? :output_size : Symbol("_output_size$(i+1)"))
-  @eval begin
-    @inline $f(arg, ::Tuple{}, p::Ptr, pu::Ptr{UInt8}) = arg
-    @inline $f(arg, l::Tuple{T}, p::Ptr, pu::Ptr{UInt8}) where {T} =
-      getfield(getfield(l, 1)(arg, p, pu), 1)
-    @inline function $f(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
-      res, p, pu = getfield(l, 1)(arg, p, pu)
-      $g(res, Base.tail(l), p, pu)
-    end
-    @inline $fo(::Val{T}, x::Tuple{}, _) where {T} = 0
-    @inline function ($fo(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
-      first(layer_output_size(Val{T}(), getfield(x, 1), s1))
-    end
-    @inline function ($fo(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
-      b, s2 = layer_output_size(Val{T}(), getfield(x, 1), s1)
-      b + $go(Val{T}(), Base.tail(x), s2)
-    end
-  end
+@inline output_size(::Val{T}, x::Tuple{}, _) where {T} = 0
+@inline function (output_size(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
+  first(layer_output_size(Val{T}(), getfield(x, 1), s1))
+end
+@inline function (output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
+  b, s2 = layer_output_size(Val{T}(), getfield(x, 1), s1)
+  b + output_size(Val{T}(), Base.tail(x), s2)
+end
+_chain(arg, ::Tuple{}, p::Ptr, pu::Ptr{UInt8}) = arg
+_chain(arg, l::Tuple{T}, p::Ptr, pu::Ptr{UInt8}) where {T} =
+  getfield(getfield(l, 1)(arg, p, pu), 1)
+function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
+  res, p, pu = getfield(l, 1)(arg, p, pu)
+  _chain(res, Base.tail(l), p, pu)
 end
 
 @inline function _try_static(i::Integer, j::Integer)
@@ -293,7 +285,7 @@ function chain_valgrad_entry!(
   if parameter_free(l)
     val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
   else
-    val, grad, puout = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+    val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
     pullback_param!(pg, l, grad, arg, p, pu)
   end
   return val

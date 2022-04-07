@@ -19,6 +19,7 @@ using SIMDTypes: Bit
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
 using HostCPUFeatures: static_sizeof, register_size, register_count
 using CPUSummary: cache_linesize
+using VectorizationBase: align, static_sizeof, relu, stridedpointer, AbstractSIMD, zero_offsets
 using LayoutPointers: bytestrideindex, stridedpointer
 using ManualMemory: preserve_buffer
 using IfElse: ifelse
@@ -26,9 +27,8 @@ import Random
 import ChainRulesCore
 import ForwardDiff
 
-using LoopVectorization: matmul_params, @turbo, @turbo_debug
-# using LoopVectorization: matmul_params#, @turbo
-# macro turbo(args...); esc(last(args)); end
+using LoopVectorization: matmul_params, CloseOpen, @turbo
+# macro turbo(ex); esc(ex); end
 
 export SimpleChain,
   TurboDense,
@@ -66,6 +66,12 @@ if VERSION >= v"1.7.0"
   if hasfield(Method, :recursion_relation)
     dont_limit = Returns(true)
     for m in methods(chain_valgrad!)
+      m.recursion_relation = dont_limit
+    end
+    for m in methods(_chain)
+      m.recursion_relation = dont_limit
+    end
+    for m in methods(output_size)
       m.recursion_relation = dont_limit
     end
   end
