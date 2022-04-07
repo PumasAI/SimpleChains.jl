@@ -8,11 +8,13 @@ end
 
 ADAM(η = 0.001) = ADAM(η, (0.9, 0.999))
 
-function update!(o::ADAM, (mt,vt,βp), x, Δ)
+function update!(o::ADAM, (mt, vt, βp), x, Δ)
   @unpack η, β = o
 
-  β₁ = β[1]; β₂ = β[2];
-  βp₁ = βp[1]; βp₂ = βp[2];
+  β₁ = β[1]
+  β₂ = β[2]
+  βp₁ = βp[1]
+  βp₂ = βp[2]
   # @inbounds @fastmath for i ∈ eachindex(Δ)
   @turbo for i ∈ eachindex(Δ)
     mt[i] = β₁ * mt[i] + (1 - β₁) * Δ[i]
@@ -26,9 +28,10 @@ function update!(o::ADAM, (mt,vt,βp), x, Δ)
   βp[2] = βp₂ * β₂
   return
 end
-@inline optmemsize(opt::ADAM, p::AbstractVector{T}) where {T} = 2align(sizeof(T)*length(p)) + align(1)
+@inline optmemsize(opt::ADAM, p::AbstractVector{T}) where {T} =
+  2align(sizeof(T) * length(p)) + align(1)
 @inline function optmemory(opt::ADAM, p::AbstractVector{T}, pu::Ptr{UInt8}) where {T}
-  memoff = align(sizeof(T)*length(p))
+  memoff = align(sizeof(T) * length(p))
   mt = PtrArray(reinterpret(Ptr{T}, pu), (ArrayInterface.static_length(p),))
   pu += memoff
   vt = PtrArray(reinterpret(Ptr{T}, pu), (ArrayInterface.static_length(p),))
@@ -36,16 +39,16 @@ end
     mt[i] = 0
     vt[i] = 0
   end
-  βp_doesnot_fit_at_end = sizeof(T)*length(p)+16 > memoff
+  βp_doesnot_fit_at_end = sizeof(T) * length(p) + 16 > memoff
   pu_p_memoff = pu + memoff
-  pβp = ifelse(βp_doesnot_fit_at_end, pu_p_memoff, pu+sizeof(T)*length(p))
+  pβp = ifelse(βp_doesnot_fit_at_end, pu_p_memoff, pu + sizeof(T) * length(p))
   pu = pu_p_memoff
   βp = PtrArray(reinterpret(Ptr{Float64}, pβp), (static(2),))
   @unpack β = opt
   βp[1] = β[1]
   βp[2] = β[2]
-  pu = ifelse(βp_doesnot_fit_at_end, pu+align(1), pu)
-  return (mt,vt,βp), pu
+  pu = ifelse(βp_doesnot_fit_at_end, pu + align(1), pu)
+  return (mt, vt, βp), pu
 end
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
@@ -53,14 +56,15 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
-  fl = Base.front(layers);
-  ll = last(layers);
+  fl = Base.front(layers)
+  ll = last(layers)
   optoff = optmemsize(opt, p)
   sx = ArrayInterface.size(pX)
   resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   GC.@preserve p g memory X begin
-    pg = pointer(g); pp = pointer(p)
+    pg = pointer(g)
+    pp = pointer(p)
     for y ∈ t
       layers_y = (fl..., ll(y))
       chain_valgrad_entry!(pg, pX, layers_y, pp, pm)
@@ -80,7 +84,8 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::I
   resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   GC.@preserve p g memory X begin
-    pg = pointer(g); pp = pointer(p)
+    pg = pointer(g)
+    pp = pointer(p)
     for _ ∈ 1:iters
       chain_valgrad_entry!(pg, pX, layers, pp, pm)
       apply_penalty!(g, pen, p, sx)
@@ -105,29 +110,43 @@ end
 # end
 
 @generated function turbo_dense_batch_size(
-  indputdim::Integer, outputdim::Integer, Nd::Integer, ::StaticInt{W}, ::StaticInt{RS}, ::StaticInt{RC}, ::StaticInt{CLS}
-) where {W, RS, RC, CLS}
+  indputdim::Integer,
+  outputdim::Integer,
+  Nd::Integer,
+  ::StaticInt{W},
+  ::StaticInt{RS},
+  ::StaticInt{RC},
+  ::StaticInt{CLS},
+) where {W,RS,RC,CLS}
   Kk = Static.known(indputdim)
   Mk = Static.known(outputdim)
   Nk = Static.known(Nd)
   M = Mk === nothing ? 1024 : Mk
   K = Kk === nothing ? 1024 : Kk
   N = Nk === nothing ? 1024 : Nk
-  mₖ, nₖ = LoopVectorization.matmul_params(RS, RC, CLS; M, K, N, W)
+  mₖ, nₖ = matmul_params(RS, RC, CLS; M, K, N, W)
   StaticInt(nₖ)
 end
 @inline function batch_size(
-  layers::Tuple{L,Vararg}, argsz::Tuple{I,J}, ::Val{T}
+  layers::Tuple{L,Vararg},
+  argsz::Tuple{I,J},
+  ::Val{T},
 ) where {T,L<:TurboDense,I,J}
   inputdim, N = argsz
   outputdim = first(layers).outputdim
   # id, od = getfield(getfield(layers,1), :dims) # (od × id) * (id x N)
   turbo_dense_batch_size(
-    inputdim, outputdim, N, VectorizationBase.pick_vector_width(T),
-    VectorizationBase.register_size(), VectorizationBase.register_count(), VectorizationBase.cache_linesize()
+    inputdim,
+    outputdim,
+    N,
+    VectorizationBase.pick_vector_width(T),
+    VectorizationBase.register_size(),
+    VectorizationBase.register_count(),
+    VectorizationBase.cache_linesize(),
   )
 end
-@inline batch_size(layers::Tuple{L,Vararg}, argsz::Tuple, ::Val{T}) where {L,T} = batch_size(Base.tail(layers), argsz, Val(T))
+@inline batch_size(layers::Tuple{L,Vararg}, argsz::Tuple, ::Val{T}) where {L,T} =
+  batch_size(Base.tail(layers), argsz, Val(T))
 @inline batch_size(::Tuple{}, ::Tuple, ::Val{T}) where {T} = Static(18)
 
 @inline view_slice_last(X::AbstractArray{<:Any,1}, r) = view(X, r)
@@ -141,19 +160,21 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
   pen = getpenalty(_chn)
   @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  sx = ArrayInterface.size(pX) 
+  sx = ArrayInterface.size(pX)
   resize_memory!(layers, memory, pX, optoff)
   optbuffer, pm = optmemory(opt, p, pointer(memory))
   N = sx[end]
-  N_bs = batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X))))
+  N_bs =
+    batch_size(layers, chain_input_dims(chn, sx), Val(promote_type(eltype(p), eltype(X))))
   d, r = divrem(N, N_bs)
   Ssize = (Base.front(sx)..., N_bs)
   Ssize_rem = (Base.front(sx)..., r)
   GC.@preserve p g memory X begin
-    pg = pointer(g); pp = pointer(p)
+    pg = pointer(g)
+    pp = pointer(p)
     for _ ∈ 1:iters
       doff = 0
-      for d in 1:d
+      for d = 1:d
         Xd = view_slice_last(pX, doff+1:doff+N_bs)
         Xp = PtrArray(stridedpointer(Xd), Ssize, StrideArraysCore.val_dense_dims(Xd))
         chain_valgrad_entry!(pg, Xp, layers, pp, pm)
@@ -162,7 +183,10 @@ function train_batched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters)
         doff += N_bs
       end
       if r ≠ 0
-        Xd = view_slice_last(pX, doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]))
+        Xd = view_slice_last(
+          pX,
+          doff+1:ArrayInterface.static_last(ArrayInterface.axes(X)[end]),
+        )
         Xp = PtrArray(stridedpointer(Xd), Ssize_rem, StrideArraysCore.val_dense_dims(Xd))
         chain_valgrad_entry!(pg, Xp, layers, pp, pm)
         apply_penalty!(g, pen, p, sx)
@@ -176,10 +200,10 @@ train_batched(chn::Chain) = train_batched!(init_params(chn), chn)
 
 _isstochastic(::Tuple{}) = false
 function _isstochastic(x::Tuple{T,Vararg}) where {T}
-  isstochastic(getfield(x,1)) ? true : _isstochastic(Base.tail(x))
+  isstochastic(getfield(x, 1)) ? true : _isstochastic(Base.tail(x))
 end
 
-isstochastic(chn::Chain) = _isstochastic(getfield(getchain(chn),:layers))
+isstochastic(chn::Chain) = _isstochastic(getfield(getchain(chn), :layers))
 
 function train!(g, p, chn::Chain, X, opt::AbstractOptimizer, iters)
   if isstochastic(chn)
@@ -193,8 +217,8 @@ end
 for t ∈ [:train, :train_batched, :train_unbatched]
   t! = Symbol(t, :!)
   @eval function $t(chn::Chain, X, opt, iters)
-    p = init_params(chn);
-    g = similar(p);
+    p = init_params(chn)
+    g = similar(p)
     $t!(g, p, chn, X, opt, iters)
   end
 end
