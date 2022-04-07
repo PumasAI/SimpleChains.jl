@@ -147,6 +147,7 @@ function matches(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
   matches(first(x), first(y)) && matches(Base.tail(x), Base.tail(y))
 end
 function verify_arg(c, arg)
+  @show chain_input_dims(c) size(arg)
   if !matches(chain_input_dims(c), size(arg))
     throw(ArgumentError("Input argument: !matches(chain_input_dims(c), size(arg))"))
   end

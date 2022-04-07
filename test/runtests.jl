@@ -396,7 +396,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
   @testset "LeNet" begin
     N = 20
     nclasses = 10
-    x = randn(28, 28, 1, N)
+    x = randn(28, 28, 1, N);
     lenet = SimpleChain(
       (static(28), static(28), static(1)),
       SimpleChains.Conv(SimpleChains.relu, (5, 5), 6),
@@ -411,11 +411,16 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     SimpleChains.outputdim(lenet, size(x))
     # y =
     # d = Simple
-    p = SimpleChains.init_params(lenet, size(x))
+    p = SimpleChains.init_params(lenet, size(x));
     lenet(x, p)
-    g = similar(p)
-    y = rand(one(UInt32):UInt32(nclasses), N)
-    valgrad!(g, SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y)), p, x)
+    g = similar(p);
+    y = rand(one(UInt32):UInt32(nclasses), N);
+    lenet.memory .= 0x00;
+    valgrad!(g, SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y)), x, p)
+    g2 = similar(g);
+    lenet.memory .= 0xff;
+    valgrad!(g2, SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y)), x, p)
+    @test g == g2
   end
 end
 Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
