@@ -75,22 +75,17 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
       else
         # typename doesn't work on 1.5
         @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
-      end
-
-      p = SimpleChains.init_params(sc, T)
-      g = similar(p)
-      @test_throws ArgumentError sc(rand(T, 23, 2), p)
-      @test_throws ArgumentError sc(rand(T, 23), p)
-      @test_throws MethodError sc(Array{T,0}(undef), p)
-      @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
-      @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
-      valgrad!(g, scflp, x, p)
-      if VERSION < v"1.9-DEV" # TODO: remove check when Zygote stops segfaulting on 1.8-DEV
-        @test g == Zygote.gradient(
-          p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
-          p,
-        )[1]
-        _gzyg = Zygote.gradient(p) do p
+    end
+    p = SimpleChains.init_params(scflp, T);
+    g = similar(p);
+    @test_throws ArgumentError sc(rand(T,23,2), p)
+    @test_throws ArgumentError sc(rand(T,23), p)
+    @test_throws MethodError sc(Array{T,0}(undef), p)
+    @test_throws ArgumentError valgrad!(g, sc, rand(T,23,2), p)
+    @test_throws ArgumentError valgrad!(g, sc, rand(T,23), p)
+    valgrad!(g, scflp, x, p)
+    if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
+        @test g == Zygote.gradient(p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p), p)        _gzyg = Zygote.gradient(p) do p
           0.5 * sum(abs2, Base.front(sc)(x, p) .- y)
         end
         gzyg = copy(_gzyg[1])
@@ -120,17 +115,23 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
           abs2(xi - yi)
         end
         l + 2.3 * (sum(abs2, A1) + sum(abs2, b1)) + 0.45 * (sum(abs, A2) + sum(abs, b2))
-      end
-      @test g ≈ gfd
-
-      scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
-      @test sprint((io, t) -> show(io, t), scd) == """
-  SimpleChain with the following layers:
-  TurboDense static(8) with bias.
-  Activation layer applying: tanh
-  Dropout(p=0.2)
-  TurboDense static(2) with bias.
-  SquaredLoss"""
+    end
+    @test g ≈ gfd
+    scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
+    @test_throws ArgumentError SimpleChains.init_params(scd, T)
+    @test length(SimpleChains.init_params(scd, size(x), T)) == length(p)
+    @test sprint((io,t) -> show(io,t), scd) == """
+SimpleChain with the following layers:
+TurboDense static(8) with bias.
+Activation layer applying: tanh
+Dropout(p=0.2)
+TurboDense static(2) with bias.
+SquaredLoss"""
+  
+    valgrad!(g, scd, x, p)
+    offset = 2SimpleChains.align(first(scd.layers).outputdim * size(x, 2) * sizeof(T))
+    si = SimpleChains.StrideIndex{1,(1,),1}((SimpleChains.StaticInt(1),), (SimpleChains.StaticInt(1),))
+    m = SimpleChains.StrideArray(SimpleChains.PtrArray(SimpleChains.stridedpointer(reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset), si), (size(x, 2) * 8,), Val((true,))), scd.memory);
 
       valgrad!(g, scd, x, p)
       offset = 2SimpleChains.align(first(scd.layers).outputdim * size(x, 2) * sizeof(T))
