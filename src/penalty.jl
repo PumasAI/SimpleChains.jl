@@ -52,8 +52,8 @@ function init_params(
 ) where {T}
   init_params(getchain(Λ), id, T)
 end
-function init_params(Λ::AbstractPenalty, ::Type{T} = Float32) where {T}
-  init_params(getchain(Λ), nothing, T)
+function init_params(Λ::AbstractPenalty)
+  init_params(getchain(Λ), nothing, Float32)
 end
 init_params!(Λ::AbstractPenalty, x, id = nothing) = init_params!(getchain(Λ), x, id)
 
