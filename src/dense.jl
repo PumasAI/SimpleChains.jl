@@ -899,4 +899,3 @@ function dense!(
   matmul!(Cdual, Adual, B, BT())
   dualeval!(f, Cdual)
 end
-

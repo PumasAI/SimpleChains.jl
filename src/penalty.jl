@@ -47,18 +47,15 @@ remove_loss(Λ::AbstractPenalty) = remove_loss(getchain(Λ))
 
 function init_params(
   Λ::AbstractPenalty,
-  id::Union{Nothing,InputDim}=nothing,
-  ::Type{T} = Float32
+  id::Union{Nothing,InputDim} = nothing,
+  ::Type{T} = Float32,
 ) where {T}
-    init_params(getchain(Λ), id, T)
+  init_params(getchain(Λ), id, T)
 end
-function init_params(
-  Λ::AbstractPenalty,
-  ::Type{T} = Float32
-) where {T}
-    init_params(getchain(Λ), nothing, T)
+function init_params(Λ::AbstractPenalty, ::Type{T} = Float32) where {T}
+  init_params(getchain(Λ), nothing, T)
 end
-init_params!(Λ::AbstractPenalty, x, id=nothing) = init_params!(getchain(Λ), x, id)
+init_params!(Λ::AbstractPenalty, x, id = nothing) = init_params!(getchain(Λ), x, id)
 
 target(c::AbstractPenalty) = target(getchain(c))
 

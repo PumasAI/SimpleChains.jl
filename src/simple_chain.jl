@@ -90,7 +90,8 @@ parameter_free(x) = numparam(x) == 0
 @inline function resize_memory!(
   layers,
   memory::Vector{UInt8},
-  ::Val{T}, sx,
+  ::Val{T},
+  sx,
   additional = static(0),
 ) where {T}
   d = output_size(Val(T), layers, sx) + additional
@@ -101,7 +102,8 @@ end
 @inline function resize_memory!(
   layers,
   memory::Vector{UInt8},
-  ::Val{T}, sx,
+  ::Val{T},
+  sx,
   additional,
   additional_per_thread,
   nthread,
@@ -147,7 +149,6 @@ function matches(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
   matches(first(x), first(y)) && matches(Base.tail(x), Base.tail(y))
 end
 function verify_arg(c, arg)
-  @show chain_input_dims(c) size(arg)
   if !matches(chain_input_dims(c), size(arg))
     throw(ArgumentError("Input argument: !matches(chain_input_dims(c), size(arg))"))
   end

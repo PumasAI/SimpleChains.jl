@@ -29,7 +29,7 @@ function update!(o::ADAM, (mt, vt, βp), x, Δ)
   return
 end
 @inline function optmemsize(::ADAM, p::AbstractVector{T}) where {T}
-    2align(sizeof(T) * length(p)) + align(1)
+  2align(sizeof(T) * length(p)) + align(1)
 end
 @inline function optmemory(opt::ADAM, p::AbstractVector{T}, pu::Ptr{UInt8}) where {T}
   memoff = align(sizeof(T) * length(p))

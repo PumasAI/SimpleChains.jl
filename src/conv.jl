@@ -170,15 +170,17 @@ function convlayer!(
   b = zero_offsets(_b)
   # FIXME: this seems to be buggy!!! The outer `@turbo` definitely
   # results in worse accuracy after training
-  for o ∈ axes(K, 4); @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2)
-  # @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
-  # for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
-    s = zero(eltype(C))
-    for k₁ ∈ axes(K, 1), k₂ ∈ axes(K, 2), i ∈ axes(K, 3)
-      s += A[j₁+k₁, j₂+k₂, i] * K[k₁, k₂, i, o]
+  for o ∈ axes(K, 4)
+    @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2)
+      # @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
+      # for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
+      s = zero(eltype(C))
+      for k₁ ∈ axes(K, 1), k₂ ∈ axes(K, 2), i ∈ axes(K, 3)
+        s += A[j₁+k₁, j₂+k₂, i] * K[k₁, k₂, i, o]
+      end
+      C[j₁, j₂, o], ∂C[j₁, j₂, o] = ∂f(s + b[o])
     end
-    C[j₁, j₂, o], ∂C[j₁, j₂, o] = ∂f(s + b[o])
-  end; end
+  end
   # end
 end
 function convlayer!(

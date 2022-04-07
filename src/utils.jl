@@ -75,12 +75,10 @@ end
 function glorot_uniform!(A::AbstractArray{T}, rng = local_rng()) where {T}
   scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
   # (rand()-0.5)*scale === rand()*scale - 0.5scale
-  rand!(rng, A, static(0), T(-0.5)*scale, scale)
+  rand!(rng, A, static(0), T(-0.5) * scale, scale)
 end
 # https://github.com/FluxML/Flux.jl/blob/master/LICENSE.md
 function glorot_normal!(A::AbstractArray{T}, rng = local_rng()) where {T}
   σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
   randn!(rng, A, static(0), static(0), σ)
 end
-
-

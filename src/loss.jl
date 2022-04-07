@@ -179,20 +179,25 @@ end
 function error_count(c::SimpleChain, p, X, Y = target(c))
   error_count(c, p, X, Y, last(c.layers))
 end
-function error_count(c::SimpleChain, p, X, Y::AbstractVector{UInt32}, ::LogitCrossEntropyLoss)
+function error_count(
+  c::SimpleChain,
+  p,
+  X,
+  Y::AbstractVector{UInt32},
+  ::LogitCrossEntropyLoss,
+)
   cnl = remove_loss(c)
   Ŷ = cnl(X, p)
   ntot = 0
-  @turbo for i = eachindex(Y)
+  @turbo for i in eachindex(Y)
     k = -1
     m = typemin(eltype(Ŷ))
-    for j = axes(Ŷ,1)
-      cmp = Ŷ[j,i] > m
+    for j in axes(Ŷ, 1)
+      cmp = Ŷ[j, i] > m
       k = cmp ? j : k
-      m = cmp ? Ŷ[j,i] : m
+      m = cmp ? Ŷ[j, i] : m
     end
     ntot += k == Y[i]
   end
   return ntot
 end
-
