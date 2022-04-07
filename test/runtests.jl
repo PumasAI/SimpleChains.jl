@@ -221,7 +221,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     xdd = dual.(xd)
 
     pu =
-      Vector{UInt8}(undef, first(SimpleChains.output_size(Val(eltype(xdd)), td, size(x))))
+      Vector{UInt8}(undef, first(SimpleChains.layer_output_size(Val(eltype(xdd)), td, size(x))))
 
     A = reshape(view(p, 1:8*24), (8, 24))
     b = view(p, 1+8*24:8*25)
