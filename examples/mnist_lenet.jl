@@ -15,20 +15,15 @@ import MLDatasets
 # import BSON
 using CUDA
 # arguments for the `train` function
-Base.@kwdef mutable struct Args
-  η = 3e-4             # learning rate
-  λ = 0                # L2 regularizer param, implemented as weight decay
-  batchsize = 128      # batch size
-  epochs = 10          # number of epochs
-  seed = 0             # set seed > 0 for reproducibility
-  use_cuda = true      # if true use cuda (if available)
-  infotime = 1             # report every `infotime` epochs
-  checktime = 5        # Save the model every `checktime` epochs. Set to 0 for no checkpoints.
-  tblogger = true      # log training with tensorboard
-  savepath = "runs/"    # results path
+Base.@kwdef struct Args
+  η::Float64 = 3e-4             # learning rate
+  λ::Float64 = 0                # L2 regularizer param, implemented as weight decay
+  batchsize::Int = 128      # batch size
+  epochs::Int = 10          # number of epochs
+  seed::Int = 0             # set seed > 0 for reproducibility
 end
 args = Args();
-const use_cuda = args.use_cuda && CUDA.functional()
+const use_cuda = true && CUDA.functional()
 const device = if use_cuda
   @info "Training on GPU"
   gpu
@@ -109,57 +104,21 @@ function train(; kws...)
   train!(model, args, opt)
 
 end
-function train!(model, args = Args(), opt = ADAM(args.η))
+function train!(model, train_loader, args = Args(), opt = ADAM(args.η))
   ps = Flux.params(model)
-  use_cuda = args.use_cuda && CUDA.functional()
   if args.λ > 0 # add weight decay, equivalent to L2 regularization
     opt = Optimiser(WeightDecay(args.λ), opt)
   end
-
-  ## LOGGING UTILITIES
-  # if args.tblogger
-  #     tblogger = TBLogger(args.savepath, tb_overwrite)
-  #     set_step_increment!(tblogger, 0) # 0 auto increment since we manually set_step!
-  #     # @info "TensorBoard logging at \"$(args.savepath)\""
-  # end
-
-  # function report(epoch)
-  #     train = eval_loss_accuracy(train_loader, model, device)
-  #     test = eval_loss_accuracy(test_loader, model, device)
-  #     println("Epoch: $epoch   Train: $(train)   Test: $(test)")
-  #     if args.tblogger
-  #         set_step!(tblogger, epoch)
-  #         with_logger(tblogger) do
-  #             @info "train" loss = train.loss acc = train.acc
-  #             @info "test" loss = test.loss acc = test.acc
-  #         end
-  #     end
-  # end
-
-  ## TRAINING
-  # @info "Start Training"
-  # report(0)
-  for epoch = 1:args.epochs
+  for _ = 1:args.epochs
     for (x, y) in train_loader
-      x, y = x |> device, y |> device
+      x = device(x)
+      y = device(y)
       gs = Flux.gradient(ps) do
         ŷ = model(x)
         loss(ŷ, y)
       end
-
       Flux.Optimise.update!(opt, ps, gs)
     end
-
-    ## Printing and logging
-    # epoch % args.infotime == 0 && report(epoch)
-    # if args.checktime > 0 && epoch % args.checktime == 0
-    #       !ispath(args.savepath) && mkpath(args.savepath)
-    #       modelpath = joinpath(args.savepath, "model.bson")
-    #       let model = cpu(model) #return model to cpu before serialization
-    #           BSON.@save modelpath model epoch
-    #       end
-    #       @info "Model saved in \"$(modelpath)\""
-    #   end
   end
 end
 
@@ -242,7 +201,7 @@ eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
 
 
 
-@time train!(model)
+@time train!(model, train_loader)
 eval_loss_accuracy(train_loader, model, device),
 eval_loss_accuracy(test_loader, model, device)
 
