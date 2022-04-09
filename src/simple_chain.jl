@@ -96,7 +96,10 @@ parameter_free(x) = numparam(x) == 0
 ) where {T}
   d = output_size(Val(T), layers, sx) + additional
   d2 = (2d)
-  d2 > length(memory) && resize!(memory, d2)
+  if d2 > length(memory)
+    empty!(memory)
+    resize!(memory, d2)
+  end
   d
 end
 @inline function resize_memory!(
@@ -110,7 +113,10 @@ end
 ) where {T}
   base_mem_per_thread = 2output_size(Val(T), layers, sx) + additional_per_thread
   mem_total = additional + base_mem_per_thread * nthread
-  mem_total > length(memory) && resize!(memory, mem_total)
+  if mem_total > length(memory)
+    empty!(memory)
+    resize!(memory, mem_total)
+  end
   base_mem_per_thread
 end
 @inline function resize_memory!(

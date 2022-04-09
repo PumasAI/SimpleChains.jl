@@ -43,7 +43,7 @@ function LeNet5(; imgsize = (28, 28, 1), nclasses = 10)
     Flux.MaxPool((2, 2)),
     Flux.Conv((5, 5), 6 => 16, Flux.relu),
     Flux.MaxPool((2, 2)),
-    flatten,
+    Flux.flatten,
     Flux.Dense(prod(out_conv_size), 120, Flux.relu),
     Flux.Dense(120, 84, Flux.relu),
     Flux.Dense(84, nclasses),
