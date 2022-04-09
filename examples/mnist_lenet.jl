@@ -155,7 +155,8 @@ model = LeNet5();
 @time model(device(x))
 @time lenet(x, p)
 
-lenetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y.indices));
+lenetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(UInt32.(first.(Tuple.(vec(argmax(y,dims=1)))))));
+
 g = similar(p);
 @time valgrad!(g, lenetloss, x, p)
 
@@ -164,6 +165,8 @@ lenetfull = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(Y.in
 
 G = similar(p, length(p), min(Threads.nthreads(), Sys.CPU_THREADS ÷ 2));
 @time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
+
+
 
 Xtest, Ytest = test_loader.data;
 eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)

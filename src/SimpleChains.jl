@@ -21,8 +21,9 @@ using HostCPUFeatures: static_sizeof, register_size, register_count
 using CPUSummary: cache_linesize
 using VectorizationBase: align, static_sizeof, relu, stridedpointer, AbstractSIMD, zero_offsets
 using LayoutPointers: bytestrideindex, stridedpointer
-using ManualMemory: preserve_buffer
+import ManualMemory: preserve_buffer
 using IfElse: ifelse
+import ManualMemory: preserve_buffer
 import Random
 import ChainRulesCore
 import ForwardDiff

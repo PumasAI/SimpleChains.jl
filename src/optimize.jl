@@ -46,8 +46,8 @@ end
   pu = pu_p_memoff
   βp = PtrArray(reinterpret(Ptr{Float64}, pβp), (static(2),))
   @unpack β = opt
-  βp[1] = β[1]
-  βp[2] = β[2]
+  @inbounds βp[1] = β[1]
+  @inbounds βp[2] = β[2]
   pu = ifelse(βp_doesnot_fit_at_end, pu + align(1), pu)
   return (mt, vt, βp), pu
 end
@@ -125,7 +125,7 @@ function shuffle_chain_valgrad_thread!(
   ptgt = pointer(tgt)
   GC.@preserve tgtpb Xpb begin
     for i = fm1:l-1
-      j = perm[i+1] # j is zero-based
+      @inbounds j = perm[i+1] # j is zero-based
       # @show i, j
       @simd ivdep for k = 0:Int(tgtlen)-1
         x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
@@ -321,7 +321,7 @@ function train_batched!(
   tgt = target(chn)
   nthread = size(g, static(2))
   N_bs = if batchsize === nothing
-    static(16) * batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
+    static(8) * batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
   else
     batchsize
   end
@@ -340,7 +340,10 @@ function train_batched!(
     shuffle_per_thread,
     nthread,
   )
-  GC.@preserve p g memory X begin
+  loss = last(layers);
+  Y = preserve_buffer(loss)
+  newlayers = (Base.front(layers)..., loss(PtrArray(Y)))
+  GC.@preserve p g memory X Y begin
     optbuffer, pm = optmemory(opt, p, pointer(memory))
     perm = PtrArray(Ptr{Int}(pm), (N,))
     pm += perm_mem
@@ -361,7 +364,7 @@ function train_batched!(
           g,
           opt,
           pX,
-          layers,
+          newlayers,
           pen,
           sx,
           p,

@@ -15,6 +15,8 @@ end
 
 target(_) = nothing
 target(sc::SimpleChain) = target(last(sc.layers))
+preserve_buffer(l::AbstractLoss) = target(l)
+StrideArraysCore.object_and_preserve(l::AbstractLoss) = l, target(l)
 _iterate_over_losses(::AbstractArray{<:AbstractArray}) = true
 _iterate_over_losses(_) = false
 iterate_over_losses(sc) = _iterate_over_losses(target(sc))

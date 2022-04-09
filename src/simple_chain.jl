@@ -245,8 +245,8 @@ function init_params(Λ::SimpleChain, ::Type{T}) where {T}
   init_params(Λ, nothing, T)
 end
 
-maybe_static_size_arg(_, arg) = arg
-function maybe_static_size_arg(s::Tuple, arg::Array)
+@inline maybe_static_size_arg(_, arg) = arg
+@inline function maybe_static_size_arg(s::Tuple, arg::Array)
   PtrArray(pointer(arg), _try_static(s, size(arg)))
 end
 
