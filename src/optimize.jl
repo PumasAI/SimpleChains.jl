@@ -321,7 +321,7 @@ function train_batched!(
   tgt = target(chn)
   nthread = size(g, static(2))
   N_bs = if batchsize === nothing
-    batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
+    static(16) * batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
   else
     batchsize
   end
