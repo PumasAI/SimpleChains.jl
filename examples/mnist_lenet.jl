@@ -135,14 +135,6 @@ lenet = SimpleChain(
   TurboDense(SimpleChains.relu, 84),
   TurboDense(identity, 10),
 )
-function eval_loss_accuracy(X, Y, model, p)
-  Yoc = onecold(Y) .% UInt32
-  mloss = SimpleChains.add_loss(model, SimpleChains.LogitCrossEntropyLoss(Yoc))
-  l = mloss(X, p) * size(X)[end]
-  acc = sum(onecold(Matrix(Base.front(mloss)(X, p))) .== Yoc)
-  ntot = size(X)[end]
-  return (loss = l / ntot |> round4, acc = acc / ntot * 100 |> round4)
-end
 
 
 train_loader, test_loader = get_data(args);
@@ -169,21 +161,21 @@ G = similar(p, length(p), min(Threads.nthreads(), Sys.CPU_THREADS ÷ 2));
 
 
 Xtest, Ytest = test_loader.data;
-eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+SimpleChains.error_mean_and_loss(lenetfull, X, p), SimpleChains.error_mean_and_loss(lenetfull, Xtest, Ytest.indices, p)
 
 SimpleChains.init_params!(lenet, p, size(Xtest));
 @time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
-eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+SimpleChains.error_mean_and_loss(lenetfull, X, p), SimpleChains.error_mean_and_loss(lenetfull, Xtest, Ytest.indices, p)
 
 
 
 lenet.memory .= 0;
 p = SimpleChains.init_params!(lenet, p, size(x));
 @time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
-eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+SimpleChains.error_mean_and_loss(lenetfull, X, p), SimpleChains.error_mean_and_loss(lenetfull, Xtest, Ytest.indices, p)
 SimpleChains.init_params!(lenet, p, size(x));
 @time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
-eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+SimpleChains.error_mean_and_loss(lenetfull, X, p), SimpleChains.error_mean_and_loss(lenetfull, Xtest, Ytest.indices, p)
 
 
 
@@ -197,26 +189,18 @@ g0 == g1
 lenet.memory .= 0;
 p = SimpleChains.init_params!(lenet, p, size(x));
 @time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
-eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+SimpleChains.error_mean_and_loss(lenetfull, X, p), SimpleChains.error_mean_and_loss(lenetfull, Xtest, Ytest.indices, p)
 p = SimpleChains.init_params!(lenet, p, size(x));
 @time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
-eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
+SimpleChains.error_mean_and_loss(lenetfull, X, p), SimpleChains.error_mean_and_loss(lenetfull, Xtest, Ytest.indices, p)
 
 
 
 @time train!(model, train_loader)
-eval_loss_accuracy(train_loader, model, device),
-eval_loss_accuracy(test_loader, model, device)
+SimpleChains.error_mean_and_loss(train_loader, model, device),
+SimpleChains.error_mean_and_loss(test_loader, model, device)
 
 X, Y = train_loader.data;
 lenetfull = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(Y.indices));
 
 
-G = similar(p, length(p), min(Threads.nthreads(), Sys.CPU_THREADS ÷ 2));
-@time SimpleChains.train_batched!(G, p, lenetfull, X, SimpleChains.ADAM(3e-4), 10);
-
-Xtest, Ytest = test_loader.data;
-eval_loss_accuracy(X, Y, lenet, p), eval_loss_accuracy(Xtest, Ytest, lenet, p)
-
-eval_loss_accuracy(X, Y, lenet, p)
-eval_loss_accuracy(Xtest, Ytest, lenet, p)

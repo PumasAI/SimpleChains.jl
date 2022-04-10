@@ -12,6 +12,11 @@ end
 function remove_loss(sc::SimpleChain)
   has_loss(sc) ? Base.front(sc) : sc
 end
+pop_loss(sc::SimpleChain) = last(sc.layers)
+function split_loss(sc::SimpleChain)
+  layers = sc.layers
+  SimpleChain(chain_input_dims(sc), Base.front(layers), sc.memory), last(layers)
+end
 
 target(_) = nothing
 target(sc::SimpleChain) = target(last(sc.layers))
@@ -23,16 +28,23 @@ iterate_over_losses(sc) = _iterate_over_losses(target(sc))
 
 parameter_free(::AbstractLoss) = true
 numparam(::AbstractLoss, _) = 0, 1
-function layer_output_size(
+function _layer_output_size_needs_temp(
   ::Val{T},
   sl::AbstractLoss{<:AbstractArray{<:AbstractArray}},
   s,
 ) where {T}
   align(length(first(target(sl))) * static_sizeof(T)), static_sizeof(T)
 end
-function layer_output_size(::Val{T}, sl::AbstractLoss, s) where {T}
+function _layer_output_size_needs_temp_of_equal_len_as_target(::Val{T}, sl::AbstractLoss, s) where {T}
   align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 end
+function _layer_output_size_no_temp(::Val{T}, sl::AbstractLoss, s) where {T}
+  0, static_sizeof(T)
+end
+function layer_output_size(::Val{T}, sl::AbstractLoss, s) where {T}
+  _layer_output_size_no_temp(Val{T}(), sl, s)
+end
+
 struct SquaredLoss{Y} <: AbstractLoss{Y}
   y::Y
 end
@@ -128,12 +140,38 @@ function (sl::AbstractLoss{<:AbstractArray{<:AbstractArray}})(arg, p, pu)
 end
 
 
-struct LogitCrossEntropyLoss{Y<:AbstractVector{UInt32}} <: AbstractLoss{Y}
+struct LogitCrossEntropyLoss{Y<:Union{AbstractVector{UInt32},Nothing}} <: AbstractLoss{Y}
   y::Y
 end
+# function LogitCrossEntropyLoss!(y::AbstractVector{UInt32})
+#   m = 0xffffffff
+#   @turbo for i = eachindex(y)
+#     m = min(i, y[i])
+#   end
+#   @turbo for i = eachindex(y)
+#     y[i] -= m
+#   end
+#   LogitCrossEntropyLoss(y)
+# end
+# function LogitCrossEntropyLoss!(y::AbstractVector{UInt32}, x)
+#   m = 0xffffffff
+#   @turbo for i = eachindex(y)
+#     m = min(i, x[i])
+#   end
+#   @turbo for i = eachindex(y)
+#     y[i] = x[i] - m
+#   end
+#   LogitCrossEntropyLoss(y)
+# end
+# LogitCrossEntropyLoss(y) = LogitCrossEntropyLoss!(Vector{UInt32}(undef, length(y)), y)
+
 LogitCrossEntropyLoss() = LogitCrossEntropyLoss(nothing)
 target(sl::LogitCrossEntropyLoss) = getfield(sl, :y)
 (::LogitCrossEntropyLoss)(Y::AbstractVector{UInt32}) = LogitCrossEntropyLoss(Y)
+
+function layer_output_size(::Val{T}, sl::LogitCrossEntropyLoss, s) where {T}
+  _layer_output_size_needs_temp_of_equal_len_as_target(Val{T}(), sl, s)
+end
 
 function (lcel::LogitCrossEntropyLoss)(arg::AbstractArray{T}, p::Ptr, pu) where {T}
   y = lcel.y
@@ -173,32 +211,44 @@ end
 function Base.getindex(sl::LogitCrossEntropyLoss, r)
   LogitCrossEntropyLoss(view(target(sl), r))
 end
-function error_rate(c::SimpleChain, p, X, Y = target(c), l = last(c.layers))
-  error_count(c, p, X, Y, l) / size(Y)[end]
-end
-function error_count(c::SimpleChain, p, X, Y = target(c))
-  error_count(c, p, X, Y, last(c.layers))
-end
-function error_count(
-  c::SimpleChain,
-  p,
-  X,
-  Y::AbstractVector{UInt32},
-  ::LogitCrossEntropyLoss,
-)
-  cnl = remove_loss(c)
-  Ŷ = cnl(X, p)
+function error_count(Ŷ, Y)
   ntot = 0
-  @turbo for i in eachindex(Y)
+  @inbounds for i in eachindex(Y)
     k = -1
     m = typemin(eltype(Ŷ))
     for j in axes(Ŷ, 1)
       cmp = Ŷ[j, i] > m
-      k = cmp ? j : k
-      m = cmp ? Ŷ[j, i] : m
+      k = ifelse(cmp, j, k)
+      m = ifelse(cmp, Ŷ[j, i], m)
     end
     ntot += k == Y[i]
   end
   return ntot
+end
+function error_count(c::SimpleChain, X, p)
+  cnl, loss = split_loss(c)
+  Ŷ = cnl(X, p)
+  error_count(Ŷ, target(loss))
+end
+function error_count_and_loss(c::SimpleChain, X::AbstractArray{T}, p) where {T}
+  cnl, loss = split_loss(c)
+  Ŷ = cnl(X, p)
+  ec = error_count(Ŷ, target(loss))
+  mem = c.memory
+  os = first(layer_output_size(Val(T), loss, size(X)))
+  ((length(mem) == 0) & (os != 0)) && resize!(mem, os)
+  pu = pointer(mem)
+  pX = pointer(X)
+  if (os != 0) & (UInt(pu) <= UInt(pX)) & (UInt(pX) <= (UInt(pu) + UInt(os)))
+    pu += os
+  end
+  GC.@preserve mem p return ec, first(loss(Ŷ, pointer(p), pu))
+end
+function error_count_and_loss(c::SimpleChain, X::AbstractArray{T}, Y, p) where {T}
+  error_count_and_loss(add_loss(c, pop_loss(c)(Y)), X, p)
+end
+function error_mean_and_loss(c::SimpleChain, X, args...)
+  cnt, l = error_count_and_loss(c, X, args...)
+  cnt / size(X)[end], l
 end
 
