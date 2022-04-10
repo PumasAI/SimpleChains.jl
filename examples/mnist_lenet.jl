@@ -1,5 +1,18 @@
-# SimpleChains
+# Common
 
+import MLDatasets
+function get_data()
+  xtrain, ytrain = MLDatasets.MNIST.traindata(Float32)
+  xtest, ytest = MLDatasets.MNIST.testdata(Float32)
+
+  ((reshape(xtrain, 28, 28, 1, :), UInt32.(ytrain .+ 1)),
+  (reshape(xtest, 28, 28, 1, :), UInt32.(ytest .+ 1)))
+end
+(xtrain, ytrain), (xtest, ytest) = get_data();
+
+
+
+# SimpleChains
 using SimpleChains
 lenet = SimpleChain(
   (static(28), static(28), static(1)),
@@ -13,8 +26,6 @@ lenet = SimpleChain(
   TurboDense(identity, 10),
 )
 
-
-(xtrain, ytrain), (xtest, ytest) = get_data()
 
 
 @time p = SimpleChains.init_params(lenet);
@@ -77,7 +88,6 @@ using Statistics, Random
 # using Logging: with_logger
 # using TensorBoardLogger: TBLogger, tb_overwrite, set_step!, set_step_increment!
 # using ProgressMeter: @showprogress
-import MLDatasets
 # import BSON
 using CUDA
 # arguments for the `train` function
@@ -116,13 +126,6 @@ function LeNet5(; imgsize = (28, 28, 1), nclasses = 10)
   ) |> device
 end
 
-function get_data()
-  xtrain, ytrain = MLDatasets.MNIST.traindata(Float32)
-  xtest, ytest = MLDatasets.MNIST.testdata(Float32)
-
-  ((reshape(xtrain, 28, 28, 1, :), UInt32.(ytrain .+ 1)),
-  (reshape(xtest, 28, 28, 1, :), UInt32.(ytest .+ 1)))
-end
 function loaders(xtrain, ytrain, xtest, ytest, args)
   ytrain, ytest = onehotbatch(ytrain, 1:10), onehotbatch(ytest, 1:10)
 
@@ -196,14 +199,19 @@ end
 
 
 
-# Flux
-train_loader, test_loader = loaders(xtrain, ytrain, xtest, ytest, Args(batchsize = 512));
+# Flux # @time model(device(xtrain))
+
 model = LeNet5();
-@time model(device(xtrain))
+batchsize = use_cuda ? 2048 : 96Threads.nthreads();
+train_loader, test_loader = loaders(xtrain, ytrain, xtest, ytest, Args(;batchsize)); 
 
 @time train!(model, train_loader)
-SimpleChains.error_mean_and_loss(train_loader, model, device),
-SimpleChains.error_mean_and_loss(test_loader, model, device)
+eval_loss_accuracy(train_loader, model, device),
+eval_loss_accuracy(test_loader, model, device)
+
+@time train!(model, train_loader)
+eval_loss_accuracy(train_loader, model, device),
+eval_loss_accuracy(test_loader, model, device)
 
 
 
