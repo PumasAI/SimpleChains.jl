@@ -17,13 +17,11 @@ using ArrayInterface:
   offsets
 using SIMDTypes: Bit
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
-using HostCPUFeatures: static_sizeof, register_size, register_count
+using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize
-using VectorizationBase: align, static_sizeof, relu, stridedpointer, AbstractSIMD, zero_offsets
-using LayoutPointers: bytestrideindex, stridedpointer
+using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
 import ManualMemory: preserve_buffer
 using IfElse: ifelse
-import ManualMemory: preserve_buffer
 import Random
 import ChainRulesCore
 import ForwardDiff
@@ -40,6 +38,7 @@ export SimpleChain,
   Flatten,
   AbsoluteLoss,
   SquaredLoss,
+  LogitCrossEntropyLoss,
   relu,
   static,
   StrideArray,
