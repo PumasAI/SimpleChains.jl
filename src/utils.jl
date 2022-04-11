@@ -138,6 +138,13 @@ function randpermzero!(r::VectorizedRNG.Xoshift, a::AbstractArray{<:Integer})
   end
   return a
 end
+# This uses a SIMD random number generator not for the sake of
+# sampling multiple permutations in parallel, but for generating
+# multiple proposals in parallel for the rejection sampling.
+# This makes it unlikely that the entire vector is rejected.
+# Which in turn means the branch mispredict rate goes from 7% to 0%
+# on Skylake-X, more than doubling the instructions per clock cycle.
+# (And requiring fewer instructions.)
 function randpermzero!(
   r::VectorizedRNG.Xoshift,
   a::AbstractArray{I},

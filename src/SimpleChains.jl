@@ -15,6 +15,7 @@ using ArrayInterface:
   StrideIndex,
   contiguous_axis,
   stride_rank,
+  length,
   static_length,
   static_first,
   static_last,
@@ -26,6 +27,8 @@ using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize
 using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
+using Static: One
+using StrideArraysCore: zview
 import ManualMemory: preserve_buffer
 using IfElse: ifelse
 import Random
@@ -33,7 +36,8 @@ import ChainRulesCore
 import ForwardDiff
 
 using LoopVectorization: matmul_params, CloseOpen, @turbo
-# macro turbo(ex); esc(ex); end
+# macro turbo(ex); esc(ex); end; macro turbo(ex0, ex1); esc(ex1); end
+
 
 export SimpleChain,
   TurboDense,

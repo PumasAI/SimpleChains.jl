@@ -106,40 +106,42 @@ function shuffle_chain_valgrad_thread!(
   # @show size(tgt)
   tgtpb = preserve_buffer(tgt)
   Xpb = preserve_buffer(Xp)
-  Xsz = Base.front(size(Xp))
-  eltx = eltype(Xp)
+  # Xsz = Base.front(size(Xp))
+  # eltx = eltype(Xp)
   eltgt = eltype(tgt)
-  szeltx = sizeof(eltx)
+  # szeltx = sizeof(eltx)
   szeltgt = sizeof(eltgt)
 
-  Xtmp = PtrArray(Ptr{eltx}(pm), (Xsz..., lastdim))
-  Xlen = tsprod(Xsz)
-  pXtmp = pointer(Xtmp)
-  pm += align(sizeof(eltgt) * Xlen * lastdim)
+  # Xtmp = PtrArray(Ptr{eltx}(pm), (Xsz..., lastdim))
+  # Xlen = tsprod(Xsz)
+  # pXtmp = pointer(Xtmp)
+  # pm += align(sizeof(eltgt) * Xlen * lastdim)
   tgtsz = Base.front(size(tgt))
   tgttmp = PtrArray(Ptr{eltgt}(pm), (tgtsz..., lastdim))
   ptgttmp = pointer(tgttmp)
   tgtlen = tsprod(tgtsz)
   pm += align(szeltgt * tgtlen * lastdim)
-  pX = pointer(Xp)
+  # pX = pointer(Xp)
   ptgt = pointer(tgt)
   GC.@preserve tgtpb Xpb begin
     for i = fm1:l-1
-      @inbounds j = perm[i+1] # j is zero-based
+      @inbounds j = perm[i] # `perm` and `j` are zero-based
       # @show i, j
       @simd ivdep for k = 0:Int(tgtlen)-1
         x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
         unsafe_store!(ptgttmp + k * szeltgt, x)
       end
       # Base.unsafe_copyto!(ptgttmp, ptgt + tgtlen*szeltgt*j, Int(tgtlen))
-      Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
+      # Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
       ptgttmp += Int(tgtlen) * szeltgt
-      pXtmp += Int(Xlen) * szeltx
+      # pXtmp += Int(Xlen) * szeltx
     end
   end
   # @show 1+fm1:l batchsize Xtmp tgttmp tgtlen Xlen lastdim
   newlayers = (Base.front(layers)..., loss(tgttmp))
-  chain_valgrad_entry!(pointer(g) + goff, Xtmp, newlayers, pointer(p), pm)
+  permview = StrideArraysCore.ptrarray0(pointer(perm)+(Base.elsize(perm)*fm1), (lastdim,))
+  # chain_valgrad_entry!(pointer(g) + goff, Xtmp, newlayers, pointer(p), pm)
+  chain_valgrad_entry!(pointer(g) + goff, Xp, newlayers, permview, pointer(p), pm)
   return nothing
 end
 function shuffle_update!(
@@ -345,13 +347,13 @@ function train_batched!(
   newlayers = (Base.front(layers)..., loss(PtrArray(Y)))
   GC.@preserve p g memory X Y begin
     optbuffer, pm = optmemory(opt, p, pointer(memory))
-    perm = PtrArray(Ptr{Int}(pm), (N,))
+    perm = StrideArraysCore.ptrarray0(Ptr{Int}(pm), (N,))
     pm += perm_mem
     d, r = divrem(N, N_bs)
     d += r != 0
     r = ifelse(r != 0, r, N_bs)
     @inbounds for n = 0:N-1
-      perm[n+1] = n
+      perm[n] = n
     end
     iter = 0
     while true

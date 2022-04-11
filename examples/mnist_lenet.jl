@@ -87,6 +87,8 @@ SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
 SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
 
 
+
+
 ## Classification of MNIST dataset
 ## with the convolutional neural network known as LeNet5.
 ## This script also combines various
