@@ -72,10 +72,10 @@ end
 
 # specialization for identity
 function (::Activation{typeof(identity)})(
-  x::AbstractArray{T},
+  x::AbstractArray,
   p::Ptr,
   pu::Ptr{UInt8},
-) where {T}
+)
   return x, p, pu
 end
 call!(x::AbstractArray, ::Activation{typeof(identity)}, p::Ptr, pu::Ptr{UInt8}) = x, p, pu

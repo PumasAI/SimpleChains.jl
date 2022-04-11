@@ -11,6 +11,8 @@ end
 
 TurboDense{B}(f::F, t::I) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
 TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
+TurboDense{B,I}(f::F, t::Integer) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, I(t))
+TurboDense{B,I}(t::Integer, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, I(t))
 function TurboDense{B}(::Integer, ::Integer) where {B}
   throw(
     ArgumentError(

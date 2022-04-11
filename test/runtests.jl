@@ -23,9 +23,9 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
           ),
         ) # test inputdim
         scdbase = SimpleChain((
-          TurboDense{true}(tanh, static(8)),
+          TurboDense{true,Int}(tanh, 8),
           Dropout(0.2),
-          TurboDense{true}(identity, static(2)),
+          TurboDense{true,Int}(identity, 2),
         )) # test inputdim unknown
       else # test construction using `Vararg`
         scbase = SimpleChain(
@@ -35,9 +35,9 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
           TurboDense{true}(identity, static(2)),
         ) # test inputdim
         scdbase = SimpleChain(
-          TurboDense{true}(tanh, static(8)),
+          TurboDense{true,Int}(tanh, 8),
           Dropout(0.2),
-          TurboDense{true}(identity, static(2)),
+          TurboDense{true,Int}(identity, 2),
         ) # test inputdim unknown
       end
 
