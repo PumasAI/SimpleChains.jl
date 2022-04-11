@@ -12,7 +12,6 @@ end
 TurboDense{B}(f::F, t::I) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
 TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
 TurboDense{B,I}(f::F, t::Integer) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, I(t))
-TurboDense{B,I}(t::Integer, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, I(t))
 function TurboDense{B}(::Integer, ::Integer) where {B}
   throw(
     ArgumentError(
@@ -746,8 +745,7 @@ function matmul!(
   B = zero_offsets(reinterpret(reshape, T, Bdual))
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  @turbo warn_check_args = false for p ∈ indices((B, C), 1),
-    m ∈ indices((A, C), (1,2))
+  @turbo warn_check_args = false for p ∈ indices((B, C), 1), m ∈ indices((A, C), (1, 2))
 
     Cmn = zero(T)
     for k ∈ CloseOpen(K)
@@ -769,7 +767,7 @@ function matmul!(
   K = Kp1 - StaticInt(1)
   @turbo warn_check_args = false for p ∈ indices((B, C), 1),
     n ∈ indices((B, C), 3),
-    m ∈ indices((A, C), (1,2))
+    m ∈ indices((A, C), (1, 2))
 
     Cmn = zero(T)
     for k ∈ CloseOpen(K)
@@ -786,8 +784,7 @@ function matmul!(
 ) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   B = reinterpret(reshape, T, Bdual)
-  @turbo warn_check_args = false for m ∈ indices((A, C), (1, 2)),
-    p ∈ indices((B, C), 1)
+  @turbo warn_check_args = false for m ∈ indices((A, C), (1, 2)), p ∈ indices((B, C), 1)
     Cpmn = zero(T)
     for k ∈ indices((A, B), 2)
       Cpmn += A[m, k] * B[p, k]
@@ -806,6 +803,7 @@ function matmul!(
   @turbo warn_check_args = false for n ∈ indices((B, C), 3),
     m ∈ indices((A, C), (1, 2)),
     p ∈ indices((B, C), 1)
+
     Cpmn = zero(T)
     for k ∈ indices((A, B), 2)
       Cpmn += A[m, k] * B[p, k, n]
@@ -834,9 +832,7 @@ function matmul!(
     end
     Cf1[p, m] = Cmn + Af[p, m, Kp1]
   end
-  @turbo warn_check_args = false for m ∈ indices((A, C), 2),
-    p ∈ 1:Pstatic,
-    k ∈ 1:K
+  @turbo warn_check_args = false for m ∈ indices((A, C), 2), p ∈ 1:Pstatic, k ∈ 1:K
 
     C[p+1, m] += A[1, m, k] * B[p+1, k]
   end

@@ -35,7 +35,11 @@ function _layer_output_size_needs_temp(
 ) where {T}
   align(length(first(target(sl))) * static_sizeof(T)), static_sizeof(T)
 end
-function _layer_output_size_needs_temp_of_equal_len_as_target(::Val{T}, sl::AbstractLoss, s) where {T}
+function _layer_output_size_needs_temp_of_equal_len_as_target(
+  ::Val{T},
+  sl::AbstractLoss,
+  s,
+) where {T}
   align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 end
 function _layer_output_size_no_temp(::Val{T}, sl::AbstractLoss, s) where {T}
@@ -251,4 +255,3 @@ function error_mean_and_loss(c::SimpleChain, X, args...)
   cnt, l = error_count_and_loss(c, X, args...)
   cnt / size(X)[end], l
 end
-

@@ -130,10 +130,7 @@ end
 #   VectorizedRNG.storestate!(r, s)
 #   return a
 # end
-function randpermzero!(
-  r::VectorizedRNG.Xoshift,
-  a::AbstractArray{<:Integer},
-)
+function randpermzero!(r::VectorizedRNG.Xoshift, a::AbstractArray{<:Integer})
   randpermzero!(r, a, VectorizationBase.pick_vector_width(UInt64))
 end
 function randpermzero!(
@@ -141,31 +138,31 @@ function randpermzero!(
   a::AbstractArray{<:Integer},
   ::StaticInt{W},
 ) where {W}
-    n = length(a)
-    @assert n <= one(Int64) << 52
-    n == 0 && return a
-    fi = firstindex(a)
-    @inbounds a[fi] = 0
-    mask = UInt64(3)
-    s = VectorizedRNG.getstate(r, Val{1}(), StaticInt{W}())
-    @inbounds for i = 1:n-1
-      sp = Random.ltm52(i + 1, mask % Int)
-      while true
-        s, uvu = VectorizedRNG.nextstate(s, Val(1))
-        u = VectorizationBase.data(uvu)[1]
-        jv = u & mask
-        m = VectorizationBase.data(jv <= sp.sup)
-        iszero(m) && continue
-        j = VectorizationBase.extractelement(jv, trailing_zeros(m))
-        if i != j # a[i] is undef (and could be #undef)
-          a[fi+i] = a[fi+j]
-        end
-        a[fi+j] = i
-        i % UInt64 == mask && (mask = UInt64(2) * mask + one(UInt64))
-        break
+  n = length(a)
+  @assert n <= one(Int64) << 52
+  n == 0 && return a
+  fi = firstindex(a)
+  @inbounds a[fi] = 0
+  mask = UInt64(3)
+  s = VectorizedRNG.getstate(r, Val{1}(), StaticInt{W}())
+  @inbounds for i = 1:n-1
+    sp = Random.ltm52(i + 1, mask % Int)
+    while true
+      s, uvu = VectorizedRNG.nextstate(s, Val(1))
+      u = VectorizationBase.data(uvu)[1]
+      jv = u & mask
+      m = VectorizationBase.data(jv <= sp.sup)
+      iszero(m) && continue
+      j = VectorizationBase.extractelement(jv, trailing_zeros(m))
+      if i != j # a[i] is undef (and could be #undef)
+        a[fi+i] = a[fi+j]
       end
+      a[fi+j] = i
+      i % UInt64 == mask && (mask = UInt64(2) * mask + one(UInt64))
+      break
     end
-    VectorizedRNG.storestate!(r, s)
-    return a
+  end
+  VectorizedRNG.storestate!(r, s)
+  return a
 end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)

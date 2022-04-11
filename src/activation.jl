@@ -71,11 +71,7 @@ function pullback!(
 end
 
 # specialization for identity
-function (::Activation{typeof(identity)})(
-  x::AbstractArray,
-  p::Ptr,
-  pu::Ptr{UInt8},
-)
+function (::Activation{typeof(identity)})(x::AbstractArray, p::Ptr, pu::Ptr{UInt8})
   return x, p, pu
 end
 call!(x::AbstractArray, ::Activation{typeof(identity)}, p::Ptr, pu::Ptr{UInt8}) = x, p, pu

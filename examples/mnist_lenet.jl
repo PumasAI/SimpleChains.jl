@@ -5,8 +5,10 @@ function get_data()
   xtrain, ytrain = MLDatasets.MNIST.traindata(Float32)
   xtest, ytest = MLDatasets.MNIST.testdata(Float32)
 
-  ((reshape(xtrain, 28, 28, 1, :), UInt32.(ytrain .+ 1)),
-  (reshape(xtest, 28, 28, 1, :), UInt32.(ytest .+ 1)))
+  (
+    (reshape(xtrain, 28, 28, 1, :), UInt32.(ytrain .+ 1)),
+    (reshape(xtest, 28, 28, 1, :), UInt32.(ytest .+ 1)),
+  )
 end
 (xtrain, ytrain), (xtest, ytest) = get_data();
 
@@ -37,25 +39,33 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain));
 g = similar(p);
 @time valgrad!(g, lenetloss, xtrain, p)
 
-G = similar(p, length(p), min(Threads.nthreads(), (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1))));
+G = similar(
+  p,
+  length(p),
+  min(Threads.nthreads(), (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1))),
+);
 
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p), SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
+SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
 
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p), SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
+SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
 
 
 
 lenet.memory .= 0;
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p), SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
+SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p), SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
+SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
 
 
 
@@ -69,10 +79,12 @@ g0 == g1
 lenet.memory .= 0;
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p), SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
+SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p), SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
+SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
 
 
 ## Classification of MNIST dataset
@@ -203,7 +215,7 @@ end
 
 model = LeNet5();
 batchsize = use_cuda ? 2048 : 96Threads.nthreads();
-train_loader, test_loader = loaders(xtrain, ytrain, xtest, ytest, Args(;batchsize)); 
+train_loader, test_loader = loaders(xtrain, ytrain, xtest, ytest, Args(; batchsize));
 
 @time train!(model, train_loader)
 eval_loss_accuracy(train_loader, model, device),
@@ -212,6 +224,3 @@ eval_loss_accuracy(test_loader, model, device)
 @time train!(model, train_loader)
 eval_loss_accuracy(train_loader, model, device),
 eval_loss_accuracy(test_loader, model, device)
-
-
-

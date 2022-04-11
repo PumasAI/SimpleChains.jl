@@ -340,7 +340,7 @@ function train_batched!(
     shuffle_per_thread,
     nthread,
   )
-  loss = last(layers);
+  loss = last(layers)
   Y = preserve_buffer(loss)
   newlayers = (Base.front(layers)..., loss(PtrArray(Y)))
   GC.@preserve p g memory X Y begin

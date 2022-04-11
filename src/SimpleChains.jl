@@ -2,7 +2,13 @@ module SimpleChains
 
 # using ChainRules, ChainRulesCore, NNlibCPU
 using UnPack,
-  VectorizationBase, ArrayInterface, Polyester, SLEEFPirates, StrideArraysCore, Static
+  VectorizationBase,
+  ArrayInterface,
+  Polyester,
+  SLEEFPirates,
+  StrideArraysCore,
+  Static,
+  VectorizedRNG
 using ArrayInterface:
   size,
   axes,
