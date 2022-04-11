@@ -131,38 +131,43 @@ end
 #   return a
 # end
 function randpermzero!(r::VectorizedRNG.Xoshift, a::AbstractArray{<:Integer})
-  randpermzero!(r, a, VectorizationBase.pick_vector_width(UInt64))
+  if length(a) > typemax(UInt32)
+    randpermzero!(r, a, Val(UInt64), VectorizationBase.pick_vector_width(UInt64))
+  else
+    randpermzero!(r, a, Val(UInt32), VectorizationBase.pick_vector_width(UInt64))
+  end
+  return a
 end
 function randpermzero!(
   r::VectorizedRNG.Xoshift,
-  a::AbstractArray{<:Integer},
+  a::AbstractArray{I},
+  ::Val{U},
   ::StaticInt{W},
-) where {W}
+) where {W,U,I<:Integer}
   n = length(a)
-  @assert n <= one(Int64) << 52
-  n == 0 && return a
+  @assert n%UInt64 <= min(typemax(U)%UInt64, one(UInt64)<<52)
+  n == 0 && return nothing
   fi = firstindex(a)
   @inbounds a[fi] = 0
-  mask = UInt64(3)
+  mask = U(3)
   s = VectorizedRNG.getstate(r, Val{1}(), StaticInt{W}())
-  @inbounds for i = 1:n-1
-    sp = Random.ltm52(i + 1, mask % Int)
+  @inbounds for i = one(U):((n-1)%U)
     while true
       s, uvu = VectorizedRNG.nextstate(s, Val(1))
-      u = VectorizationBase.data(uvu)[1]
+      u = reinterpret(U, VectorizationBase.data(uvu)[1])
       jv = u & mask
-      m = VectorizationBase.data(jv <= sp.sup)
+      m = VectorizationBase.data(jv <= i)
       iszero(m) && continue
       j = VectorizationBase.extractelement(jv, trailing_zeros(m))
       if i != j # a[i] is undef (and could be #undef)
-        a[fi+i] = a[fi+j]
+        a[fi+(i%Int)] = a[fi+(j%Int)]
       end
-      a[fi+j] = i
-      i % UInt64 == mask && (mask = UInt64(2) * mask + one(UInt64))
+      a[fi+(j%Int)] = i%I
+      i == mask && (mask = U(2) * mask + one(U))
       break
     end
   end
   VectorizedRNG.storestate!(r, s)
-  return a
+  return nothing
 end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
