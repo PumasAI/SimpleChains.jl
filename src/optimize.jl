@@ -379,7 +379,7 @@ function train_batched!(
         doff >= N && break
       end
       (iter += 1) < iters || break
-      Random.shuffle!(perm)
+      randpermzero!(perm)
     end
   end
   p

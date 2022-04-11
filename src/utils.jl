@@ -82,3 +82,90 @@ function glorot_normal!(A::AbstractArray{T}, rng = local_rng()) where {T}
   σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
   randn!(rng, A, static(0), static(0), σ)
 end
+
+function randpermzero!(r::Random.AbstractRNG, a::AbstractArray{<:Integer})
+  n = length(a)
+  @assert n <= one(Int64) << 52
+  n == 0 && return a
+  fi = firstindex(a)
+  @inbounds a[fi] = 0
+  mask = 3
+  @inbounds for i = 1:n-1
+    sp = Random.ltm52(i, mask)
+    while true
+      j = rand(r, sp.s)
+      j > sp.sup && continue
+      if i != j # a[i] is undef (and could be #undef)
+        a[fi+i] = a[fi+j]
+      end
+      a[fi+j] = i
+      i % UInt64 == mask && (mask = 2mask + 1)
+      break
+    end
+  end
+  return a
+end
+# function randpermzero!(r::VectorizedRNG.Xoshift, a::AbstractArray{<:Integer})
+#   n = length(a)
+#   @assert n <= one(Int64) << 52
+#   n == 0 && return a
+#   fi = firstindex(a)
+#   @inbounds a[fi] = 0
+#   mask = UInt64(3)
+#   s = VectorizedRNG.getstate(r)
+#   @inbounds for i = 1:n-1
+#     sp = Random.ltm52(i + 1, mask % Int)
+#     while true
+#       s, u = VectorizedRNG.nextstate(s)
+#       j = u & mask
+#       j > sp.sup && continue
+#       if i != j # a[i] is undef (and could be #undef)
+#         a[fi+i] = a[fi+j]
+#       end
+#       a[fi+j] = i
+#       i % UInt64 == mask && (mask = UInt64(2) * mask + one(UInt64))
+#       break
+#     end
+#   end
+#   VectorizedRNG.storestate!(r, s)
+#   return a
+# end
+function randpermzero!(
+  r::VectorizedRNG.Xoshift,
+  a::AbstractArray{<:Integer},
+)
+  randpermzero!(r, a, VectorizationBase.pick_vector_width(UInt64))
+end
+function randpermzero!(
+  r::VectorizedRNG.Xoshift,
+  a::AbstractArray{<:Integer},
+  ::StaticInt{W},
+) where {W}
+    n = length(a)
+    @assert n <= one(Int64) << 52
+    n == 0 && return a
+    fi = firstindex(a)
+    @inbounds a[fi] = 0
+    mask = UInt64(3)
+    s = VectorizedRNG.getstate(r, Val{1}(), StaticInt{W}())
+    @inbounds for i = 1:n-1
+      sp = Random.ltm52(i + 1, mask % Int)
+      while true
+        s, uvu = VectorizedRNG.nextstate(s, Val(1))
+        u = VectorizationBase.data(uvu)[1]
+        jv = u & mask
+        m = VectorizationBase.data(jv <= sp.sup)
+        iszero(m) && continue
+        j = VectorizationBase.extractelement(jv, trailing_zeros(m))
+        if i != j # a[i] is undef (and could be #undef)
+          a[fi+i] = a[fi+j]
+        end
+        a[fi+j] = i
+        i % UInt64 == mask && (mask = UInt64(2) * mask + one(UInt64))
+        break
+      end
+    end
+    VectorizedRNG.storestate!(r, s)
+    return a
+end
+randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
