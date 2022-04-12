@@ -4,7 +4,7 @@ CurrentModule = SimpleChains
 
 # SimpleChains
 
-Documentation for [SimpleChains](https://github.com/JuliaSIMD/SimpleChains.jl).
+Documentation for [SimpleChains](https://github.com/PumasAI/SimpleChains.jl).
 
 ```@index
 ```

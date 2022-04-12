@@ -1,9 +1,9 @@
 # SimpleChains
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaSIMD.github.io/SimpleChains.jl/stable)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaSIMD.github.io/SimpleChains.jl/dev)
-[![Build Status](https://github.com/JuliaSIMD/SimpleChains.jl/workflows/CI/badge.svg)](https://github.com/JuliaSIMD/SimpleChains.jl/actions)
-[codecov-img]:          https://codecov.io/gh/PumasAI/SimpleChains.jl/branch/master/graph/badge.svg           "Code Coverage"
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://PumasAI.github.io/SimpleChains.jl/stable)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://PumasAI.github.io/SimpleChains.jl/dev)
+[![Build Status](https://github.com/PumasAI/SimpleChains.jl/workflows/CI/badge.svg)](https://github.com/PumasAI/SimpleChains.jl/actions)
+[![codecov-img](https://codecov.io/gh/PumasAI/SimpleChains.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/PumasAI/SimpleChains.jl)
 
 `SimpleChains.jl` only supports simple chains, but it intends to be fast for small problems on the CPU.
 Currently, `valgrad!` is the only means of extracting gradient information.
