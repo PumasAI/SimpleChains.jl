@@ -168,7 +168,7 @@ function shuffle_update!(
     pstart,
     pstop,
   )
-  @turbo for t = 2:nthread, i in axes(g, 1)
+  for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
   gpb = preserve_buffer(g)
