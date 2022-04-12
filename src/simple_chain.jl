@@ -54,6 +54,18 @@ function Base.show(io::IO, sc::SimpleChain)
   _show(io, sc.layers)
 end
 
+function outputdim(x::Tuple{X}, s1) where {X}
+  last(layer_output_size(Val{Float32}(), getfield(x, 1), s1))
+end
+function outputdim(x::Tuple{X1,X2,Vararg}, s1::Tuple) where {X1,X2}
+  # Main._a[] = (T, x, s1)
+  _, s2 = layer_output_size(Val{Float32}(), getfield(x, 1), s1)
+  outputdim(Base.tail(x), s2)
+end
+function outputdim(sc::SimpleChain, id = nothing)
+  inputdim = chain_input_dims(sc, id)
+  outputdim(sc.layers, inputdim)
+end
 
 """
   Base.front(c::SimpleChain)
@@ -64,17 +76,6 @@ Base.front(c::SimpleChain) =
   SimpleChain(chain_input_dims(c), Base.front(c.layers), c.memory)
 Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers..., l), c.memory)
 
-
-# output_size must be defined to return the total size of all outputs
-output_size(::Val{T}, x::Tuple{}, _) where {T} = 0
-function output_size(::Val{T}, x::Tuple{X}, s1) where {T,X}
-  first(output_size(Val{T}(), getfield(x, 1), s1))
-end
-function output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple) where {T,X1,X2}
-  # Main._a[] = (T, x, s1)
-  b, s2 = output_size(Val{T}(), getfield(x, 1), s1)
-  b + output_size(Val{T}(), Base.tail(x), s2)
-end
 function numparam(c::SimpleChain, id = nothing)
   _id = chain_input_dims(c, id)
   _numparam(0, c.layers, _id)
@@ -89,13 +90,60 @@ parameter_free(x) = numparam(x) == 0
 @inline function resize_memory!(
   layers,
   memory::Vector{UInt8},
+  ::Val{T},
+  sx,
+  additional = static(0),
+) where {T}
+  d = output_size(Val(T), layers, sx) + additional
+  d2 = (2d)
+  if d2 > length(memory)
+    empty!(memory)
+    resize!(memory, d2)
+  end
+  d
+end
+@inline function resize_memory!(
+  layers,
+  memory::Vector{UInt8},
+  ::Val{T},
+  sx,
+  additional,
+  additional_per_thread,
+  nthread,
+) where {T}
+  base_mem_per_thread = 2output_size(Val(T), layers, sx) + additional_per_thread
+  mem_total = additional + base_mem_per_thread * nthread
+  if mem_total > length(memory)
+    empty!(memory)
+    resize!(memory, mem_total)
+  end
+  base_mem_per_thread
+end
+@inline function resize_memory!(
+  layers,
+  memory::Vector{UInt8},
   arg::AbstractArray{T},
   additional = static(0),
 ) where {T}
-  d = output_size(Val(T), layers, size(arg)) + additional
-  d2 = 2d
-  d2 > length(memory) && resize!(memory, d2)
-  d
+  resize_memory!(layers, memory, Val(T), size(arg), additional)
+end
+@inline function resize_memory!(
+  layers,
+  memory::Vector{UInt8},
+  arg::AbstractArray{T},
+  additional,
+  additional_per_thread,
+  nthread,
+) where {T}
+  resize_memory!(
+    layers,
+    memory,
+    Val(T),
+    size(arg),
+    additional,
+    additional_per_thread,
+    nthread,
+  )
 end
 
 matches(::InputDimUnknown, _) = true
@@ -118,8 +166,17 @@ function (c::SimpleChain)(arg, params)
   resize_memory!(layers, memory, parg)
   GC.@preserve arg unsafe_chain(layers, params, memory, parg)
 end
-function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
+@inline function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
   GC.@preserve params memory _chain(arg, layers, pointer(params), pointer(memory))
+end
+
+@inline output_size(::Val{T}, x::Tuple{}, _) where {T} = 0
+@inline function (output_size(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
+  first(layer_output_size(Val{T}(), getfield(x, 1), s1))
+end
+@inline function (output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
+  b, s2 = layer_output_size(Val{T}(), getfield(x, 1), s1)
+  b + output_size(Val{T}(), Base.tail(x), s2)
 end
 _chain(arg, ::Tuple{}, p::Ptr, pu::Ptr{UInt8}) = arg
 _chain(arg, l::Tuple{T}, p::Ptr, pu::Ptr{UInt8}) where {T} =
@@ -168,9 +225,7 @@ function chain_input_dims(chn::SimpleChain, inputdim::Tuple{Vararg{Integer}})
 end
 
 function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
-  GC.@preserve x begin
-    init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
-  end
+  GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
   return x
 end
 function init_params!(layers::Tuple, p::Ptr, id)
@@ -190,8 +245,8 @@ function init_params(Λ::SimpleChain, ::Type{T}) where {T}
   init_params(Λ, nothing, T)
 end
 
-maybe_static_size_arg(_, arg) = arg
-function maybe_static_size_arg(s::Tuple, arg::Array)
+@inline maybe_static_size_arg(_, arg) = arg
+@inline function maybe_static_size_arg(s::Tuple, arg::Array)
   PtrArray(pointer(arg), _try_static(s, size(arg)))
 end
 
@@ -223,6 +278,28 @@ function unsafe_valgrad!(g, layers, params, memory::Vector{UInt8}, arg)
     chain_valgrad_entry!(pointer(g), arg, layers, pointer(params), pointer(memory))
   end
 end
+# fallback valgrad_layer for functions not implementing fusion w/ indexing
+function valgrad_layer!(pg, l, Xp, perm, p, pu)
+  Xsz = Base.front(size(Xp))
+  eltx = eltype(Xp)
+  lastdim = length(perm)
+  Xtmp = PtrArray(Ptr{eltx}(pu), (Xsz..., lastdim))
+  Xlen = tsprod(Xsz)
+  pXtmp = pointer(Xtmp)
+  pu += align(sizeof(eltx) * Xlen * lastdim)
+  pX = pointer(Xp)
+  Xpb = preserve_buffer(Xp)
+  szeltx = sizeof(eltx)
+  GC.@preserve Xpb begin
+    for i = CloseOpen(lastdim)
+      @inbounds j = perm[i] # `perm` and `j` are zero-based
+      Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
+      pXtmp += Int(Xlen) * szeltx
+    end
+  end
+  # @show 1+fm1:l batchsize Xtmp tgttmp tgtlen Xlen lastdim
+  valgrad_layer!(pg, l, Xp, p, pu)
+end
 
 function chain_valgrad_entry!(
   pg,
@@ -233,6 +310,24 @@ function chain_valgrad_entry!(
 ) where {X1,X2}
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
+  if parameter_free(l)
+    val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
+  else
+    val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+    pullback_param!(pg, l, grad, arg, p, pu)
+  end
+  return val
+end
+function chain_valgrad_entry!(
+  pg,
+  arg,
+  layers::Tuple{X1,X2,Vararg},
+  inds,
+  p::Ptr,
+  pu::Ptr{UInt8},
+) where {X1,X2}
+  l = getfield(layers, 1)
+  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, inds, p, pu)
   if parameter_free(l)
     val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
   else

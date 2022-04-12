@@ -9,8 +9,9 @@ struct TurboDense{B,I<:Integer,F}
   outputdim::I
 end
 
-TurboDense{B}(f::F, t::I) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, t)
-TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, t)
+TurboDense{B}(f::F, t::I) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
+TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, static(t))
+TurboDense{B,I}(f::F, t::Integer) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, I(t))
 function TurboDense{B}(::Integer, ::Integer) where {B}
   throw(
     ArgumentError(
@@ -18,7 +19,7 @@ function TurboDense{B}(::Integer, ::Integer) where {B}
     ),
   )
 end
-TurboDense(a, b) = TurboDense{true}(a, b)
+TurboDense(f, d) = TurboDense{true}(f, static(d))
 
 function Base.show(io::IO, td::TurboDense{B}) where {B}
   w = B ? "with" : "without"
@@ -46,18 +47,11 @@ end
 _numparam(d::TurboDense{false}, inputdim::Integer) = inputdim * d.outputdim
 _numparam(d::TurboDense{true}, inputdim::Integer) = (inputdim + 1) * d.outputdim
 parameter_free(::TurboDense) = false
-function output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
+function layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
   g1, outputdim = numparam(td, inputdim)
   g2 = prod(outputdim)
   align(static_sizeof(T) * g1) + 2align(static_sizeof(T) * g2), outputdim
 end
-fast_fuse(::typeof(relu)) = True()
-fast_fuse(::typeof(abs)) = True()
-fast_fuse(::typeof(abs2)) = True()
-fast_fuse(::typeof(Base.FastMath.abs_fast)) = True()
-fast_fuse(::typeof(Base.FastMath.abs2_fast)) = True()
-fast_fuse(::typeof(identity)) = True()
-fast_fuse(_) = False()
 fast_fuse(td::TurboDense) = fast_fuse(getfield(td, :f))
 
 function getparams(td::TurboDense{false}, p::Ptr{T}, inputdim::Integer) where {T}
@@ -78,19 +72,16 @@ end
 function _init_params!(td::TurboDense{true}, p, inputdim::Integer)
   W, p = getparams(td, p, inputdim)
   outputdim = td.outputdim
-  lrng = local_rng()
-  gn = Base.FastMath.sqrt_fast(eltype(W)(2 / (inputdim + outputdim)))
-  randn!(lrng, view(W, :, 1:inputdim), static(0), static(0), gn)
-  # randn!(lrng, view(W, :, inputdim+1))
-  fill!(view(W, :, inputdim + 1), 0)
+  glorot_normal!(view(W, :, 1:inputdim))
+  @turbo for i = 1:outputdim
+    W[i, inputdim+1] = 0
+  end
   return p, outputdim
 end
 function _init_params!(td::TurboDense{false}, p, inputdim::Integer)
   W, p = getparams(td, p, inputdim)
-  outputdim = td.outputdim
-  gn = Base.FastMath.sqrt_fast(eltype(W)(2 / (inputdim + outputdim)))
-  randn!(local_rng(), W, static(0), static(0), gn)
-  return p, outputdim
+  glorot_normal!(W)
+  return p, td.outputdim
 end
 
 function alloc_return(
@@ -230,6 +221,11 @@ end
   ∂fx = getfield(ForwardDiff.partials(dx).values, 1)
   fx, ∂fx
 end
+@inline function (fw::ForwardDiffElementwise{typeof(relu)})(x)
+  y = zero(x)
+  m = x < y
+  ifelse(m, y, x), ~m
+end
 # overloadable
 @inline ∂(f::F) where {F} = ForwardDiffElementwise{F}(f)
 
@@ -252,14 +248,19 @@ function get∂C(
   C::AbstractArray,
   ∂Cp::Ptr{UInt8},
 ) where {B,D}
-  ∂C = PtrArray(reinterpret(Ptr{Bit}, ∂Cp), size(C))
-  ∂Cp += align((length(∂C) + 7) >>> 3)
+  outputdim = size(C)
+  ∂C = PtrArray(reinterpret(Ptr{Bit}, ∂Cp), outputdim)
+  ∂Cp += align((last(StrideArraysCore.strides(∂C)) >>> 3) * last(outputdim))
   ∂C, ∂Cp
 end
-get∂C(::TurboDense{B,D,typeof(identity)}, ::AbstractArray, ∂Cp::Ptr{UInt8}) where {B,D} =
+function get∂C(
+  ::TurboDense{B,D,typeof(identity)},
+  ::AbstractArray,
+  ∂Cp::Ptr{UInt8},
+) where {B,D}
   (nothing, ∂Cp)
+end
 
-# generic
 function dense!(
   f::F,
   ∂C::AbstractArray{T1,N},
@@ -394,7 +395,7 @@ function dense!(
 end
 function dense!(
   ::typeof(relu),
-  ∂C::AbstractArray{Bit,N},
+  ∂C::AbstractArray{Bool,N},
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
   B::AbstractArray{T2,N},
@@ -415,7 +416,7 @@ function dense!(
 end
 function dense!(
   ::typeof(relu),
-  ∂C::AbstractArray{Bit,N},
+  ∂C::AbstractArray{Bool,N},
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
   B::AbstractArray{T2,N},
@@ -466,16 +467,6 @@ function dense!(
   end
 end
 
-# struct DensePullBack{B,D,F,T,AT}
-#   td::TurboDense{B,D,F}
-#   p::Ptr{T}
-#   A::AT
-# end
-
-
-
-
-
 function valgrad_layer!(
   pg::Ptr{T},
   td::TurboDense{O},
@@ -505,14 +496,14 @@ end
 function pullback!(
   pg::Ptr{T},
   td::TurboDense{O},
-  _C̄,
+  C̄,
   B,
   p::Ptr{T},
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8},
 ) where {T,O}
   # Start with 4-arg `pulback!` to update `∂C`
-  C̄ = pullback_param!(pg, td, _C̄, B, p, pu) # Ā = C̄ * B'
+  pullback_param!(pg, td, C̄, B, p, pu) # Ā = C̄ * B'
   # Now 5-arg
   # B̄ = A' * C̄
   intput_dims = size(B, StaticInt(1))
@@ -527,8 +518,8 @@ function matrix_view(::TurboDense{true}, A)
   K = Kp1 - StaticInt(1)
   view(A, :, static(1):K)
 end
-upate_C̄!(_, __, td::TurboDense{B,D,typeof(identity)}) where {B,D} = nothing #=∂C=#
-function upate_C̄!(C̄, ∂C, ::TurboDense{B,D}) where {B,D}
+update_C̄!(::typeof(identity), _, __) = nothing #=∂C=#
+function update_C̄!(::F, C̄, ∂C) where {F}
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
   end
@@ -542,11 +533,10 @@ function pullback_param!(
   pu::Ptr{UInt8},
 ) where {T,O}
   # Ā = C̄ * B'
-  ∂C, _ = get∂C(td, C̄, pu)
-  upate_C̄!(C̄, ∂C, td)
+  update_C̄!(td.f, C̄, first(get∂C(td, C̄, pu)))
   Ā, __ = getparams(td, pg, size(B, StaticInt(1)))
   dense_param_update!(td, Ā, C̄, B)
-  C̄
+  return nothing
 end
 function dense_param_update!(::TurboDense{true}, Ā, C̄, B)
   Kp1 = ArrayInterface.size(Ā, StaticInt(2))
@@ -755,8 +745,7 @@ function matmul!(
   B = zero_offsets(reinterpret(reshape, T, Bdual))
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  @turbo warn_check_args = false for p ∈ indices((B, C), 1),
-    m ∈ indices((A, C), (1,2))
+  @turbo warn_check_args = false for p ∈ indices((B, C), 1), m ∈ indices((A, C), (1, 2))
 
     Cmn = zero(T)
     for k ∈ CloseOpen(K)
@@ -778,7 +767,7 @@ function matmul!(
   K = Kp1 - StaticInt(1)
   @turbo warn_check_args = false for p ∈ indices((B, C), 1),
     n ∈ indices((B, C), 3),
-    m ∈ indices((A, C), (1,2))
+    m ∈ indices((A, C), (1, 2))
 
     Cmn = zero(T)
     for k ∈ CloseOpen(K)
@@ -795,8 +784,7 @@ function matmul!(
 ) where {T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   C = reinterpret(reshape, T, Cdual)
   B = reinterpret(reshape, T, Bdual)
-  @turbo warn_check_args = false for m ∈ indices((A, C), (1, 2)),
-    p ∈ indices((B, C), 1)
+  @turbo warn_check_args = false for m ∈ indices((A, C), (1, 2)), p ∈ indices((B, C), 1)
     Cpmn = zero(T)
     for k ∈ indices((A, B), 2)
       Cpmn += A[m, k] * B[p, k]
@@ -815,6 +803,7 @@ function matmul!(
   @turbo warn_check_args = false for n ∈ indices((B, C), 3),
     m ∈ indices((A, C), (1, 2)),
     p ∈ indices((B, C), 1)
+
     Cpmn = zero(T)
     for k ∈ indices((A, B), 2)
       Cpmn += A[m, k] * B[p, k, n]
@@ -843,9 +832,7 @@ function matmul!(
     end
     Cf1[p, m] = Cmn + Af[p, m, Kp1]
   end
-  @turbo warn_check_args = false for m ∈ indices((A, C), 2),
-    p ∈ 1:Pstatic,
-    k ∈ 1:K
+  @turbo warn_check_args = false for m ∈ indices((A, C), 2), p ∈ 1:Pstatic, k ∈ 1:K
 
     C[p+1, m] += A[1, m, k] * B[p+1, k]
   end
@@ -939,7 +926,6 @@ function matmul!(
     C[p+1, m, n] += A[1, m, k] * B[p+1, k, n]
   end
 end
-
 
 function dense!(
   f::F,
