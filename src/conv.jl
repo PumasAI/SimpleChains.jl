@@ -7,7 +7,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,2},
   _A::AbstractArray{<:Any,2},
   _K::AbstractArray{<:Any,3},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -27,7 +27,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,3},
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,3},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -43,7 +43,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,3},
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,3},
-  _b,
+  _b::AbstractVector,
   _inds::AbstractVector{<:Integer}
 ) where {F}
   C = zero_offsets(_C)
@@ -61,7 +61,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,2},
   _A::AbstractArray{<:Any,2},
   _K::AbstractArray{<:Any,3},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -85,7 +85,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,3},
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,3},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -102,7 +102,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,3},
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,3},
-  _b,
+  _b::AbstractVector,
   _inds::AbstractVector{<:Integer}
 ) where {F}
   ∂C = zero_offsets(_∂C)
@@ -122,7 +122,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,3},
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,4},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -141,7 +141,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,4},
   _A::AbstractArray{<:Any,4},
   _K::AbstractArray{<:Any,4},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -156,7 +156,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,4},
   _A::AbstractArray{<:Any,4},
   _K::AbstractArray{<:Any,4},
-  _b,
+  _b::AbstractVector,
   _inds::AbstractVector{<:Integer}
 ) where {F}
   C = zero_offsets(_C)
@@ -174,7 +174,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,4},
   _A::AbstractArray{<:Any,4},
   _K::AbstractArray{<:Any,5},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -193,7 +193,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,5},
   _A::AbstractArray{<:Any,5},
   _K::AbstractArray{<:Any,5},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -208,7 +208,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,5},
   _A::AbstractArray{<:Any,5},
   _K::AbstractArray{<:Any,5},
-  _b,
+  _b::AbstractVector,
   _inds::AbstractVector{<:Integer}
 ) where {F}
   C = zero_offsets(_C)
@@ -228,7 +228,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,3},
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,4},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -252,12 +252,17 @@ function convlayer!(
 end
 function convlayer!(
   f::F,
-  ∂C::AbstractArray{<:Any,4},
-  C::AbstractArray{<:Any,4},
-  A::AbstractArray{<:Any,4},
-  K::AbstractArray{<:Any,4},
-  b,
+  _∂C::AbstractArray{<:Any,4},
+  _C::AbstractArray{<:Any,4},
+  _A::AbstractArray{<:Any,4},
+  _K::AbstractArray{<:Any,4},
+  _b::AbstractVector,
 ) where {F}
+  ∂C = zero_offsets(_∂C)
+  C = zero_offsets(_C)
+  A = zero_offsets(_A)
+  K = zero_offsets(_K)
+  b = zero_offsets(_b)
   for d ∈ axes(C, 4)
     convlayer!(f, zview(∂C, :, :, :, d), zview(C, :, :, :, d), zview(A, :, :, :, d), K, b)
   end
@@ -268,7 +273,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,4},
   _A::AbstractArray{<:Any,4},
   _K::AbstractArray{<:Any,4},
-  _b,
+  _b::AbstractVector,
   _inds::AbstractVector{<:Integer}
 ) where {F}
   ∂C = zero_offsets(_∂C)
@@ -289,7 +294,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,4},
   _A::AbstractArray{<:Any,4},
   _K::AbstractArray{<:Any,5},
-  _b,
+  _b::AbstractVector,
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -312,7 +317,7 @@ function convlayer!(
   C::AbstractArray{<:Any,5},
   A::AbstractArray{<:Any,5},
   K::AbstractArray{<:Any,5},
-  b,
+  b::AbstractVector,
 ) where {F}
   for d ∈ axes(C, 4)
     convlayer!(
@@ -331,7 +336,7 @@ function convlayer!(
   _C::AbstractArray{<:Any,5},
   _A::AbstractArray{<:Any,5},
   _K::AbstractArray{<:Any,5},
-  _b,
+  _b::AbstractVector,
   _inds::AbstractVector{<:Integer}
 ) where {F}
   ∂C = zero_offsets(_∂C)

@@ -278,6 +278,28 @@ function unsafe_valgrad!(g, layers, params, memory::Vector{UInt8}, arg)
     chain_valgrad_entry!(pointer(g), arg, layers, pointer(params), pointer(memory))
   end
 end
+# fallback valgrad_layer for functions not implementing fusion w/ indexing
+function valgrad_layer!(pg, l, Xp, perm, p, pu)
+  Xsz = Base.front(size(Xp))
+  eltx = eltype(Xp)
+  lastdim = length(perm)
+  Xtmp = PtrArray(Ptr{eltx}(pu), (Xsz..., lastdim))
+  Xlen = tsprod(Xsz)
+  pXtmp = pointer(Xtmp)
+  pu += align(sizeof(eltx) * Xlen * lastdim)
+  pX = pointer(Xp)
+  Xpb = preserve_buffer(Xp)
+  szeltx = sizeof(eltx)
+  GC.@preserve Xpb begin
+    for i = CloseOpen(lastdim)
+      @inbounds j = perm[i] # `perm` and `j` are zero-based
+      Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
+      pXtmp += Int(Xlen) * szeltx
+    end
+  end
+  # @show 1+fm1:l batchsize Xtmp tgttmp tgtlen Xlen lastdim
+  valgrad_layer!(pg, l, Xp, p, pu)
+end
 
 function chain_valgrad_entry!(
   pg,
