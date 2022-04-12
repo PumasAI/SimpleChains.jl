@@ -13,7 +13,12 @@ makedocs(;
     canonical = "https://PumasAI.github.io/SimpleChains.jl",
     assets = String[],
   ),
-  pages = ["Home" => "index.md"],
+         pages = ["Home" => "index.md",
+                      "Examples" => [
+                        "examples/smallmlp.md",
+                        "examples/mnist.md",
+                        ]
+],
 )
 
 deploydocs(; repo = "github.com/PumasAI/SimpleChains.jl", devbranch = "main")
