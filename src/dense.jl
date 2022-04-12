@@ -533,7 +533,8 @@ function pullback_param!(
   pu::Ptr{UInt8},
 ) where {T,O}
   # Ā = C̄ * B'
-  update_C̄!(td.f, C̄, first(get∂C(td, C̄, pu)))
+  ∂C = first(get∂C(td, C̄, pu))
+  update_C̄!(td.f, C̄, ∂C)
   Ā, __ = getparams(td, pg, size(B, StaticInt(1)))
   dense_param_update!(td, Ā, C̄, B)
   return nothing

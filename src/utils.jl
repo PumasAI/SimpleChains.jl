@@ -178,3 +178,16 @@ function randpermzero!(
   return nothing
 end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
+
+function aloc_threaded_grad(
+  Λ::SimpleChain,
+  id::Union{Nothing,InputDim} = nothing,
+  ::Type{T} = Float32;
+  numthreads = min(num_threads(), num_cores())
+) where {T}
+  np = numparam(Λ, id)
+  x = align(np, T)
+  mem = Vector{T}(undef, x*numthreads + register_size()÷sizeof(T)-1)
+  StrideArray(PtrArray(align(pointer(mem)), (np,numthreads), (One(), x)), mem)
+end
+

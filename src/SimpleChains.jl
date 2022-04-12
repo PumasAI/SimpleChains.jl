@@ -25,7 +25,7 @@ using ArrayInterface:
 using SIMDTypes: Bit
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
-using CPUSummary: cache_linesize
+using CPUSummary: cache_linesize, num_threads, num_cores
 using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
 using Static: One
 using StrideArraysCore: zview
@@ -59,8 +59,8 @@ export SimpleChain,
   L2Penalty,
   FrontLastPenalty
 
-include("utils.jl")
 include("simple_chain.jl")
+include("utils.jl")
 include("activation.jl")
 include("dense.jl")
 include("dropout.jl")

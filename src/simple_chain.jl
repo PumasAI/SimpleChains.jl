@@ -283,10 +283,13 @@ function valgrad_layer!(pg, l, Xp, perm, p, pu)
   Xsz = Base.front(size(Xp))
   eltx = eltype(Xp)
   lastdim = length(perm)
-  Xtmp = PtrArray(Ptr{eltx}(pu), (Xsz..., lastdim))
+  Xtsz = (Xsz..., lastdim)
+  pointer_offset = first(layer_output_size(Val(eltype(p)), l, Xtsz))
+  pux = pu + pointer_offset
+  Xtmp = PtrArray(Ptr{eltx}(pux), Xtsz)
   Xlen = tsprod(Xsz)
   pXtmp = pointer(Xtmp)
-  pu += align(sizeof(eltx) * Xlen * lastdim)
+  pux += align(sizeof(eltx) * Xlen * lastdim)
   pX = pointer(Xp)
   Xpb = preserve_buffer(Xp)
   szeltx = sizeof(eltx)
@@ -297,8 +300,8 @@ function valgrad_layer!(pg, l, Xp, perm, p, pu)
       pXtmp += Int(Xlen) * szeltx
     end
   end
-  # @show 1+fm1:l batchsize Xtmp tgttmp tgtlen Xlen lastdim
-  valgrad_layer!(pg, l, Xp, p, pu)
+  pg2, larg, p2, _ = valgrad_layer!(pg, l, Xtmp, p, pu)
+  pg2, larg, p2, pux
 end
 
 function chain_valgrad_entry!(
@@ -346,7 +349,9 @@ function chain_valgrad!(
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+  # @show X2,grad
   lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
+  # @show X1,lgrad
   return val, lgrad, pu4
 end
 function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where {X}
@@ -354,6 +359,7 @@ function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where
   __, val, _, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   # val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
+  # @show lgrad
   return val, lgrad, pu3
 end
 @inline getchain(sc::SimpleChain) = sc

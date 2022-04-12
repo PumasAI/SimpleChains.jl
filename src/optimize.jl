@@ -21,7 +21,7 @@ function update!(o::ADAM, (mt, vt, βp), x, Δ)
     vt[i] = β₂ * vt[i] + (1 - β₂) * Δ[i]^2
     # Δ[i] =  mt[i] / (1 - βp₁) / (sqrt(vt[i] / (1 - βp₂)) + 1e-8) * η
     Δᵢ = η * mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1e-8))
-    Δ[i] = Δᵢ
+    # Δ[i] = Δᵢ
     x[i] -= Δᵢ#Δ[i]
   end
   βp[1] = βp₁ * β₁
@@ -78,8 +78,12 @@ function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
-  apply_penalty!(g, pen, p, sx)
-  GC.@preserve gpb update!(opt, optbuffer, p, PtrArray(pointer(g), (length(p),)))
+  gpb = preserve_buffer(g)
+  GC.@preserve gpb begin
+    gv = PtrArray(pointer(g), (length(p),))
+    apply_penalty!(gv, pen, p, sx)
+    update!(opt, optbuffer, p, gv)
+  end
 end
 # note that pstop - pstart = subrangelen, so it is not a closed-closed i
 function shuffle_chain_valgrad_thread!(
@@ -167,9 +171,12 @@ function shuffle_update!(
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
-  apply_penalty!(g, pen, p, sx)
   gpb = preserve_buffer(g)
-  GC.@preserve gpb update!(opt, optbuffer, p, PtrArray(pointer(g), (length(p),)))
+  GC.@preserve gpb begin
+    gv = PtrArray(pointer(g), (length(p),))
+    apply_penalty!(gv, pen, p, sx)
+    update!(opt, optbuffer, p, gv)
+  end
 end
 function shuffle_update!(
   g::AbstractVector,
