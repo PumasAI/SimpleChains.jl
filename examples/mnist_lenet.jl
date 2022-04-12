@@ -47,25 +47,25 @@ G = similar(
 
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
-SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
+SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
-SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
+SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
 
 
 lenet.memory .= 0;
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
-SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
+SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
-SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
+SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
 
 
@@ -79,12 +79,12 @@ g0 == g1
 lenet.memory .= 0;
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
-SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
+SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
-SimpleChains.error_mean_and_loss(lenetloss, xtrain, p),
-SimpleChains.error_mean_and_loss(lenetloss, xtest, ytest, p)
+SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
+SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
 
 

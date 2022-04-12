@@ -215,7 +215,7 @@ end
 function Base.getindex(sl::LogitCrossEntropyLoss, r)
   LogitCrossEntropyLoss(view(target(sl), r))
 end
-function error_count(Ŷ, Y)
+function correct_count(Ŷ, Y)
   ntot = 0
   @inbounds for i in eachindex(Y)
     k = -1
@@ -229,15 +229,15 @@ function error_count(Ŷ, Y)
   end
   return ntot
 end
-function error_count(c::SimpleChain, X, p)
+function correct_count(c::SimpleChain, X, p)
   cnl, loss = split_loss(c)
   Ŷ = cnl(X, p)
-  error_count(Ŷ, target(loss))
+  correct_count(Ŷ, target(loss))
 end
-function error_count_and_loss(c::SimpleChain, X::AbstractArray{T}, p) where {T}
+function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, p) where {T}
   cnl, loss = split_loss(c)
   Ŷ = cnl(X, p)
-  ec = error_count(Ŷ, target(loss))
+  ec = correct_count(Ŷ, target(loss))
   mem = c.memory
   os = first(layer_output_size(Val(T), loss, size(X)))
   ((length(mem) == 0) & (os != 0)) && resize!(mem, os)
@@ -248,10 +248,10 @@ function error_count_and_loss(c::SimpleChain, X::AbstractArray{T}, p) where {T}
   end
   GC.@preserve mem p return ec, first(loss(Ŷ, pointer(p), pu))
 end
-function error_count_and_loss(c::SimpleChain, X::AbstractArray{T}, Y, p) where {T}
-  error_count_and_loss(add_loss(c, pop_loss(c)(Y)), X, p)
+function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, Y, p) where {T}
+  correct_count_and_loss(add_loss(c, pop_loss(c)(Y)), X, p)
 end
-function error_mean_and_loss(c::SimpleChain, X, args...)
-  cnt, l = error_count_and_loss(c, X, args...)
+function accuracy_and_loss(c::SimpleChain, X, args...)
+  cnt, l = correct_count_and_loss(c, X, args...)
   cnt / size(X)[end], l
 end
