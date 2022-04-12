@@ -1,3 +1,4 @@
+ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
 using SimpleChains, MLDatasets, Test
 
 lenet = SimpleChain(
