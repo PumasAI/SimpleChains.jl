@@ -12,3 +12,7 @@ Documentation for [SimpleChains](https://github.com/PumasAI/SimpleChains.jl).
 ```@autodocs
 Modules = [SimpleChains]
 ```
+
+```@contents
+Pages = ["examples/smallmlp.md", "examples/mnist.md"]
+```

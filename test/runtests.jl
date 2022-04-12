@@ -419,33 +419,9 @@ SquaredLoss"""
     @test Ac == g
   end
   @testset "LeNet" begin
-    N = 20
-    nclasses = 10
-    x = randn(28, 28, 1, N)
-    lenet = SimpleChain(
-      (static(28), static(28), static(1)),
-      SimpleChains.Conv(SimpleChains.relu, (5, 5), 6),
-      SimpleChains.MaxPool(2, 2),
-      SimpleChains.Conv(SimpleChains.relu, (5, 5), 16),
-      SimpleChains.MaxPool(2, 2),
-      Flatten(3),
-      TurboDense(SimpleChains.relu, 120),
-      TurboDense(SimpleChains.relu, 84),
-      TurboDense(identity, nclasses),
-    )
-    SimpleChains.outputdim(lenet, size(x))
-    # y =
-    # d = Simple
-    p = SimpleChains.init_params(lenet, size(x))
-    lenet(x, p)
-    g = similar(p)
-    y = rand(one(UInt32):UInt32(nclasses), N)
-    lenet.memory .= 0x00
-    valgrad!(g, SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y)), x, p)
-    g2 = similar(g)
-    lenet.memory .= 0xff
-    valgrad!(g2, SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y)), x, p)
-    @test g == g2
+    include("mnist.jl")
   end
 end
-Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) #TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
+# TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
+# For now, there are the tests at the start.
+Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) 

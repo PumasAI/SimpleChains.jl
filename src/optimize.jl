@@ -105,25 +105,16 @@ function shuffle_chain_valgrad_thread!(
   tgt = target(loss)
   # @show size(tgt)
   tgtpb = preserve_buffer(tgt)
-  Xpb = preserve_buffer(Xp)
-  # Xsz = Base.front(size(Xp))
-  # eltx = eltype(Xp)
   eltgt = eltype(tgt)
-  # szeltx = sizeof(eltx)
   szeltgt = sizeof(eltgt)
 
-  # Xtmp = PtrArray(Ptr{eltx}(pm), (Xsz..., lastdim))
-  # Xlen = tsprod(Xsz)
-  # pXtmp = pointer(Xtmp)
-  # pm += align(sizeof(eltgt) * Xlen * lastdim)
   tgtsz = Base.front(size(tgt))
   tgttmp = PtrArray(Ptr{eltgt}(pm), (tgtsz..., lastdim))
   ptgttmp = pointer(tgttmp)
   tgtlen = tsprod(tgtsz)
   pm += align(szeltgt * tgtlen * lastdim)
-  # pX = pointer(Xp)
   ptgt = pointer(tgt)
-  GC.@preserve tgtpb Xpb begin
+  GC.@preserve tgtpb begin
     for i = fm1:l-1
       @inbounds j = perm[i] # `perm` and `j` are zero-based
       # @show i, j
