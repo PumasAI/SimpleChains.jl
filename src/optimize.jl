@@ -155,27 +155,6 @@ function shuffle_update!(
   pstop,
 )
   nthread = size(g, static(2))
-  if nthread == 1
-    gpb = preserve_buffer(g)
-    GC.@preserve gpb begin
-      shuffle_update!(
-        PtrArray(pointer(g), (length(p),)),
-        opt,
-        Xp,
-        layers,
-        pen,
-        sx,
-        p,
-        pm,
-        optbuffer,
-        mpt,
-        perm,
-        pstart,
-        pstop,
-      )
-    end
-    return nothing
-  end
   Polyester.batch(
     shuffle_chain_valgrad_thread!,
     (nthread, nthread),
@@ -324,14 +303,20 @@ end
 @inline view_slice_last(X::AbstractArray{<:Any,4}, r) = view(X, :, :, :, r)
 @inline view_slice_last(X::AbstractArray{<:Any,5}, r) = view(X, :, :, :, :, r)
 function train_batched!(
-  g,
-  p,
+  g::AbstractVecOrMat,
+  p::AbstractVector,
   _chn::Chain,
   X,
   opt::AbstractOptimizer,
   iters;
   batchsize = nothing,
 )
+  if g isa AbstractMatrix && size(g,2) == 1
+    gpb = preserve_buffer(g)
+    gv = PtrArray(pointer(g), (length(p),))
+    GC.@preserve gpb train_batched!(gv, p, _chn, X, opt, iters; batchsize)
+    return p
+  end
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
