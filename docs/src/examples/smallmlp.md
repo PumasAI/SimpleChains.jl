@@ -46,10 +46,24 @@ end
 
 report(p)
 for _ in 1:3
-  @time SimpleChains.train_batched!(
-    G, p, mlpdloss, X, SimpleChains.ADAM(1e-6), 1_000_000, batchsize = size(X)[end]
+  @time SimpleChains.train_unbatched!(
+    G, p, mlpdloss, X, SimpleChains.ADAM(), 10_000
   );
   report(p)
 end
+```
+I get
+```julia
+┌ Info: Loss:
+│   train = 0.012996411f0
+└   test = 0.021395735f0
+  0.488138 seconds
+┌ Info: Loss:
+│   train = 0.0027068993f0
+└   test = 0.009439239f0
+  0.481226 seconds
+┌ Info: Loss:
+│   train = 0.0016358295f0
+└   test = 0.0074498975f0
 ```
 

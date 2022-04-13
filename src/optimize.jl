@@ -55,23 +55,43 @@ function update!(g::AbstractVector, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
   apply_penalty!(g, pen, p, sx)
   update!(opt, optbuffer, p, g)
 end
-function chain_valgrad_thread!((g, Xp, layers, p, pm), start, stop, mpt)
+function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
   batchsize = size(Xp, ndims(Xp))
   start > stop && return nothing
   off = start - 1
   nt = size(g, static(2))
-  goff = stride(g, 2) * sizeof(eltype(g)) * off
-  moff = mpt * off
+  goff = stride(g, static(2)) * sizeof(eltype(g)) * off
   f = ((off * batchsize) ÷ nt) + 1
   l = (stop * batchsize) ÷ nt
   Xpv = view_slice_last(Xp, f:l)
-  newlayers = (Base.front(layers)..., last(layers)[f:l])
-  chain_valgrad_entry!(pointer(g) + goff, Xpv, newlayers, pointer(p), pm + moff)
+  loss = last(layers)
+  tgt = view_slice_last(target(loss), f:l)
+  tgtpb = preserve_buffer(tgt)
+  Xpb = preserve_buffer(Xpv)
+  newlayers = (Base.front(layers)..., loss(PtrArray(tgt)))
+  # newlayers = (Base.front(layers)..., last(layers)[f:l])
+  GC.@preserve tgtpb Xpb begin
+    chain_valgrad_entry!(
+      pointer(g) + goff,
+      PtrArray(Xpv),
+      newlayers,
+      pointer(p),
+      pm + mpt * off,
+    )
+  end
   return nothing
 end
 function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, mpt)
   nthread = size(g, static(2))
-  Polyester.batch(chain_valgrad_thread!, (nthread, nthread), g, Xp, layers, p, pm, mpt)
+  Xpb = preserve_buffer(Xp)
+  Xpp = PtrArray(Xp)
+  loss = last(layers)
+  tgt = target(loss)
+  tgtpb = preserve_buffer(tgt)
+  newlayers = (Base.front(layers)..., loss(PtrArray(tgt)))
+  GC.@preserve Xpb tgtpb begin
+    Polyester.batch(chain_valgrad_thread!, (nthread, nthread), g, Xpp, newlayers, p, pm, mpt)
+  end
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
