@@ -349,9 +349,7 @@ function chain_valgrad!(
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-  # @show X2,grad
   lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
-  # @show X1,lgrad
   return val, lgrad, pu4
 end
 function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where {X}
