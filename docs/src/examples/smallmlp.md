@@ -22,22 +22,34 @@ function f(x)
 end
 
 T = Float32;
-X = randn(T, 2*2, 1_000);
+X = randn(T, 2*2, 10_000);
 Y = reduce(hcat, map(f, eachcol(X)));
+Xtest = randn(T, 2*2, 10_000);
+Ytest = reduce(hcat, map(f, eachcol(Xtest)));
 ```
 
 Now, to train our network:
 ```julia
 @time p = SimpleChains.init_params(mlpd);
-
 G = SimpleChains.alloc_threaded_grad(mlpd);
 
 mlpdloss = SimpleChains.add_loss(mlpd, SquaredLoss(Y));
-mlpdloss(X, p)
+mlpdtest = SimpleChains.add_loss(mlpd, SquaredLoss(Ytest));
 
-@time SimpleChains.train_batched!(
-  G, p, mlpdloss, X, SimpleChains.ADAM(1e-6), 1_000_000, batchsize = size(X)[end]
-);
-mlpdloss(X, p)
+report = let mtrain = mlpdloss, X=X, Xtest=Xtest, mtest = mlpdtest
+  p -> begin
+    let train = mlpdloss(X, p), test = mlpdtest(Xtest, p)
+      @info "Loss:" train test
+    end
+  end
+end
+
+report(p)
+for _ in 1:3
+  @time SimpleChains.train_batched!(
+    G, p, mlpdloss, X, SimpleChains.ADAM(1e-6), 1_000_000, batchsize = size(X)[end]
+  );
+  report(p)
+end
 ```
 
