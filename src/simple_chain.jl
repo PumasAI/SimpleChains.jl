@@ -359,7 +359,6 @@ function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where
   __, val, _, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   # val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
   lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
-  # @show lgrad
   return val, lgrad, pu3
 end
 @inline getchain(sc::SimpleChain) = sc
