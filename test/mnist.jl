@@ -43,7 +43,8 @@ end
 
 # initialize a gradient buffer matrix; number of columns places an upper bound
 # on the number of threads used.
-G = similar(p, length(p), min(Threads.nthreads(), (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1))));
+# G = similar(p, length(p), min(Threads.nthreads(), (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1))));
+G = Simple.alloc_threaded_grad(lenetloss);
 # train
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
 # assess training and test loss
@@ -54,6 +55,8 @@ a1, l1 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
 # assess training and test loss
 a2, l2 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a3, l3 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
-@test a2 > a0 > 0.96
-@test a3 > a1 > 0.96
+@test a0 > 0.96
+@test a2 > 0.98
+@test a1 > 0.96
+@test a3 > 0.98
 
