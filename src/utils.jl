@@ -197,7 +197,7 @@ function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
   )
 end
 
-function aloc_threaded_grad(
+function alloc_threaded_grad(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32;
