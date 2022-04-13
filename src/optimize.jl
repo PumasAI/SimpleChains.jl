@@ -155,6 +155,27 @@ function shuffle_update!(
   pstop,
 )
   nthread = size(g, static(2))
+  if nthread == 1
+    gpb = preserve_buffer(g)
+    GC.@preserve gpb begin
+      shuffle_update!(
+        PtrArray(pointer(g), (length(p),)),
+        opt,
+        Xp,
+        layers,
+        pen,
+        sx,
+        p,
+        pm,
+        optbuffer,
+        mpt,
+        perm,
+        pstart,
+        pstop,
+      )
+    end
+    return nothing
+  end
   Polyester.batch(
     shuffle_chain_valgrad_thread!,
     (nthread, nthread),
@@ -168,7 +189,7 @@ function shuffle_update!(
     pstart,
     pstop,
   )
-  for t = 2:nthread, i in axes(g, 1)
+  @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
   gpb = preserve_buffer(g)
@@ -177,6 +198,7 @@ function shuffle_update!(
     apply_penalty!(gv, pen, p, sx)
     update!(opt, optbuffer, p, gv)
   end
+  return nothing
 end
 function shuffle_update!(
   g::AbstractVector,
