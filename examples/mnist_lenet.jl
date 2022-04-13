@@ -166,7 +166,7 @@ function eval_loss_accuracy(loader, model, device)
     acc += sum(onecold(ŷ |> cpu) .== onecold(y |> cpu))
     ntot += size(x)[end]
   end
-  return (loss = l / ntot |> round4, acc = acc / ntot * 100 |> round4)
+  return (acc = acc / ntot * 100 |> round4, loss = l / ntot |> round4)
 end
 
 ## utility functions
