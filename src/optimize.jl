@@ -123,7 +123,8 @@ function shuffle_chain_valgrad_thread!(
       @inbounds j = perm[i] # `perm` and `j` are zero-based
       # @show i, j
       @simd ivdep for k = 0:Int(tgtlen)-1
-        x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
+        x = tgt[k+1,j+1]
+        # x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
         unsafe_store!(ptgttmp + k * szeltgt, x)
       end
       # Base.unsafe_copyto!(ptgttmp, ptgt + tgtlen*szeltgt*j, Int(tgtlen))

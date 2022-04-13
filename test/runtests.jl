@@ -83,7 +83,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
       @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
       @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
       valgrad!(g, scflp, x, p) 
-     if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
+      if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
         @test g == only(
           Zygote.gradient(
             p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
@@ -94,7 +94,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
           0.5/size(x)[end] * sum(abs2, Base.front(sc)(x, p) .- y)
         end
         gzyg = copy(_gzyg[1])
-        g2 = similar(g)
+        g2 = similar(g);
         valgrad!(g2, sc, x, p)
         @test g2 ≈ gzyg
       end

@@ -28,6 +28,7 @@ using HostCPUFeatures: static_sizeof, register_size, register_count, static_size
 using CPUSummary: cache_linesize, num_threads, num_cores
 using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
 using Static: One
+using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview
 import ManualMemory: preserve_buffer
 using IfElse: ifelse
@@ -35,7 +36,7 @@ import Random
 import ChainRulesCore
 import ForwardDiff
 
-using LoopVectorization: matmul_params, CloseOpen, @turbo
+using LoopVectorization: matmul_params, @turbo
 # macro turbo(ex); esc(ex); end; macro turbo(ex0, ex1); esc(ex1); end
 
 

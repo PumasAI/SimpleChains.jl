@@ -279,20 +279,18 @@ function unsafe_valgrad!(g, layers, params, memory::Vector{UInt8}, arg)
   end
 end
 # fallback valgrad_layer for functions not implementing fusion w/ indexing
-function valgrad_layer!(pg, l, Xp, perm, p, pu)
+
+function subset_batch(Xp::AbstractArray{T,N}, perm, pu) where {T,N}
   Xsz = Base.front(size(Xp))
-  eltx = eltype(Xp)
   lastdim = length(perm)
   Xtsz = (Xsz..., lastdim)
-  pointer_offset = first(layer_output_size(Val(eltype(p)), l, Xtsz))
-  pux = pu + pointer_offset
-  Xtmp = PtrArray(Ptr{eltx}(pux), Xtsz)
+  Xtmp = PtrArray(Ptr{T}(pu), Xtsz)
   Xlen = tsprod(Xsz)
   pXtmp = pointer(Xtmp)
-  pux += align(sizeof(eltx) * Xlen * lastdim)
+  szeltx = sizeof(T)
+  pu += align(szeltx * Xlen * lastdim)
   pX = pointer(Xp)
   Xpb = preserve_buffer(Xp)
-  szeltx = sizeof(eltx)
   GC.@preserve Xpb begin
     for i = CloseOpen(lastdim)
       @inbounds j = perm[i] # `perm` and `j` are zero-based
@@ -300,8 +298,7 @@ function valgrad_layer!(pg, l, Xp, perm, p, pu)
       pXtmp += Int(Xlen) * szeltx
     end
   end
-  pg2, larg, p2, _ = valgrad_layer!(pg, l, Xtmp, p, pu)
-  pg2, larg, p2, pux
+  Xtmp, pu
 end
 
 function chain_valgrad_entry!(
@@ -329,16 +326,10 @@ function chain_valgrad_entry!(
   p::Ptr,
   pu::Ptr{UInt8},
 ) where {X1,X2}
-  l = getfield(layers, 1)
-  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, inds, p, pu)
-  if parameter_free(l)
-    val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
-  else
-    val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-    pullback_param!(pg, l, grad, arg, p, pu)
-  end
-  return val
+  arg_subset, pu = subset_batch(arg, inds, pu)
+  chain_valgrad_entry!(pg, arg_subset, layers, p, pu)
 end
+
 function chain_valgrad!(
   pg,
   arg,
