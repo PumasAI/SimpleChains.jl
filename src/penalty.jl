@@ -84,24 +84,24 @@ L1Penalty(p::AbstractPenalty, λ) = L1Penalty(getchain(p), λ)
 getλ(p::L1Penalty) = getfield(p, :λ)
 (p::L1Penalty)(chn::SimpleChain) = L1Penalty(chn, p.λ)
 
-@inline function apply_penalty(Λ::L1Penalty, p::AbstractVector{T3}) where {T3}
-  l = zero(T3)
+@inline function apply_penalty(Λ::L1Penalty, p::AbstractVector{T}) where {T}
+  l = zero(T)
   @turbo for i ∈ eachindex(p) # add penalty
     l += abs(p[i])
   end
-  Base.FastMath.mul_fast(l, T3(Λ.λ))
+  Base.FastMath.mul_fast(l, T(Λ.λ))
 end
 function apply_penalty!(
   g::AbstractVector{T1},
   Λ::L1Penalty,
-  p::AbstractVector{T3},
-) where {T1,T3}
-  T = promote_type(T1, T3)
+  p::AbstractVector{T2},
+) where {T1,T2}
+  T = promote_type(T1, T2)
   l = zero(T)
   λ = T(Λ.λ)
   @turbo for i ∈ eachindex(g) # add penalty
     pᵢ = p[i]
-    pos = pᵢ ≥ zero(T3)
+    pos = pᵢ ≥ zero(T2)
     λᵢ = ifelse(pos, λ, -λ)
     l += λᵢ * pᵢ
     g[i] += λᵢ
@@ -130,9 +130,9 @@ end
 function apply_penalty!(
   g::AbstractVector{T1},
   Λ::L2Penalty,
-  p::AbstractVector{T3},
-) where {T1,T3}
-  T = promote_type(T1, T3)
+  p::AbstractVector{T2},
+) where {T1,T2}
+  T = promote_type(T1, T2)
   l = zero(T)
   λ = T(Λ.λ)
   @turbo for i ∈ eachindex(g) # add penalty

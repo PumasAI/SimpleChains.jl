@@ -15,14 +15,11 @@ function update!(o::ADAM, (mt, vt, βp), x, Δ)
   β₂ = β[2]
   βp₁ = βp[1]
   βp₂ = βp[2]
-  # @inbounds @fastmath for i ∈ eachindex(Δ)
   @turbo for i ∈ eachindex(Δ)
     mt[i] = β₁ * mt[i] + (1 - β₁) * Δ[i]
     vt[i] = β₂ * vt[i] + (1 - β₂) * Δ[i]^2
-    # Δ[i] =  mt[i] / (1 - βp₁) / (sqrt(vt[i] / (1 - βp₂)) + 1e-8) * η
     Δᵢ = η * mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1e-8))
-    # Δ[i] = Δᵢ
-    x[i] -= Δᵢ#Δ[i]
+    x[i] -= Δᵢ
   end
   βp[1] = βp₁ * β₁
   βp[2] = βp₂ * β₂
@@ -121,22 +118,16 @@ function shuffle_chain_valgrad_thread!(
   GC.@preserve tgtpb begin
     for i = fm1:l-1
       @inbounds j = perm[i] # `perm` and `j` are zero-based
-      # @show i, j
       @simd ivdep for k = 0:Int(tgtlen)-1
-        x = tgt[k+1,j+1]
-        # x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
+        # x = tgt[k+1,j+1]
+        x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
         unsafe_store!(ptgttmp + k * szeltgt, x)
       end
-      # Base.unsafe_copyto!(ptgttmp, ptgt + tgtlen*szeltgt*j, Int(tgtlen))
-      # Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
       ptgttmp += Int(tgtlen) * szeltgt
-      # pXtmp += Int(Xlen) * szeltx
     end
   end
-  # @show 1+fm1:l batchsize Xtmp tgttmp tgtlen Xlen lastdim
   newlayers = (Base.front(layers)..., loss(tgttmp))
   permview = StrideArraysCore.ptrarray0(pointer(perm)+(Base.elsize(perm)*fm1), (lastdim,))
-  # chain_valgrad_entry!(pointer(g) + goff, Xtmp, newlayers, pointer(p), pm)
   chain_valgrad_entry!(pointer(g) + goff, Xp, newlayers, permview, pointer(p), pm)
   return nothing
 end
@@ -248,12 +239,6 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer)
     train_unbatched!(g, p, _chn, X, opt, 10_000)
   end
 end
-
-
-# @inline function batch_size(layers::Tuple, ::Val{T}) where {T}
-#   fl = getfield(layers,1)
-#   parameter_free(fl) && return batch_size(Base.tail(layers), Val(T))
-# end
 
 @generated function turbo_dense_batch_size(
   indputdim::Integer,
@@ -407,7 +392,6 @@ function train!(g, p, chn::Chain, X, opt::AbstractOptimizer, iters)
     train_batched!(g, p, chn, X, opt, iters)
   end
 end
-# train(chn::Chain) = train!(init_params(chn), chn)
 
 for t ∈ [:train, :train_batched, :train_unbatched]
   t! = Symbol(t, :!)
