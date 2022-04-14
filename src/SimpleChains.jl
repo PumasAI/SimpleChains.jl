@@ -27,7 +27,7 @@ using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
 using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
-using Static: One
+using Static: One, lt
 using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview
 import ManualMemory: preserve_buffer
