@@ -198,6 +198,15 @@ function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
 end
 
 _min(a,b) = ifelse(lt(a,b), a, b)
+"""
+    alloc_threaded_grad(chn, id = nothing, ::Type{T} = Float32; numthreads = min(Threads.nthreads(), SimpleChains.num_cores())
+
+Returns a preallocated array for writing gradients, for use with `train_batched` and `train_unbatched`.
+If Julia was started with multiple threads, returns a matrix with one column per thread, so they may
+accumulate gradients in parallel.
+
+Note that the memory is alligned to avoid false sharing.
+"""
 function alloc_threaded_grad(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,

@@ -74,6 +74,11 @@ getλ(::NoPenalty) = nothing
 @inline apply_penalty(Λ, p, _) = apply_penalty(Λ, p)
 @inline apply_penalty!(g, Λ, p, _) = apply_penalty!(g, Λ, p)
 
+"""
+    L1Penalty(λ)
+
+Applies a L1 penalty of `λ` to parameters, i.e. penalizing by their absolute value.
+"""
 struct L1Penalty{NN,T} <: AbstractPenalty{NN}
   chn::NN
   λ::T
@@ -109,6 +114,11 @@ function apply_penalty!(
   l
 end
 
+"""
+    L2Penalty(λ)
+
+Applies a L2 penalty of `λ` to parameters, i.e. penalizing by their squares.
+"""
 struct L2Penalty{NN,T} <: AbstractPenalty{NN}
   chn::NN
   λ::T

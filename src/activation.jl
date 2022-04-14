@@ -1,7 +1,12 @@
 
 
 # Elementwise transforms
+"""
+    Activation(activation)
 
+
+Applies `activation` function elementwise.
+"""
 struct Activation{F}
   f::F
 end

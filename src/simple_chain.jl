@@ -2,6 +2,29 @@
 struct InputDimUnknown end
 const InputDim = Union{InputDimUnknown,Tuple{Vararg{Integer}}}
 
+"""
+    SimpleChain([inputdim::Union{Integer,Tuple{Vararg{Integer}}, ] layers)
+
+Construct a SimpleChain. Optional `input dims` argument allows `SimpleChains` to check
+the size of inputs. Making these `static` will allow `SimpleChains` to infer size
+and loop bounds and compile time.
+Batch size generally should not be included in the `input dim`.
+If `inputdim` is not specified, some methods, e.g. `init_params`, will require
+passing the size as an additional argument, because the number of parameters may be
+a function of the input size (e.g., for a `TurboDense` layer).
+
+The `layers` argument holds various `SimpleChains` layers, e.g. `TurboDense`, `Conv`,
+`Activation`, `Flatten`, `Dropout`, or `MaxPool`. It may optionally terminate in an
+`AbstractLoss` layer.
+
+These objects are callable, e.g.
+
+```julia
+c = SimpleChain(...);
+p = SimpleChains.init_params(c);
+c(X, p) # X are the independent variables, and `p` the parameter vector.
+```
+"""
 struct SimpleChain{N,I<:InputDim,L<:Tuple{Vararg{Any,N}}}
   inputdim::I
   layers::L
@@ -224,6 +247,13 @@ function chain_input_dims(chn::SimpleChain, inputdim::Tuple{Vararg{Integer}})
   _try_static(chain_input_dims(chn), inputdim)
 end
 
+
+"""
+    SimpleChains.init_params!(chn, p, id = nothing)
+
+Randomly initializes parameter vector `p` with input dim `id`. Input dim does not need to be specified if these were provided
+to the chain object itself.
+"""
 function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
   GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
   return x
@@ -241,6 +271,12 @@ function init_params(
   _id = chain_input_dims(Λ, id)
   init_params!(Λ, Vector{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id))
 end
+"""
+    SimpleChains.init_params(chn[, id = nothing][, ::Type{T} = Float32])
+
+Creates a parameter vector of element type `T` with size matching that by `id` (argument not reguired if provided to the `chain`
+object itself.
+"""
 function init_params(Λ::SimpleChain, ::Type{T}) where {T}
   init_params(Λ, nothing, T)
 end

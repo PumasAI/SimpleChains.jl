@@ -1,8 +1,13 @@
 
 """
-  TurboDense{B}(outputdim, activation)
+    TurboDense{B=true}(activation, outputdim::Integer)
 
+Linear (dense) layer.
+- `B` specifies whether the layer includes a bias term.
+- `outputdim` indicates how many dimensions the input is mapped to.
+- The `activation` function is applied elementwise to the result.
 
+Randomly initializing weights using the (Xaviar) Glorot normal distribution.
 """
 struct TurboDense{B,I<:Integer,F}
   f::F

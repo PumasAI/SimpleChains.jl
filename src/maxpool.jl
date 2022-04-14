@@ -1,4 +1,9 @@
 
+"""
+    MaxPool(dims::Tuple{Vararg{Integer}}
+
+Calculates the maximum of pools of size `dims`.
+"""
 struct MaxPool{D} end
 MaxPool(x::Tuple{Vararg{Integer}}) = MaxPool{map(Int, x)}()
 MaxPool(x::Vararg{Integer}) = MaxPool{map(Int, x)}()

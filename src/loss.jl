@@ -1,6 +1,12 @@
 abstract type AbstractLoss{Y} end
 
 has_loss(sc::SimpleChain) = last(sc.layers) isa AbstractLoss
+"""
+    add_loss(chn, l::AbstractLoss)
+
+Add the loss function `l` to the simple chain. The loss function
+should hold the target you're trying to fit.
+"""
 function add_loss(sc::SimpleChain, l::AbstractLoss)
   id = chain_input_dims(sc)
   if has_loss(sc)
@@ -49,6 +55,11 @@ function layer_output_size(::Val{T}, sl::AbstractLoss, s) where {T}
   _layer_output_size_no_temp(Val{T}(), sl, s)
 end
 
+"""
+    SquaredLoss(target)
+
+Calculates half of mean squared loss of the target.
+"""
 struct SquaredLoss{Y} <: AbstractLoss{Y}
   y::Y
 end
@@ -93,7 +104,11 @@ function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg::AbstractArray{T,N}, p
   T(0.5/size(arg,N)) * s, p, pu
 end
 
+"""
+    AbsoluteLoss
 
+Calculates mean absolute loss of the target.
+"""
 struct AbsoluteLoss{Y} <: AbstractLoss{Y}
   y::Y
 end
@@ -144,7 +159,11 @@ function (sl::AbstractLoss{<:AbstractArray{<:AbstractArray}})(arg, p, pu)
   return s, p, pu
 end
 
+"""
+    LogitCrossEntropyLoss
 
+Calculates mean logit cross-entropy loss.
+"""
 struct LogitCrossEntropyLoss{Y<:Union{AbstractVector{UInt32},Nothing}} <: AbstractLoss{Y}
   y::Y
 end
