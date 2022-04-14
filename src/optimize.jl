@@ -467,9 +467,9 @@ function train_batched!(
       doff = 0
       while true
         doffnext = doff + N_bs
-        doffnext > N && break
-        batchstop = doffnext
-        # batchstop::Int = min(doffnext, N)
+        # doffnext > N && break
+        # batchstop = doffnext
+        batchstop::Int = min(doffnext, N)
         # @show doff:batchstop
         shuffle_update!(
           g,
@@ -487,7 +487,7 @@ function train_batched!(
           batchstop,
         )
         doff = doffnext
-        # doff >= N && break
+        doff >= N && break
       end
       (iter += 1) < iters || break
       randpermzero!(perm)
