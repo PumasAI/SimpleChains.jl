@@ -127,7 +127,10 @@ function shuffle_chain_valgrad_thread!(
 
   fm1 = off * batchsize + pstart + min(r, off)
   lastdim = batchsize + (start <= r)
-  ((lastdim > 0) & (subrangelen > 0)) || return nothing
+  if !((lastdim > 0) & (subrangelen > 0))
+    # fill!(g, 0)
+    return nothing
+  end
   l = fm1 + lastdim
 
   loss = last(layers)
@@ -175,6 +178,7 @@ function shuffle_update!(
   pstop,
 )
   nthread = size(g, static(2))
+  #=
   batchsize = pstop - pstart
   if batchsize < nthread
     gpb = preserve_buffer(g)
@@ -216,6 +220,7 @@ function shuffle_update!(
       end
     end
   end
+  =#
   Polyester.batch(
     shuffle_chain_valgrad_thread!,
     (nthread, nthread),
@@ -425,6 +430,10 @@ function train_batched!(
   else
     batchsize
   end
+  if N_bs >= batchsize
+    train_unbatched!(g, p, _chn, X, opt, iters)
+    return p
+  end
   tgt_batch_len = tsprod(Base.front(size(tgt))) * N_bs
   X_batch_len = tsprod(Base.front(sx)) * N_bs
   sxb = (Base.front(sx)..., N_bs)
@@ -458,7 +467,9 @@ function train_batched!(
       doff = 0
       while true
         doffnext = doff + N_bs
-        batchstop::Int = min(doffnext, N)
+        doffnext > N && break
+        batchstop = doffnext
+        # batchstop::Int = min(doffnext, N)
         # @show doff:batchstop
         shuffle_update!(
           g,
@@ -476,7 +487,7 @@ function train_batched!(
           batchstop,
         )
         doff = doffnext
-        doff >= N && break
+        # doff >= N && break
       end
       (iter += 1) < iters || break
       randpermzero!(perm)
