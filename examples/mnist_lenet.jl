@@ -39,18 +39,14 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain));
 g = similar(p);
 @time valgrad!(g, lenetloss, xtrain, p)
 
-G = similar(
-  p,
-  length(p),
-  min(Threads.nthreads(), (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1))),
-);
+G = SimpleChains.alloc_threaded_grad(lenetloss);
 
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
-SimpleChains.init_params!(lenet, p);
+# SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
@@ -143,8 +139,9 @@ end
 function loaders(xtrain, ytrain, xtest, ytest, args)
   ytrain, ytest = onehotbatch(ytrain, 1:10), onehotbatch(ytest, 1:10)
 
-  train_loader = DataLoader((xtrain, ytrain), batchsize = args.batchsize, shuffle = true)
-  test_loader = DataLoader((xtest, ytest), batchsize = args.batchsize)
+  train_loader =
+    DataLoader((device(xtrain), device(ytrain)), batchsize = args.batchsize, shuffle = true)
+  test_loader = DataLoader((device(xtest), device(ytest)), batchsize = args.batchsize)
 
   return train_loader, test_loader
 end
@@ -166,7 +163,7 @@ function eval_loss_accuracy(loader, model, device)
     acc += sum(onecold(ŷ |> cpu) .== onecold(y |> cpu))
     ntot += size(x)[end]
   end
-  return (loss = l / ntot |> round4, acc = acc / ntot * 100 |> round4)
+  return (acc = acc / ntot * 100 |> round4, loss = l / ntot |> round4)
 end
 
 ## utility functions

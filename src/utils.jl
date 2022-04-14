@@ -152,7 +152,7 @@ function randpermzero!(
   ::StaticInt{W},
 ) where {W,U,I<:Integer}
   n = length(a)
-  @assert n%UInt64 <= min(typemax(U)%UInt64, one(UInt64)<<52)
+  @assert n % UInt64 <= min(typemax(U) % UInt64, one(UInt64) << 52)
   n == 0 && return nothing
   fi = firstindex(a)
   @inbounds a[fi] = 0
@@ -169,7 +169,7 @@ function randpermzero!(
       if i != j # a[i] is undef (and could be #undef)
         a[fi+(i%Int)] = a[fi+(j%Int)]
       end
-      a[fi+(j%Int)] = i%I
+      a[fi+(j%Int)] = i % I
       i == mask && (mask = U(2) * mask + one(U))
       break
     end
@@ -178,3 +178,35 @@ function randpermzero!(
   return nothing
 end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
+
+function _alloc_grad(mem::Vector{T}, np, ::One, x) where {T}
+  StrideArray(
+    PtrArray(align(pointer(mem)), (np,), (static_sizeof(T), ), Val((true,))),
+    mem,
+  )
+end
+function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
+  StrideArray(
+    PtrArray(
+      align(pointer(mem)),
+      (np, numthreads),
+      (static_sizeof(T), x),
+      Val((true, false)),
+    ),
+    mem,
+  )
+end
+
+_min(a,b) = ifelse(lt(a,b), a, b)
+function alloc_threaded_grad(
+  Λ::SimpleChain,
+  id::Union{Nothing,InputDim} = nothing,
+  ::Type{T} = Float32;
+  numthreads = _min(num_threads(), num_cores()),
+) where {T}
+  np = numparam(Λ, id)
+  x = align(np, T)
+  mem = Vector{T}(undef, x * numthreads + register_size() ÷ sizeof(T) - 1)
+  _alloc_grad(mem, np, numthreads, x * sizeof(T))
+end
+

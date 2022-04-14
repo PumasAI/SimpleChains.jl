@@ -25,9 +25,10 @@ using ArrayInterface:
 using SIMDTypes: Bit
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
-using CPUSummary: cache_linesize
+using CPUSummary: cache_linesize, num_threads, num_cores
 using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
-using Static: One
+using Static: One, lt
+using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview
 import ManualMemory: preserve_buffer
 using IfElse: ifelse
@@ -35,7 +36,8 @@ import Random
 import ChainRulesCore
 import ForwardDiff
 
-using LoopVectorization: matmul_params, CloseOpen, @turbo
+using LoopVectorization: matmul_params, @turbo
+# using LoopVectorization: matmul_params
 # macro turbo(ex); esc(ex); end; macro turbo(ex0, ex1); esc(ex1); end
 
 
@@ -59,8 +61,8 @@ export SimpleChain,
   L2Penalty,
   FrontLastPenalty
 
-include("utils.jl")
 include("simple_chain.jl")
+include("utils.jl")
 include("activation.jl")
 include("dense.jl")
 include("dropout.jl")

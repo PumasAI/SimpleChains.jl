@@ -15,14 +15,11 @@ function update!(o::ADAM, (mt, vt, βp), x, Δ)
   β₂ = β[2]
   βp₁ = βp[1]
   βp₂ = βp[2]
-  # @inbounds @fastmath for i ∈ eachindex(Δ)
   @turbo for i ∈ eachindex(Δ)
     mt[i] = β₁ * mt[i] + (1 - β₁) * Δ[i]
     vt[i] = β₂ * vt[i] + (1 - β₂) * Δ[i]^2
-    # Δ[i] =  mt[i] / (1 - βp₁) / (sqrt(vt[i] / (1 - βp₂)) + 1e-8) * η
     Δᵢ = η * mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1e-8))
-    Δ[i] = Δᵢ
-    x[i] -= Δᵢ#Δ[i]
+    x[i] -= Δᵢ
   end
   βp[1] = βp₁ * β₁
   βp[2] = βp₂ * β₂
@@ -58,28 +55,52 @@ function update!(g::AbstractVector, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
   apply_penalty!(g, pen, p, sx)
   update!(opt, optbuffer, p, g)
 end
-function chain_valgrad_thread!((g, Xp, layers, p, pm), start, stop, mpt)
+function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
   batchsize = size(Xp, ndims(Xp))
   start > stop && return nothing
   off = start - 1
   nt = size(g, static(2))
-  goff = stride(g, 2) * sizeof(eltype(g)) * off
-  moff = mpt * off
+  goff = stride(g, static(2)) * sizeof(eltype(g)) * off
   f = ((off * batchsize) ÷ nt) + 1
   l = (stop * batchsize) ÷ nt
   Xpv = view_slice_last(Xp, f:l)
-  newlayers = (Base.front(layers)..., last(layers)[f:l])
-  chain_valgrad_entry!(pointer(g) + goff, Xpv, newlayers, pointer(p), pm + moff)
+  loss = last(layers)
+  tgt = view_slice_last(target(loss), f:l)
+  tgtpb = preserve_buffer(tgt)
+  Xpb = preserve_buffer(Xpv)
+  newlayers = (Base.front(layers)..., loss(PtrArray(tgt)))
+  # newlayers = (Base.front(layers)..., last(layers)[f:l])
+  GC.@preserve tgtpb Xpb begin
+    chain_valgrad_entry!(
+      pointer(g) + goff,
+      PtrArray(Xpv),
+      newlayers,
+      pointer(p),
+      pm + mpt * off,
+    )
+  end
   return nothing
 end
 function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, mpt)
   nthread = size(g, static(2))
-  Polyester.batch(chain_valgrad_thread!, (nthread, nthread), g, Xp, layers, p, pm, mpt)
+  Xpb = preserve_buffer(Xp)
+  Xpp = PtrArray(Xp)
+  loss = last(layers)
+  tgt = target(loss)
+  tgtpb = preserve_buffer(tgt)
+  newlayers = (Base.front(layers)..., loss(PtrArray(tgt)))
+  GC.@preserve Xpb tgtpb begin
+    Polyester.batch(chain_valgrad_thread!, (nthread, nthread), g, Xpp, newlayers, p, pm, mpt)
+  end
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
-  apply_penalty!(g, pen, p, sx)
-  GC.@preserve gpb update!(opt, optbuffer, p, PtrArray(pointer(g), (length(p),)))
+  gpb = preserve_buffer(g)
+  GC.@preserve gpb begin
+    gv = PtrArray(pointer(g), (length(p),))
+    apply_penalty!(gv, pen, p, sx)
+    update!(opt, optbuffer, p, gv)
+  end
 end
 # note that pstop - pstart = subrangelen, so it is not a closed-closed i
 function shuffle_chain_valgrad_thread!(
@@ -117,21 +138,16 @@ function shuffle_chain_valgrad_thread!(
   GC.@preserve tgtpb begin
     for i = fm1:l-1
       @inbounds j = perm[i] # `perm` and `j` are zero-based
-      # @show i, j
       @simd ivdep for k = 0:Int(tgtlen)-1
+        # x = tgt[k+1,j+1]
         x = unsafe_load((ptgt + (tgtlen * szeltgt) * j) + k * szeltgt)
         unsafe_store!(ptgttmp + k * szeltgt, x)
       end
-      # Base.unsafe_copyto!(ptgttmp, ptgt + tgtlen*szeltgt*j, Int(tgtlen))
-      # Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
       ptgttmp += Int(tgtlen) * szeltgt
-      # pXtmp += Int(Xlen) * szeltx
     end
   end
-  # @show 1+fm1:l batchsize Xtmp tgttmp tgtlen Xlen lastdim
   newlayers = (Base.front(layers)..., loss(tgttmp))
   permview = StrideArraysCore.ptrarray0(pointer(perm)+(Base.elsize(perm)*fm1), (lastdim,))
-  # chain_valgrad_entry!(pointer(g) + goff, Xtmp, newlayers, pointer(p), pm)
   chain_valgrad_entry!(pointer(g) + goff, Xp, newlayers, permview, pointer(p), pm)
   return nothing
 end
@@ -167,9 +183,13 @@ function shuffle_update!(
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
-  apply_penalty!(g, pen, p, sx)
   gpb = preserve_buffer(g)
-  GC.@preserve gpb update!(opt, optbuffer, p, PtrArray(pointer(g), (length(p),)))
+  GC.@preserve gpb begin
+    gv = PtrArray(pointer(g), (length(p),))
+    apply_penalty!(gv, pen, p, sx)
+    update!(opt, optbuffer, p, gv)
+  end
+  return nothing
 end
 function shuffle_update!(
   g::AbstractVector,
@@ -197,6 +217,12 @@ end
 
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
+  if g isa AbstractMatrix && size(g,2) == 1
+    gpb = preserve_buffer(g)
+    gv = PtrArray(pointer(g), (length(p),))
+    GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, t)
+    return p
+  end
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
@@ -216,6 +242,12 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
   p
 end
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
+  if g isa AbstractMatrix && size(g,2) == 1
+    gpb = preserve_buffer(g)
+    gv = PtrArray(pointer(g), (length(p),))
+    GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, iters)
+    return p
+  end
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
@@ -239,12 +271,6 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer)
     train_unbatched!(g, p, _chn, X, opt, 10_000)
   end
 end
-
-
-# @inline function batch_size(layers::Tuple, ::Val{T}) where {T}
-#   fl = getfield(layers,1)
-#   parameter_free(fl) && return batch_size(Base.tail(layers), Val(T))
-# end
 
 @generated function turbo_dense_batch_size(
   indputdim::Integer,
@@ -295,14 +321,20 @@ end
 @inline view_slice_last(X::AbstractArray{<:Any,4}, r) = view(X, :, :, :, r)
 @inline view_slice_last(X::AbstractArray{<:Any,5}, r) = view(X, :, :, :, :, r)
 function train_batched!(
-  g,
-  p,
+  g::AbstractVecOrMat,
+  p::AbstractVector,
   _chn::Chain,
   X,
   opt::AbstractOptimizer,
   iters;
   batchsize = nothing,
 )
+  if g isa AbstractMatrix && size(g,2) == 1
+    gpb = preserve_buffer(g)
+    gv = PtrArray(pointer(g), (length(p),))
+    GC.@preserve gpb train_batched!(gv, p, _chn, X, opt, iters; batchsize)
+    return p
+  end
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
@@ -392,7 +424,6 @@ function train!(g, p, chn::Chain, X, opt::AbstractOptimizer, iters)
     train_batched!(g, p, chn, X, opt, iters)
   end
 end
-# train(chn::Chain) = train!(init_params(chn), chn)
 
 for t ∈ [:train, :train_batched, :train_unbatched]
   t! = Symbol(t, :!)

@@ -856,6 +856,21 @@ function valgrad_layer!(pg::Ptr{T}, c::Conv, A, inds, p::Ptr{T}, pu::Ptr{UInt8})
     Ptr{UInt8}(pu3),
   )
 end
+function chain_valgrad_entry!(
+  pg,
+  arg,
+  layers::Tuple{Conv,X,Vararg},
+  inds,
+  p::Ptr,
+  pu::Ptr{UInt8},
+) where {X}
+  l = getfield(layers, 1)
+  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, inds, p, pu)
+  val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+  pullback_param!(pg, l, grad, arg, p, pu)
+  return val
+end
+
 
 function valgrad_layer!(
   pg::Ptr{T},

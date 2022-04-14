@@ -82,7 +82,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
       @test_throws MethodError sc(Array{T,0}(undef), p)
       @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
       @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
-      valgrad!(g, scflp, x, p)
+      valgrad!(g, scflp, x, p) 
       if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
         @test g == only(
           Zygote.gradient(
@@ -91,10 +91,10 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
           ),
         )
         _gzyg = Zygote.gradient(p) do p
-          0.5 * sum(abs2, Base.front(sc)(x, p) .- y)
+          0.5/size(x)[end] * sum(abs2, Base.front(sc)(x, p) .- y)
         end
         gzyg = copy(_gzyg[1])
-        g2 = similar(g)
+        g2 = similar(g);
         valgrad!(g2, sc, x, p)
         @test g2 ≈ gzyg
       end
@@ -119,7 +119,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
         l = 0.5mapreduce(+, vec(l2), y.data) do xi, yi
           abs2(xi - yi)
         end
-        l + 2.3 * (sum(abs2, A1) + sum(abs2, b1)) + 0.45 * (sum(abs, A2) + sum(abs, b2))
+        l/size(x)[end] + 2.3 * (sum(abs2, A1) + sum(abs2, b1)) + 0.45 * (sum(abs, A2) + sum(abs, b2))
       end
       @test g ≈ gfd
       scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
@@ -187,7 +187,7 @@ SquaredLoss"""
         b2 = view(p, 1+off_old:off)
         l2 = (A2 * l1 .+ b2)
 
-        0.5mapreduce(+, vec(l2), y.data) do xi, yi
+        (0.5/size(x)[end]) * mapreduce(+, vec(l2), y.data) do xi, yi
           abs2(xi - yi)
         end
       end
@@ -331,13 +331,13 @@ SquaredLoss"""
     function convlayertest(x, y, K, b)
       closuresshouldntbeabletomutatebindings = clt(relu, x, K, b)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y)
-      0.5 * (δ'δ)
+      0.5/size(x)[end] * (δ'δ)
     end
     function convlayertest(x, y, K0, b0, K1, b1)
       csbamb = clt(identity, clt(relu, x, K0, b0), K1, b1)
       closuresshouldntbeabletomutatebindings = tanh.(csbamb)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y)
-      0.5 * (δ'δ)
+      0.5/size(x)[end] * (δ'δ)
     end
 
     scconv = SimpleChain(
