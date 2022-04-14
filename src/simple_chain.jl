@@ -7,7 +7,7 @@ const InputDim = Union{InputDimUnknown,Tuple{Vararg{Integer}}}
 
 Construct a SimpleChain. Optional `input dims` argument allows `SimpleChains` to check
 the size of inputs. Making these `static` will allow `SimpleChains` to infer size
-and loop bounds and compile time.
+and loop bounds at compile time.
 Batch size generally should not be included in the `input dim`.
 If `inputdim` is not specified, some methods, e.g. `init_params`, will require
 passing the size as an additional argument, because the number of parameters may be
