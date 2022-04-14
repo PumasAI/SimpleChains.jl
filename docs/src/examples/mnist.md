@@ -70,7 +70,7 @@ a number of rows equal to the length of the parameter vector `p`, and one column
 per thread. For example:
 ```julia
 estimated_num_cores = (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1));
-G = similar(p, length(p), min(Threads.nthreads(), estimated_num_cores);
+G = SimpleChains.alloc_threaded_grad(lenetloss);
 ```
 Here, we're estimating that the number of physical cores is half the number of threads
 on an `x86_64` system, which is true for most -- but not all!!! -- of them.

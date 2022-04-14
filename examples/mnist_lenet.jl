@@ -39,18 +39,14 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain));
 g = similar(p);
 @time valgrad!(g, lenetloss, xtrain, p)
 
-G = similar(
-  p,
-  length(p),
-  min(Threads.nthreads(), (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1))),
-);
+G = SimpleChains.alloc_threaded_grad(lenetloss);
 
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
-SimpleChains.init_params!(lenet, p);
+# SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
