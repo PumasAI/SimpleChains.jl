@@ -430,7 +430,7 @@ function train_batched!(
   else
     batchsize
   end
-  if N_bs >= batchsize
+  if N_bs >= N
     train_unbatched!(g, p, _chn, X, opt, iters)
     return p
   end
