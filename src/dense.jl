@@ -8,6 +8,7 @@ Linear (dense) layer.
 - `outputdim` indicates how many dimensions the input is mapped to.
 
 Randomly initializing weights using the (Xavier) Glorot normal distribution.
+The bias is zero-initialized.
 """
 struct TurboDense{B,I<:Integer,F}
   f::F

@@ -251,8 +251,8 @@ end
 """
     SimpleChains.init_params!(chn, p, id = nothing)
 
-Randomly initializes parameter vector `p` with input dim `id`. Input dim does not need to be specified if these were provided
-to the chain object itself.
+Randomly initializes parameter vector `p` with input dim `id`. Input dim does not need to be specified if these were provided to the chain object itself.
+See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
 function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
   GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
@@ -274,8 +274,8 @@ end
 """
     SimpleChains.init_params(chn[, id = nothing][, ::Type{T} = Float32])
 
-Creates a parameter vector of element type `T` with size matching that by `id` (argument not reguired if provided to the `chain`
-object itself.
+Creates a parameter vector of element type `T` with size matching that by `id` (argument not reguired if provided to the `chain` object itself.
+See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
 function init_params(Λ::SimpleChain, ::Type{T}) where {T}
   init_params(Λ, nothing, T)
