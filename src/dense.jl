@@ -7,7 +7,7 @@ Linear (dense) layer.
 - The `activation` function is applied elementwise to the result.
 - `outputdim` indicates how many dimensions the input is mapped to.
 
-Randomly initializing weights using the (Xaviar) Glorot normal distribution.
+Randomly initializing weights using the (Xavier) Glorot normal distribution.
 """
 struct TurboDense{B,I<:Integer,F}
   f::F
