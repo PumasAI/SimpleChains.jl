@@ -217,6 +217,12 @@ end
 
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
+  if g isa AbstractMatrix && size(g,2) == 1
+    gpb = preserve_buffer(g)
+    gv = PtrArray(pointer(g), (length(p),))
+    GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, t)
+    return p
+  end
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
@@ -236,6 +242,12 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
   p
 end
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
+  if g isa AbstractMatrix && size(g,2) == 1
+    gpb = preserve_buffer(g)
+    gv = PtrArray(pointer(g), (length(p),))
+    GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, iters)
+    return p
+  end
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
