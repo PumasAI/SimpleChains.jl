@@ -143,8 +143,9 @@ end
 function loaders(xtrain, ytrain, xtest, ytest, args)
   ytrain, ytest = onehotbatch(ytrain, 1:10), onehotbatch(ytest, 1:10)
 
-  train_loader = DataLoader((xtrain, ytrain), batchsize = args.batchsize, shuffle = true)
-  test_loader = DataLoader((xtest, ytest), batchsize = args.batchsize)
+  train_loader =
+    DataLoader((device(xtrain), device(ytrain)), batchsize = args.batchsize, shuffle = true)
+  test_loader = DataLoader((device(xtest), device(ytest)), batchsize = args.batchsize)
 
   return train_loader, test_loader
 end
