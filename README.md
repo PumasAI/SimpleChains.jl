@@ -19,15 +19,13 @@ y = Matrix{Float64}(undef, 2, 200) .= randn.() .* 10;
 
 schain = SimpleChain(
   static(24), # input dimension (optional)
-  (
-    TurboDense{true}(tanh, 8), # dense layer with bias that maps to 8 outputs and applies `tanh` activation
-    SimpleChains.Dropout(0.2), # dropout layer
-    TurboDense{false}(identity, 2), # dense layer without bias that maps to 2 outputs and `identity` activation
-    SquaredLoss(y)
-  ) # squared error loss function
+  TurboDense{true}(tanh, 8), # dense layer with bias that maps to 8 outputs and applies `tanh` activation
+  SimpleChains.Dropout(0.2), # dropout layer
+  TurboDense{false}(identity, 2), # dense layer without bias that maps to 2 outputs and `identity` activation
+  SquaredLoss(y)
 );
 
-p = randn(SimpleChains.numparam(schain)); # something like glorot would probably be a better way to initialize
+p = randn(SimpleChains.numparam(schain));
 g = similar(p);
 
 # Entirely in place evaluation
