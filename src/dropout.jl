@@ -1,7 +1,7 @@
 using VectorizedRNG
 
 """
-  Dropout(p) # 0 < p < 1
+    Dropout(p) # 0 < p < 1
 
 Dropout layer.
 

@@ -1,5 +1,20 @@
 
+"""
+    Flatten{N}()
 
+Flattens the first `N` dimensions. E.g.,
+
+```julia
+julia> Flatten{2}()(rand(2,3,4))
+6×4 Matrix{Float64}:
+ 0.0609115  0.597285  0.279899  0.888223
+ 0.0667422  0.315741  0.351003  0.805629
+ 0.678297   0.350817  0.984215  0.399418
+ 0.125801   0.566696  0.96873   0.57744
+ 0.331961   0.350742  0.59598   0.741998
+ 0.26345    0.144635  0.076433  0.330475
+```
+"""
 struct Flatten{N} end
 Flatten(N) = Flatten{convert(Int, N)::Int}()
 @generated _dec(::Flatten{N}) where {N} = Flatten{N - 1}()

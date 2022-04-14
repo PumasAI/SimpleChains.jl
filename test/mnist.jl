@@ -21,8 +21,8 @@ ytrain1 = UInt32.(ytrain0 .+ 1);
 ytest1 = UInt32.(ytest0 .+ 1);
 lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
 
-@test SimpleChains.outputdim(lenet, size(xtrain4)) == (10,length(ytrain1));
-@test SimpleChains.outputdim(lenet, size(xtest4)) == (10,length(ytest1));
+@test SimpleChains.outputdim(lenet, size(xtrain4)) == (10, length(ytrain1));
+@test SimpleChains.outputdim(lenet, size(xtest4)) == (10, length(ytest1));
 
 # initialize parameters
 @time p = SimpleChains.init_params(lenet);
@@ -30,7 +30,7 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
 @testset "Cache Corrupting Results" begin
   g = similar(p)
   subset = 1:200
-  x = xtrain4[:,:,:,subset]
+  x = xtrain4[:, :, :, subset]
   y = ytrain1[subset]
   letnetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
   lenetloss.memory .= 0x00
@@ -55,8 +55,14 @@ a1, l1 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
 # assess training and test loss
 a2, l2 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a3, l3 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
-@test a0 > 0.96
-@test a2 > 0.98
-@test a1 > 0.96
-@test a3 > 0.98
-
+if size(G,2) <= 4
+  @test a0 > 0.96
+  @test a2 > 0.98
+  @test a1 > 0.96
+  @test a3 > 0.98
+else
+  @test a0 > 0.94
+  @test a2 > 0.96
+  @test a1 > 0.94
+  @test a3 > 0.96
+end

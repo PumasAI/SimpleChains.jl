@@ -1,6 +1,11 @@
 
 abstract type AbstractOptimizer end
 
+"""
+    ADAM(η = 0.001, β = (0.9, 0.999))
+
+ADAM optimizer.
+"""
 struct ADAM <: AbstractOptimizer
   η::Float64
   β::Tuple{Float64,Float64}
@@ -57,7 +62,10 @@ function update!(g::AbstractVector, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
 end
 function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
   batchsize = size(Xp, ndims(Xp))
-  start > stop && return nothing
+  if start > stop
+    fill!(g, zero(eltype(g)))
+    return nothing
+  end
   off = start - 1
   nt = size(g, static(2))
   goff = stride(g, static(2)) * sizeof(eltype(g)) * off
@@ -119,7 +127,10 @@ function shuffle_chain_valgrad_thread!(
 
   fm1 = off * batchsize + pstart + min(r, off)
   lastdim = batchsize + (start <= r)
-  ((lastdim > 0) & (subrangelen > 0)) || return nothing
+  if !((lastdim > 0) & (subrangelen > 0))
+    # fill!(g, 0)
+    return nothing
+  end
   l = fm1 + lastdim
 
   loss = last(layers)
@@ -167,6 +178,49 @@ function shuffle_update!(
   pstop,
 )
   nthread = size(g, static(2))
+  #=
+  batchsize = pstop - pstart
+  if batchsize < nthread
+    gpb = preserve_buffer(g)
+    GC.@preserve gpb begin
+      if batchsize == 1
+        gv = PtrArray(pointer(g), (length(p),))
+        return shuffle_update!(
+          gv,
+          opt,
+          Xp,
+          layers,
+          pen,
+          sx,
+          p,
+          pm,
+          optbuffer,
+          mpt,
+          perm,
+          pstart,
+          pstop,
+        )
+      else
+        gm = PtrArray(stridedpointer(g), (length(p), batchsize), Val{(true, false)}())
+        return shuffle_update!(
+          gm,
+          opt,
+          Xp,
+          layers,
+          pen,
+          sx,
+          p,
+          pm,
+          optbuffer,
+          mpt,
+          perm,
+          pstart,
+          pstop,
+        )
+      end
+    end
+  end
+  =#
   Polyester.batch(
     shuffle_chain_valgrad_thread!,
     (nthread, nthread),
@@ -215,7 +269,6 @@ function shuffle_update!(
   update!(opt, optbuffer, p, g)
 end
 
-
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
   if g isa AbstractMatrix && size(g,2) == 1
     gpb = preserve_buffer(g)
@@ -241,6 +294,19 @@ function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::Abstr
   end
   p
 end
+"""
+    train_unbatched!(g::AbstractVecOrMat, p, chn, X, opt, iters)
+
+Train without batching inputs.
+
+Arguments:
+- `g` pre-allocated gradient buffer. Can be allocated with `similar(p)` (if you want to run single threaded), or `alloc_threaded_grad(chn, size(X))` (`size(X)` argument is only necessary if the input dimension was not specified when constructing the chain). If a matrix, the number of columns gives how many threads to use. Do not use more threads than batch size would allow.
+- `p` is the parameter vector. It is updated inplace. It should be pre-initialized, e.g. with `init_params`/`init_params!`. This is to allow calling `train_unbatched!` several times to train in increments.
+- `chn` is the `SimpleChain`. It must include a loss (see `SimpleChains.add_loss`) containing the target information (dependent variables) you're trying to fit.
+- `X` the training data input argument (independent variables).
+- `opt` is the optimizer. Currently, only `SimpleChains.ADAM` is supported.
+- `iters`, how many iterations to train for.
+"""
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
   if g isa AbstractMatrix && size(g,2) == 1
     gpb = preserve_buffer(g)
@@ -320,6 +386,20 @@ end
 @inline view_slice_last(X::AbstractArray{<:Any,3}, r) = view(X, :, :, r)
 @inline view_slice_last(X::AbstractArray{<:Any,4}, r) = view(X, :, :, :, r)
 @inline view_slice_last(X::AbstractArray{<:Any,5}, r) = view(X, :, :, :, :, r)
+"""
+    train_batched!(g::AbstractVecOrMat, p, chn, X, opt, iters; batchsize = nothing)
+
+Train while batching arguments.
+
+Arguments:
+- `g` pre-allocated gradient buffer. Can be allocated with `similar(p)` (if you want to run single threaded), or `alloc_threaded_grad(chn, size(X))` (`size(X)` argument is only necessary if the input dimension was not specified when constructing the chain). If a matrix, the number of columns gives how many threads to use. Do not use more threads than batch size would allow.
+- `p` is the parameter vector. It is updated inplace. It should be pre-initialized, e.g. with `init_params`/`init_params!`. This is to allow calling `train_unbatched!` several times to train in increments.
+- `chn` is the `SimpleChain`. It must include a loss (see `SimpleChains.add_loss`) containing the target information (dependent variables) you're trying to fit.
+- `X` the training data input argument (independent variables).
+- `opt` is the optimizer. Currently, only `SimpleChains.ADAM` is supported.
+- `iters`, how many iterations to train for.
+- `batchsize` keyword argument: the size of the batches to use. If `batchsize = nothing`, it'll try to do a half-decent job of picking the batch size for you. However, this is not well optimized at the moment.
+"""
 function train_batched!(
   g::AbstractVecOrMat,
   p::AbstractVector,
@@ -349,6 +429,10 @@ function train_batched!(
     static(8) * batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
   else
     batchsize
+  end
+  if N_bs >= N
+    train_unbatched!(g, p, _chn, X, opt, iters)
+    return p
   end
   tgt_batch_len = tsprod(Base.front(size(tgt))) * N_bs
   X_batch_len = tsprod(Base.front(sx)) * N_bs
@@ -383,6 +467,8 @@ function train_batched!(
       doff = 0
       while true
         doffnext = doff + N_bs
+        # doffnext > N && break
+        # batchstop = doffnext
         batchstop::Int = min(doffnext, N)
         # @show doff:batchstop
         shuffle_update!(
