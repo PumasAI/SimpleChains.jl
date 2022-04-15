@@ -56,7 +56,7 @@ corresponding to the model:
 ```julia
 @time p = SimpleChains.init_params(lenet);
 ```
-The convolutional layers are initialized with a Glorot (Xavier) unifirom distribution,
+The convolutional layers are initialized with a Glorot (Xavier) uniform distribution,
 while the dense layers are initialized with a Glorot (Xaviar) normal distribution.
 Biases are initialized to zero.
 Because the number of parameters can be a function of the input size, these must
@@ -75,7 +75,7 @@ G = SimpleChains.alloc_threaded_grad(lenetloss);
 Here, we're estimating that the number of physical cores is half the number of threads
 on an `x86_64` system, which is true for most -- but not all!!! -- of them.
 Otherwise, we're assuming it is equal to the number of threads. This is of course also
-likely to be wrong, e.g. recent Power CPUs may habe 4 or even 8 threads per core.
+likely to be wrong, e.g. recent Power CPUs may have 4 or even 8 threads per core.
 You may wish to change this, or use [Hwloc.jl](https://github.com/JuliaParallel/Hwloc.jl) for an accurate number.
 
 Now that this is all said and done, we can train for `10` epochs using the `ADAM` optimizer
