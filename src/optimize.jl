@@ -13,18 +13,20 @@ end
 
 ADAM(η = 0.001) = ADAM(η, (0.9, 0.999))
 
-function update!(o::ADAM, (mt, vt, βp), x, Δ)
+function update!(o::ADAM, (mt, vt, βp), x, Δ, s = One())
   @unpack η, β = o
 
   β₁ = β[1]
   β₂ = β[2]
   βp₁ = βp[1]
   βp₂ = βp[2]
+  st = eltype(Δ)(s)
   @turbo for i ∈ eachindex(Δ)
-    mt[i] = β₁ * mt[i] + (1 - β₁) * Δ[i]
-    vt[i] = β₂ * vt[i] + (1 - β₂) * Δ[i]^2
-    Δᵢ = η * mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1e-8))
-    x[i] -= Δᵢ
+    Δᵢ = Δ[i]*st
+    mt[i] = β₁ * mt[i] + (1 - β₁) * Δᵢ
+    vt[i] = β₂ * vt[i] + (1 - β₂) * Δᵢ^2
+    Δxᵢ = mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1f-8))
+    x[i] -= η * Δxᵢ
   end
   βp[1] = βp₁ * β₁
   βp[2] = βp₂ * β₂
@@ -55,10 +57,13 @@ end
 end
 
 
-function update!(g::AbstractVector, opt, Xp, layers, pen, sx, p, pm, optbuffer, _)
-  chain_valgrad_entry!(pointer(g), Xp, layers, pointer(p), pm)
+function update!(
+  g::AbstractVector{T}, opt, Xp::AbstractArray{<:Any,N}, layers, pen, sx, p, pm, optbuffer, _
+) where {T,N}
+  GC.@preserve g p chain_valgrad_entry!(pointer(g), Xp, layers, pointer(p), pm)
   apply_penalty!(g, pen, p, sx)
-  update!(opt, optbuffer, p, g)
+  gmul = loss_multiplier(last(layers), size(Xp,static(N)), T)
+  update!(opt, optbuffer, p, g, gmul)
 end
 function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
   batchsize = size(Xp, ndims(Xp))
@@ -89,7 +94,7 @@ function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
   end
   return nothing
 end
-function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, mpt)
+function update!(g::AbstractMatrix{T}, opt, Xp::AbstractArray{<:Any,N}, layers, pen, sx, p, pm, optbuffer, mpt) where {T,N}
   nthread = size(g, static(2))
   Xpb = preserve_buffer(Xp)
   Xpp = PtrArray(Xp)
@@ -107,7 +112,8 @@ function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
   GC.@preserve gpb begin
     gv = PtrArray(pointer(g), (length(p),))
     apply_penalty!(gv, pen, p, sx)
-    update!(opt, optbuffer, p, gv)
+    gmul = loss_multiplier(loss, size(Xp,static(N)), T)
+    update!(opt, optbuffer, p, gv, gmul)
   end
 end
 # note that pstop - pstart = subrangelen, so it is not a closed-closed i
@@ -163,9 +169,9 @@ function shuffle_chain_valgrad_thread!(
   return nothing
 end
 function shuffle_update!(
-  g::AbstractMatrix,
+  g::AbstractMatrix{T},
   opt,
-  Xp,
+  Xp::AbstractArray{<:Any,N},
   layers,
   pen,
   sx,
@@ -176,7 +182,7 @@ function shuffle_update!(
   perm,
   pstart,
   pstop,
-)
+) where {T,N}
   nthread = size(g, static(2))
   #=
   batchsize = pstop - pstart
@@ -241,14 +247,15 @@ function shuffle_update!(
   GC.@preserve gpb begin
     gv = PtrArray(pointer(g), (length(p),))
     apply_penalty!(gv, pen, p, sx)
-    update!(opt, optbuffer, p, gv)
+    gmul = loss_multiplier(last(layers), size(Xp,static(N)), T)
+    update!(opt, optbuffer, p, gv, gmul)
   end
   return nothing
 end
 function shuffle_update!(
-  g::AbstractVector,
+  g::AbstractVector{T},
   opt,
-  Xp,
+  Xp::AbstractArray{<:Any,N},
   layers,
   pen,
   sx,
@@ -259,14 +266,15 @@ function shuffle_update!(
   perm,
   pstart,
   pstop,
-)
+) where {T,N}
   shuffle_chain_valgrad_thread!(
     (g, Xp, layers, p, pm, mpt, perm, pstart, pstop),
     static(1),
     static(1),
   )
   apply_penalty!(g, pen, p, sx)
-  update!(opt, optbuffer, p, g)
+  gmul = loss_multiplier(last(layers), size(Xp,static(N)), T)
+  update!(opt, optbuffer, p, g, gmul)
 end
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
