@@ -1,6 +1,7 @@
+using Test
 ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
-let
-using SimpleChains, MLDatasets, Test
+@testset "LeNet" begin
+using SimpleChains, MLDatasets
 
 lenet = SimpleChain(
   (static(28), static(28), static(1)),

@@ -418,9 +418,7 @@ SquaredLoss"""
     (g[1, 1, 1], g[1, 2, 1], g[2, 1, 1], g[2, 2, 1]) = firstcfg
     @test Ac == g
   end
-  @testset "LeNet" begin
-    include("mnist.jl")
-  end
+  include("mnist.jl")
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 # For now, there are the tests at the start.
