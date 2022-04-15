@@ -416,6 +416,7 @@ function train_batched!(
   opt::AbstractOptimizer,
   iters;
   batchsize = nothing,
+  leaveofflast::Bool = false,
 )
   if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
@@ -457,7 +458,6 @@ function train_batched!(
     shuffle_per_thread,
     nthread,
   )
-  leaveofflast = false
   loss = last(layers)
   Y = preserve_buffer(loss)
   newlayers = (Base.front(layers)..., loss(PtrArray(Y)))
@@ -476,12 +476,8 @@ function train_batched!(
       doff = 0
       while true
         doffnext = doff + N_bs
-        batchstop::Int = if leaveofflast
-          doffnext > N && break
-          doffnext
-        else
-          min(doffnext, N)
-        end
+        ifelse(leaveofflast, doffnext, doff) > (N - (!leaveofflast)) && break
+        batchstop::Int = min(doffnext, N)
         shuffle_update!(
           g,
           opt,
@@ -498,9 +494,6 @@ function train_batched!(
           batchstop,
         )
         doff = doffnext
-        if !leaveofflast
-          doff >= N && break
-        end
       end
       (iter += 1) < iters || break
       randpermzero!(perm)
