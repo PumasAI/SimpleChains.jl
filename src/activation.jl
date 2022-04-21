@@ -119,3 +119,6 @@ fast_fuse(::typeof(Base.FastMath.abs_fast)) = True()
 fast_fuse(::typeof(Base.FastMath.abs2_fast)) = True()
 fast_fuse(::typeof(identity)) = True()
 fast_fuse(_) = False()
+
+const σ = SLEEFPirates.sigmoid_fast
+

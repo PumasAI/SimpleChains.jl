@@ -8,6 +8,7 @@ end
 isloss(::AbstractLoss) = True()
 isloss(_) = False()
 has_loss_typed(sc::SimpleChain) = isloss(last(sc.layers))
+has_loss_typed(sc::AbstractPenalty) = has_loss_typed(getchain(sc))
 
 struct PullBackLayer{T,L,A,PBL}
   pg::Ptr{T}
@@ -92,12 +93,14 @@ function valgrad_noloss(sc, arg, params::AbstractVector{T}) where {T}
   c = getchain(sc)
   @unpack layers, memory = c
   parg = maybe_static_size_arg(c.inputdim, arg)
+  barg = preserve_buffer(arg)
   off = align(resize_memory!(layers, memory, parg, length(parg) * sizeof(eltype(parg))))
-  GC.@preserve arg memory begin
+  GC.@preserve barg memory begin
     g = PtrArray(reinterpret(Ptr{T}, pointer(memory) + off), (static_length(params),))
     l, pullback = unsafe_valgrad_pullback!(g, layers, params, memory, parg)
   end
-  return StrideArraysCore.StrideArray(l, memory), pullback
+  return l, pullback
+  # return StrideArraysCore.StrideArray(l, memory), pullback
 end
 
 
@@ -122,3 +125,4 @@ end
 ChainRulesCore.rrule(sc::AbstractPenalty, arg, params) = _rrule(sc, arg, params, True())
 ChainRulesCore.rrule(sc::SimpleChain, arg, params) =
   _rrule(sc, arg, params, has_loss_typed(sc))
+

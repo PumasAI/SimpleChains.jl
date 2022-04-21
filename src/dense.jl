@@ -71,6 +71,17 @@ function getparams(td::TurboDense{true}, p::Ptr{T}, inputdim::Integer) where {T}
   W = PtrArray(reinterpret(Ptr{T}, p), (outputdim, inputdimp1))
   W, p + (outputdim * inputdimp1) * sizeof(T)
 end
+# to support `params`
+function _getparams(layer::TurboDense{false}, p, inputdim::Tuple)
+  _getparams(layer, p, last(inputdim))
+end
+function _getparams(layer::TurboDense{true}, p, inputdim::Tuple)
+  A, p = getparams(layer, p, last(inputdim))
+  Kp1 = size(A, static(2))
+  K = Kp1 - static(1)
+  _, outputdim = layer_output_size(Val{Float32}(), layer, inputdim)
+  (view(A, :, static(1):K), view(A, :, Kp1)), p, outputdim
+end
 function init_params!(td::TurboDense, p, inputdim::Tuple)
   p, outputdim = _init_params!(td, p, first(inputdim))
   p, (outputdim, Base.tail(inputdim)...)
@@ -1232,3 +1243,13 @@ function dense!(
   matmul!(Cdual, A, B, BT())
   dualeval!(f, Cdual)
 end
+function dense!(
+  f, dC, C::AbstractMatrix, A::AbstractVector, B::AbstractMatrix, bias
+)
+  Abuf = preserve_buffer(A)
+  Am = PtrArray(pointer(A), (length(A),static(1)))
+  GC.@preserve Abuf begin
+    dense!(f, dC, C, Am, B, bias)
+  end
+end
+

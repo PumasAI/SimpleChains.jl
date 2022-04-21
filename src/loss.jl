@@ -275,3 +275,6 @@ function accuracy_and_loss(c::SimpleChain, X, args...)
   cnt, l = correct_count_and_loss(c, X, args...)
   cnt / size(X)[end], l
 end
+
+_params(::Tuple{AbstractLoss}, _, __) = ()
+
