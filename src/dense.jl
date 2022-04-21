@@ -1239,7 +1239,7 @@ function dense!(
   B::AbstractArray,
   ::BT,
   ::FF,
-) where {F,BT,FF,T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
+) where {F,BT<:StaticBool,FF,T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   matmul!(Cdual, A, B, BT())
   dualeval!(f, Cdual)
 end
