@@ -22,7 +22,7 @@ using ArrayInterface:
   static_step,
   indices,
   offsets
-using SIMDTypes: Bit
+using SIMDTypes: Bit, NativeTypes
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
@@ -65,6 +65,7 @@ include("simple_chain.jl")
 include("utils.jl")
 include("activation.jl")
 include("dense.jl")
+include("forwarddiff_matmul.jl")
 include("dropout.jl")
 include("conv.jl")
 include("loss.jl")
