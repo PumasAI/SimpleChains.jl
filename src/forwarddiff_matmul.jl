@@ -370,7 +370,7 @@ function matmul!(
   B::AbstractVector,
   ::True,
 ) where {D<:ForwardDiff.Dual}
-  contract!(C, A, B, Val{(0,)}, Val{(0, 1)}(), Val{(1,)}(), Val{true}(), Val{false}())
+  contract!(C, A, B, Val{(0,)}(), Val{(0, 1)}(), Val{(1,)}(), Val{true}(), Val{false}())
 end
 function matmul!(
   C::AbstractMatrix{D},
@@ -378,7 +378,7 @@ function matmul!(
   B::AbstractMatrix,
   ::True,
 ) where {D<:ForwardDiff.Dual}
-  contract!(C, A, B, Val{(0,1)}, Val{(0, 2)}(), Val{(2,1)}(), Val{true}(), Val{false}())
+  contract!(C, A, B, Val{(0,1)}(), Val{(0, 2)}(), Val{(2,1)}(), Val{true}(), Val{false}())
 end
 function matmul!(
   C::AbstractVector{D},
@@ -386,7 +386,7 @@ function matmul!(
   B::AbstractVector,
   ::False,
 ) where {D<:ForwardDiff.Dual}
-  contract!(C, A, B, Val{(0,)}, Val{(0, 1)}(), Val{(1,)}(), Val{false}(), Val{false}())
+  contract!(C, A, B, Val{(0,)}(), Val{(0, 1)}(), Val{(1,)}(), Val{false}(), Val{false}())
 end
 function matmul!(
   Cdual::AbstractMatrix{D},
@@ -394,7 +394,7 @@ function matmul!(
   B::AbstractMatrix,
   ::False,
 ) where {D<:ForwardDiff.Dual}
-  contract!(C, A, B, Val{(0,1)}, Val{(0, 2)}(), Val{(2,1)}(), Val{false}(), Val{false}())
+  contract!(C, A, B, Val{(0,1)}(), Val{(0, 2)}(), Val{(2,1)}(), Val{false}(), Val{false}())
 end
 
 function dense!(
