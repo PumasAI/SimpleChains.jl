@@ -173,7 +173,7 @@ function contract_loops(
   end
   q = :(@turbo $q)
   if lao
-    cd::Int = firstindex(==(first(contract_dims)), DA)
+    cd::Int = findfirst(==(first(contract_dims)), DA)
     Expr(:block, :(K = lastindex(A, StaticInt{$cd}())), q)
   else
     q
@@ -233,8 +233,8 @@ end
     DAN = DA
   else
     r = reinterpret_reshape_dual
-    dimC::Int = length(DC)::Int
-    new_dim = ((length(DA)::Int + length(DB)::Int - dimC) >>> 1) + dimC
+    dimC::Int = Int(length(DC))
+    new_dim = ((Int(length(DA))::Int + Int(length(DB))::Int - dimC) >>> 1) + dimC
     DCN = (new_dim, DC...)
     DAN = (new_dim, DA...)
   end
@@ -242,7 +242,7 @@ end
     contract!($r(C), $r(A), B, Val{$DCN}(), Val{$DAN}(), Val{$DB}(), Val{$LAO}(), Val{$U}())
   end
 end
-function contract!(
+@generated function contract!(
   C::PtrArray{<:Any,DDC,TC},
   A::PtrArray{<:Any,<:Any,TA},
   B::PtrArray{<:Any,DDB,TB},
@@ -267,8 +267,8 @@ function contract!(
 }
 
   r = reinterpret_reshape_dual
-  dimC::Int = length(DC)::Int
-  new_dim = ((length(DA)::Int + length(DB)::Int - dimC) >>> 1) + dimC
+  dimC::Int = Int(length(DC))
+  new_dim = ((Int(length(DA))::Int + Int(length(DB))::Int - dimC) >>> 1) + dimC
   DCN = (new_dim, DC...)
   DBN = (new_dim, DB...)
   quote
@@ -287,7 +287,7 @@ function view_d1_notfirst(A::AbstractArray{<:Any,N}) where {N}
   view(A, r, ntuple(Returns(:), Val(N-1))...)
 end
 
-function contract!(
+@generated function contract!(
   C::PtrArray{<:Any,DDC,TC},
   A::PtrArray{<:Any,DDA,TA},
   B::PtrArray{<:Any,DDB,TB},
@@ -316,8 +316,8 @@ function contract!(
   q = quote
     rB = $rr(B)
   end
-  dimC::Int = length(DC)::Int
-  new_dim = ((length(DA)::Int + length(DB)::Int - dimC) >>> 1) + dimC
+  dimC::Int = Int(length(DC))
+  new_dim = ((Int(length(DA))::Int + Int(length(DB))::Int - dimC) >>> 1) + dimC
   let
     if (DDC[1] & DDA[1]) & (DC[1] == DA[1])
       r1 = reinterpret_dual
@@ -333,7 +333,7 @@ function contract!(
       :(contract!(
         $r1(C),
         $r1(A),
-        view_d1_first($rB),
+        view_d1_first(rB),
         Val{$DCN}(),
         Val{$DAN}(),
         Val{$DB}(),
@@ -351,13 +351,13 @@ function contract!(
         contract!(
           view_d1_notfirst($rr(C)),
           view_d1_first($rr(A)),
-          view_d1_notfirst($rB),
+          view_d1_notfirst(rB),
           Val{$DCN}(),
           Val{$DA}(),
           Val{$DBN}(),
           Val{false}(),
+          Val{true}(),
         ),
-        Val{true}(),
       ),
     )
   end
