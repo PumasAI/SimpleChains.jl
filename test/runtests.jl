@@ -184,7 +184,7 @@ SquaredLoss"""
     off_old = off
     off += 2
     b2 = view(p, 1+off_old:off)
-    (W1,x1), (W2,x2) = SimpleChains.params(L2Penalty(sc, 2.3), p)
+    _, (W1,x1), (W2,x2) = SimpleChains.params(L2Penalty(sc, 2.3), p)
     @test W1 == A1
     @test x1 == b1
     @test W2 == A2
