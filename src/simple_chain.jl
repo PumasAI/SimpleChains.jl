@@ -197,9 +197,7 @@ end
 @inline function (output_size(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
   first(layer_output_size(Val{T}(), getfield(x, 1), s1))
 end
-@inline function (
-  output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int,
-) where {T,X1,X2}
+@inline function (output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
   b, s2 = layer_output_size(Val{T}(), getfield(x, 1), s1)
   b + output_size(Val{T}(), Base.tail(x), s2)
 end
