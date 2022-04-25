@@ -23,7 +23,7 @@ using ArrayInterface:
   indices,
   offsets
 using SIMDTypes: Bit, NativeTypes
-using VectorizationBase: align, relu, stridedpointer, AbstractSIMD
+using VectorizationBase: align, relu, stridedpointer, AbstractSIMD, NativeTypesV
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
 using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
