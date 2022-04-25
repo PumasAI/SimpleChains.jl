@@ -26,6 +26,7 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
 
 # initialize parameters
 @time p = SimpleChains.init_params(lenet);
+@test all(isfinite, p)
 
 @testset "Cache Corrupting Results" begin
   g = similar(p)
@@ -47,11 +48,15 @@ end
 G = SimpleChains.alloc_threaded_grad(lenetloss);
 # train
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
+@test all(isfinite, p)
+@test all(isfinite, G)
 # assess training and test loss
 a0, l0 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a1, l1 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
 # train without additional memory allocations
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
+@test all(isfinite, p)
+@test all(isfinite, G)
 # assess training and test loss
 a2, l2 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a3, l3 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
@@ -66,3 +71,4 @@ else
   @test a1 > 0.94
   @test a3 > 0.96
 end
+
