@@ -98,7 +98,16 @@ function update!(g::AbstractMatrix, opt, Xp, layers, pen, sx, p, pm, optbuffer, 
   tgtpb = preserve_buffer(tgt)
   newlayers = (Base.front(layers)..., loss(PtrArray(tgt)))
   GC.@preserve Xpb tgtpb begin
-    Polyester.batch(chain_valgrad_thread!, (nthread, nthread), g, Xpp, newlayers, p, pm, mpt)
+    Polyester.batch(
+      chain_valgrad_thread!,
+      (nthread, nthread),
+      g,
+      Xpp,
+      newlayers,
+      p,
+      pm,
+      mpt,
+    )
   end
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
@@ -158,7 +167,8 @@ function shuffle_chain_valgrad_thread!(
     end
   end
   newlayers = (Base.front(layers)..., loss(tgttmp))
-  permview = StrideArraysCore.ptrarray0(pointer(perm)+(Base.elsize(perm)*fm1), (lastdim,))
+  permview =
+    StrideArraysCore.ptrarray0(pointer(perm) + (Base.elsize(perm) * fm1), (lastdim,))
   chain_valgrad_entry!(pointer(g) + goff, Xp, newlayers, permview, pointer(p), pm)
   return nothing
 end
@@ -270,7 +280,7 @@ function shuffle_update!(
 end
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
-  if g isa AbstractMatrix && size(g,2) == 1
+  if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
     GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, t)
@@ -308,7 +318,7 @@ Arguments:
 - `iters`, how many iterations to train for.
 """
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
-  if g isa AbstractMatrix && size(g,2) == 1
+  if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
     GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, iters)
@@ -409,7 +419,7 @@ function train_batched!(
   iters;
   batchsize = nothing,
 )
-  if g isa AbstractMatrix && size(g,2) == 1
+  if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
     GC.@preserve gpb train_batched!(gv, p, _chn, X, opt, iters; batchsize)

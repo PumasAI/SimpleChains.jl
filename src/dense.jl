@@ -867,4 +867,3 @@ function dense!(f, dC, C::AbstractMatrix, A::AbstractVector, B::AbstractMatrix, 
     dense!(f, dC, C, Am, B, bias)
   end
 end
-

@@ -4,14 +4,14 @@
   for n = 1:N
     push!(t.args, :(@inbounds p[$n]))
   end
-  Expr(:block, Expr(:meta,:inline), :(p = ForwardDiff.partials(x)), t)
+  Expr(:block, Expr(:meta, :inline), :(p = ForwardDiff.partials(x)), t)
 end
 @generated function _flatten(x::ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual,N}) where {N}
   t = Expr(:tuple, :(_flatten(ForwardDiff.value(x))...))
   for n = 1:N
     push!(t.args, :(_flatten(@inbounds(p[$n]))...))
   end
-  Expr(:block, Expr(:meta,:inline), :(p = ForwardDiff.partials(x)), t)
+  Expr(:block, Expr(:meta, :inline), :(p = ForwardDiff.partials(x)), t)
 end
 
 struct DualCall{F}
@@ -35,7 +35,8 @@ end
   O = (P ÷ (I + 1)) - 1
   quote
     $(Expr(:meta, :inline))
-    @inbounds d = Base.Cartesian.@ncall $O ForwardDiff.Dual o -> Base.Cartesian.@ncall $I ForwardDiff.Dual i -> x[i + o*$I-$I]
+    @inbounds d = Base.Cartesian.@ncall $O ForwardDiff.Dual o ->
+      Base.Cartesian.@ncall $I ForwardDiff.Dual i -> x[i+o*$I-$I]
     _flatten(dc.f(d))
   end
 end
@@ -73,8 +74,7 @@ end
       C = reinterpret(reshape, T, Cdual)
       g = DualDualCall{$R}(f)
       @turbo for m ∈ eachindex(Cdual)
-        (Base.Cartesian.@ntuple $TD p -> C[p, m]) =
-          Base.Cartesian.@ncall $TD g p -> C[p, m]
+        (Base.Cartesian.@ntuple $TD p -> C[p, m]) = Base.Cartesian.@ncall $TD g p -> C[p, m]
       end
     end
   else
@@ -329,21 +329,22 @@ end
   end
 end
 
+
 function view_d1_first(A::AbstractArray{<:Any,N}) where {N}
-  view(A, firstindex(A, static(1)), ntuple(Returns(:), Val(N - 1))...)
+  view(A, firstindex(A, static(1)), ntuple(_ -> (:), Val(N - 1))...)
 end
 _increment_first(r::CloseOpen) = CloseOpen(r.lower + static(1), r.upper)
 _increment_first(r::AbstractUnitRange) = first(r)+static(1):last(r)
 
 function view_d1_notfirst(A::AbstractArray{<:Any,N}) where {N}
   r = _increment_first(axes(A, static(1)))
-  view(A, r, ntuple(Returns(:), Val(N - 1))...)
+  view(A, r, ntuple(_ -> (:), Val(N - 1))...)
 end
 _decrement_last(r::CloseOpen) = CloseOpen(r.lower, r.upper - static(1))
 _decrement_last(r::AbstractUnitRange) = CloseOpen(first(r), last(r))
 function view_dlast_front(A::AbstractArray{<:Any,N}) where {N}
   r = _decrement_last(axes(A, static(N)))
-  view(A, ntuple(Returns(:), Val(N - 1))..., r)
+  view(A, ntuple(_ -> (:), Val(N - 1))..., r)
 end
 
 @generated function contract!(
@@ -481,5 +482,3 @@ function dense!(
   matmul!(Cdual, A, B, BT())
   dualeval!(f, Cdual)
 end
-
-

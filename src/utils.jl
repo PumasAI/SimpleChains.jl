@@ -180,10 +180,7 @@ end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
 
 function _alloc_grad(mem::Vector{T}, np, ::One, x) where {T}
-  StrideArray(
-    PtrArray(align(pointer(mem)), (np,), (static_sizeof(T), ), Val((true,))),
-    mem,
-  )
+  StrideArray(PtrArray(align(pointer(mem)), (np,), (static_sizeof(T),), Val((true,))), mem)
 end
 function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
   StrideArray(
@@ -197,7 +194,7 @@ function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
   )
 end
 
-_min(a,b) = ifelse(lt(a,b), a, b)
+_min(a, b) = ifelse(lt(a, b), a, b)
 """
     alloc_threaded_grad(chn, id = nothing, ::Type{T} = Float32; numthreads = min(Threads.nthreads(), SimpleChains.num_cores())
 
@@ -249,4 +246,3 @@ function _add_memory(t::Tuple, p)
   (A, B...)
 end
 _add_memory(::Nothing, p) = nothing
-

@@ -125,4 +125,3 @@ end
 ChainRulesCore.rrule(sc::AbstractPenalty, arg, params) = _rrule(sc, arg, params, True())
 ChainRulesCore.rrule(sc::SimpleChain, arg, params) =
   _rrule(sc, arg, params, has_loss_typed(sc))
-

@@ -214,4 +214,5 @@ end
 end
 
 
-params(sc::AbstractPenalty, p::AbstractVector, inputdim = nothing) = params(getchain(sc), p, inputdim)
+params(sc::AbstractPenalty, p::AbstractVector, inputdim = nothing) =
+  params(getchain(sc), p, inputdim)

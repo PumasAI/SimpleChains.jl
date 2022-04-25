@@ -88,20 +88,24 @@ function chain_valgrad!(
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
-    δdN = δ*invN
+    δdN = δ * invN
     arg[i] = δdN
     s += δ * δdN
   end
   return T(0.5) * s, arg, pu# + sizeof(T)*length(g)
 end
-function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg::AbstractArray{T,N}, p, pu) where {T,N}
+function (sl::SquaredLoss{<:AbstractArray{<:Number}})(
+  arg::AbstractArray{T,N},
+  p,
+  pu,
+) where {T,N}
   y = getfield(sl, :y)
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
     s += δ * δ
   end
-  T(0.5/size(arg,N)) * s, p, pu
+  T(0.5 / size(arg, N)) * s, p, pu
 end
 
 """
@@ -277,4 +281,3 @@ function accuracy_and_loss(c::SimpleChain, X, args...)
 end
 
 _params(::Tuple{AbstractLoss}, _, __) = ()
-

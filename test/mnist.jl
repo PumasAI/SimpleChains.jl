@@ -55,7 +55,7 @@ a1, l1 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
 # assess training and test loss
 a2, l2 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a3, l3 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
-if size(G,2) <= 4
+if size(G, 2) <= 4
   @test a0 > 0.96
   @test a2 > 0.98
   @test a1 > 0.96

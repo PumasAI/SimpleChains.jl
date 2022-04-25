@@ -121,4 +121,3 @@ fast_fuse(::typeof(identity)) = True()
 fast_fuse(_) = False()
 
 const σ = SLEEFPirates.sigmoid_fast
-
