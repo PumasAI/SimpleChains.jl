@@ -331,7 +331,7 @@ SquaredLoss"""
     function convlayertest(x, y, K, b)
       closuresshouldntbeabletomutatebindings = clt(relu, x, K, b)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y)
-      (δ'δ) / 2#size(x)[end]
+      (δ'δ) / 2
     end
     function convlayertest(x, y, K0, b0, K1, b1)
       csbamb = clt(identity, clt(relu, x, K0, b0), K1, b1)
