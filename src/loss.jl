@@ -226,7 +226,6 @@ function chain_valgrad!(
   @turbo for i in eachindex(y)
     s -= arg[y[i], i]
   end
-  # Ninv = inv(T(N))
   @turbo for i in eachindex(arg)
     arg[i] = exp(arg[i])
   end
