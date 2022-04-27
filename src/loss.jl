@@ -93,9 +93,6 @@ function chain_valgrad!(
     δ = arg[i] - y[i]
     arg[i] = δ
     s += δ * δ
-    # δdN = δ*invN
-    # arg[i] = δdN
-    # s += δ * δdN
   end
   return s, arg, pu# + sizeof(T)*length(g)
 end
