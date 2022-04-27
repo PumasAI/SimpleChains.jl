@@ -19,7 +19,7 @@ tssum(x) = ArrayInterface.reduce_tup(+, x)
 tssum(::Tuple{}) = static(0)
 
 function maximum_turbo!(m, y)
-  @turbo for i in eachindex(m)
+  @turbo for i in indices((m,y),(1,2))
     mi = typemin(eltype(y))
     for j in axes(y, 1)
       mi = max(mi, y[j, i])
@@ -31,10 +31,10 @@ end
 
 function unnormalized_logsoftmax!(z, m, y::AbstractMatrix)
   maximum_turbo!(m, y)
-  @turbo for j in axes(y, 2)
+  @turbo for j in indices((y,z), 2)
     mj = m[j]
     s = zero(eltype(m))
-    for i in axes(y, 1)
+    for i in indices((y,z), 1)
       yij = y[i, j]
       zij = mj == Inf ? (yij == Inf ? zero(eltype(y)) : -Inf) : yij - m[j]
       z[i, j] = zij

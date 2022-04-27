@@ -34,12 +34,12 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
   subset = 1:200
   x = xtrain4[:, :, :, subset]
   y = ytrain1[subset]
-  letnetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
-  lenetloss.memory .= 0x00
-  valgrad!(g, lenetloss, x, p)
+  lenetloss_sub = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
+  lenetloss_sub.memory .= 0x00
+  valgrad!(g, lenetloss_sub, x, p)
   g2 = similar(g)
-  lenetloss.memory .= 0xff
-  valgrad!(g2, lenetloss, x, p)
+  lenetloss_sub.memory .= 0xff
+  valgrad!(g2, lenetloss_sub, x, p)
   @test g == g2
 end
 
