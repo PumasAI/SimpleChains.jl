@@ -94,7 +94,7 @@ function chain_valgrad!(
     arg[i] = δ
     s += δ * δ
   end
-  return s, arg, pu# + sizeof(T)*length(g)
+  return s, arg, pu
 end
 function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg::AbstractArray{T,N}, p, pu) where {T,N}
   y = getfield(sl, :y)
