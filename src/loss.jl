@@ -103,8 +103,7 @@ function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg::AbstractArray{T,N}, p
     δ = arg[i] - y[i]
     s += δ * δ
   end
-  # NOTE: we're dividing by 1/size(arg,N)
-  # s / T(size(arg,N)), p, pu
+  # NOTE: we're dividing by size(arg,N)
   T(0.5)*s, p, pu
 end
 
