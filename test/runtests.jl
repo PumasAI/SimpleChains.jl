@@ -337,7 +337,7 @@ SquaredLoss"""
       csbamb = clt(identity, clt(relu, x, K0, b0), K1, b1)
       closuresshouldntbeabletomutatebindings = tanh.(csbamb)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y)
-      (δ'δ) / 2#size(x)[end]
+      (δ'δ) / 2
     end
 
     scconv = SimpleChain(
