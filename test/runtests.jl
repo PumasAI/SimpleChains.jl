@@ -7,6 +7,9 @@ end
 dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
 dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
+import InteractiveUtils
+InteractiveUtils.versioninfo(verbose=true)
+
 @testset "SimpleChains.jl" begin
   @test isempty(Test.detect_unbound_args(SimpleChains))
   @test isempty(Test.detect_ambiguities(SimpleChains))
