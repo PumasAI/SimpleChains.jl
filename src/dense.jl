@@ -39,7 +39,7 @@ end
 # output_dims(d::TurboDense) = getfield(d,:outputdim)
 
 """
-  numparam(d::Layer, inputdim::Tuple)
+    numparam(d::Layer, inputdim::Tuple)
 
 Returns a `Tuple{Int,S}`.
 The first element is the number of parameters required by the layer given an argument of size `inputdim`.
