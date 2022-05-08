@@ -404,11 +404,12 @@ function dense!(
   ∂C::AbstractArray{Bool,N},
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
-  B::AbstractArray{T2,N},
+  B::AbstractArray{T2, N},
   ::True,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
+  n = StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
@@ -420,6 +421,29 @@ function dense!(
     ∂C[m, n] = Cmnr_gt_0
   end
 end
+function dense!(
+  ::typeof(relu),
+  ∂C::AbstractArray{Bool,1},
+  C::AbstractArray{T1,1},
+  A::AbstractMatrix,
+  B::AbstractArray{T2, 1},
+  ::True,
+) where {T1<:Base.HWReal,T2<:Base.HWReal}
+  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  K = Kp1 - StaticInt(1)
+  n = StaticInt(1)
+  @turbo for m ∈ indices((A, C), 1)
+    Cmn = zero(eltype(C))
+    for k ∈ 1:K
+      Cmn += A[m, k] * B[k, n]
+    end
+    Cmnr = Cmn + A[m, Kp1]
+    Cmnr_gt_0 = Cmnr > zero(Cmnr)
+    C[m, n] = ifelse(Cmnr_gt_0, Cmnr, zero(Cmnr))
+    ∂C[m, n] = Cmnr_gt_0
+  end
+end
+
 function dense!(
   ::typeof(relu),
   ∂C::AbstractArray{Bool,N},
@@ -469,6 +493,21 @@ function dense!(
     for k ∈ indices((A, B), (2, 1))
       Cmn += A[m, k] * B[k, n]
     end
+    C[m, n] = Cmn
+  end
+end
+
+function dense!(
+  ::typeof(identity),
+  ::Nothing,
+  C::AbstractArray{T1,N},
+  A::AbstractVector,
+  B::AbstractArray{T2,N},
+  ::False,
+) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
+  @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
+    Cmn = zero(eltype(C))
+    Cmn += A[m, 1] * B[1, n]
     C[m, n] = Cmn
   end
 end
