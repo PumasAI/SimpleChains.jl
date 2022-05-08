@@ -409,7 +409,6 @@ function dense!(
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  n = StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
