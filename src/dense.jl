@@ -505,9 +505,7 @@ function dense!(
   ::False,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
-    Cmn = zero(eltype(C))
-    Cmn += A[m, 1] * B[1, n]
-    C[m, n] = Cmn
+    C[m, n] = A[m] * B[1, n]
   end
 end
 
