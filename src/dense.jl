@@ -422,10 +422,10 @@ function dense!(
 end
 function dense!(
   ::typeof(relu),
-  ∂C::AbstractArray{Bool,1},
-  C::AbstractArray{T1,1},
+  ∂C::AbstractVector{Bool},
+  C::AbstractVector{T1},
   A::AbstractMatrix,
-  B::AbstractArray{T2, 1},
+  B::AbstractVector{T2},
   ::True,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
