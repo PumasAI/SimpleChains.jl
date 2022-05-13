@@ -15,8 +15,8 @@ lenet = SimpleChain(
   TurboDense(identity, 10),
 )
 # 3d and 0-indexed
-xtrain3, ytrain0 = MLDatasets.MNIST.traindata(Float32);
-xtest3, ytest0 = MLDatasets.MNIST.testdata(Float32);
+xtrain3, ytrain0 = MLDatasets.MNIST(Float32, split=:train)[:];
+xtest3, ytest0 = MLDatasets.MNIST(Float32, split=:test)[:];
 xtrain4 = reshape(xtrain3, 28, 28, 1, :);
 xtest4 = reshape(xtest3, 28, 28, 1, :);
 ytrain1 = UInt32.(ytrain0 .+ 1);
@@ -29,18 +29,20 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
 # initialize parameters
 @time p = SimpleChains.init_params(lenet);
 @test all(isfinite, p)
+
 @testset "Cache Corrupting Results" begin
   g = similar(p)
   subset = 1:200
   x = xtrain4[:, :, :, subset]
   y = ytrain1[subset]
-  lenetloss_sub = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
-  lenetloss_sub.memory .= 0x00
-  valgrad!(g, lenetloss_sub, x, p)
-  g2 = similar(g)
-  lenetloss_sub.memory .= 0xff
-  valgrad!(g2, lenetloss_sub, x, p)
-  @test g == g2
+  let lenetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
+    lenetloss.memory .= 0x00
+    valgrad!(g, lenetloss, x, p)
+    g2 = similar(g)
+    lenetloss.memory .= 0xff
+    valgrad!(g2, lenetloss, x, p)
+    @test g == g2
+  end
 end
 
 # initialize a gradient buffer matrix; number of columns places an upper bound
@@ -76,3 +78,4 @@ else
   @test a3 > 0.95
 end
 end
+

@@ -96,14 +96,18 @@ function chain_valgrad!(
   end
   return s, arg, pu
 end
-function (sl::SquaredLoss{<:AbstractArray{<:Number}})(arg::AbstractArray{T,N}, p, pu) where {T,N}
+function (sl::SquaredLoss{<:AbstractArray{<:Number}})(
+  arg::AbstractArray{T,N},
+  p,
+  pu,
+) where {T,N}
   y = getfield(sl, :y)
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
     s += δ * δ
   end
-  # NOTE: we're dividing by size(arg,N)
+  # NOTE: we're not dividing by size(arg,N)
   T(0.5)*s, p, pu
 end
 
@@ -277,3 +281,5 @@ function accuracy_and_loss(c::SimpleChain, X, args...)
   cnt, l = correct_count_and_loss(c, X, args...)
   cnt / size(X)[end], l
 end
+
+_params(::Tuple{AbstractLoss}, _, __) = ()

@@ -103,7 +103,16 @@ function update!(g::AbstractMatrix{T}, opt, Xp::AbstractArray{<:Any,N}, layers, 
   tgtpb = preserve_buffer(tgt)
   newlayers = (Base.front(layers)..., loss(PtrArray(tgt)))
   GC.@preserve Xpb tgtpb begin
-    Polyester.batch(chain_valgrad_thread!, (nthread, nthread), g, Xpp, newlayers, p, pm, mpt)
+    Polyester.batch(
+      chain_valgrad_thread!,
+      (nthread, nthread),
+      g,
+      Xpp,
+      newlayers,
+      p,
+      pm,
+      mpt,
+    )
   end
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
@@ -128,7 +137,7 @@ function shuffle_chain_valgrad_thread!(
   numthread = size(g, static(2))
   batchsize, r = divrem(subrangelen, numthread)
   off = start - 1
-  goff = stride(g, 2) * sizeof(eltype(g)) * off
+  goff = g isa AbstractVector ? 0 : stride(g, static(2)) * sizeof(eltype(g)) * off
   pm += mpt * off
 
   fm1 = off * batchsize + pstart + min(r, off)
@@ -141,7 +150,6 @@ function shuffle_chain_valgrad_thread!(
 
   loss = last(layers)
   tgt = target(loss)
-  # @show size(tgt)
   tgtpb = preserve_buffer(tgt)
   eltgt = eltype(tgt)
   szeltgt = sizeof(eltgt)
@@ -164,7 +172,8 @@ function shuffle_chain_valgrad_thread!(
     end
   end
   newlayers = (Base.front(layers)..., loss(tgttmp))
-  permview = StrideArraysCore.ptrarray0(pointer(perm)+(Base.elsize(perm)*fm1), (lastdim,))
+  permview =
+    StrideArraysCore.ptrarray0(pointer(perm) + (Base.elsize(perm) * fm1), (lastdim,))
   chain_valgrad_entry!(pointer(g) + goff, Xp, newlayers, permview, pointer(p), pm)
   return nothing
 end
@@ -240,6 +249,7 @@ function shuffle_update!(
     pstart,
     pstop,
   )
+  
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
@@ -278,7 +288,7 @@ function shuffle_update!(
 end
 
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
-  if g isa AbstractMatrix && size(g,2) == 1
+  if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
     GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, t)
@@ -316,7 +326,7 @@ Arguments:
 - `iters`, how many iterations to train for.
 """
 function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
-  if g isa AbstractMatrix && size(g,2) == 1
+  if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
     GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, iters)

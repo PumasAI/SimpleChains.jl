@@ -5,10 +5,10 @@ const InputDim = Union{InputDimUnknown,Tuple{Vararg{Integer}}}
 """
     SimpleChain([inputdim::Union{Integer,Tuple{Vararg{Integer}}, ] layers)
 
-Construct a SimpleChain. Optional `input dims` argument allows `SimpleChains` to check
+Construct a SimpleChain. Optional `inputdim` argument allows `SimpleChains` to check
 the size of inputs. Making these `static` will allow `SimpleChains` to infer size
 and loop bounds at compile time.
-Batch size generally should not be included in the `input dim`.
+Batch size generally should not be included in the `inputdim`.
 If `inputdim` is not specified, some methods, e.g. `init_params`, will require
 passing the size as an additional argument, because the number of parameters may be
 a function of the input size (e.g., for a `TurboDense` layer).
@@ -91,7 +91,7 @@ function outputdim(sc::SimpleChain, id = nothing)
 end
 
 """
-  Base.front(c::SimpleChain)
+    Base.front(c::SimpleChain)
 
 Useful for popping off a loss layer.
 """
@@ -274,7 +274,7 @@ end
 """
     SimpleChains.init_params(chn[, id = nothing][, ::Type{T} = Float32])
 
-Creates a parameter vector of element type `T` with size matching that by `id` (argument not reguired if provided to the `chain` object itself.
+Creates a parameter vector of element type `T` with size matching that by `id` (argument not required if provided to the `chain` object itself).
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
 function init_params(Λ::SimpleChain, ::Type{T}) where {T}
@@ -289,11 +289,11 @@ end
 """
 Allowed destruction:
 
-  valgrad_layer!
+    valgrad_layer!
 Accepts return of previous layer (`B`) and returns an ouput `C`.
 If an internal layer, allowed to destroy `B` (e.g. dropout layer).
 
-  pullback!
+    pullback!
 Accepts adjoint of its return (`C̄`). It is allowed to destroy this.
 It is also allowed to destroy the previous layer's return `B` to produce `B̄` (the `C̄` it receives).
 Thus, the pullback is not allowed to depend on `C`, as it may have been destroyed in producing `C̄`.
@@ -328,7 +328,7 @@ function subset_batch(Xp::AbstractArray{T,N}, perm, pu) where {T,N}
   pX = pointer(Xp)
   Xpb = preserve_buffer(Xp)
   GC.@preserve Xpb begin
-    for i = CloseOpen(lastdim)
+    for i in CloseOpen(lastdim)
       @inbounds j = perm[i] # `perm` and `j` are zero-based
       Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
       pXtmp += Int(Xlen) * szeltx

@@ -80,12 +80,14 @@ InteractiveUtils.versioninfo(verbose=true)
       end
       p = SimpleChains.init_params(scflp, T)
       g = similar(p)
-      @test_throws ArgumentError sc(rand(T, 23, 2), p)
-      @test_throws ArgumentError sc(rand(T, 23), p)
-      @test_throws MethodError sc(Array{T,0}(undef), p)
-      @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
-      @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
-      valgrad!(g, scflp, x, p) 
+      let sc = SimpleChains.remove_loss(sc)
+        @test_throws ArgumentError sc(rand(T, 23, 2), p)
+        @test_throws ArgumentError sc(rand(T, 23), p)
+        @test_throws MethodError sc(Array{T,0}(undef), p)
+        @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
+        @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
+      end
+      valgrad!(g, scflp, x, p)
       if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
         @test g == only(
           Zygote.gradient(
@@ -97,7 +99,7 @@ InteractiveUtils.versioninfo(verbose=true)
           sum(abs2, Base.front(sc)(x, p) .- y)/2# / size(x)[end]
         end
         gzyg = copy(_gzyg[1])
-        g2 = similar(g);
+        g2 = similar(g)
         valgrad!(g2, sc, x, p)
         @test g2 ≈ gzyg
       end
@@ -129,12 +131,12 @@ InteractiveUtils.versioninfo(verbose=true)
       @test_throws ArgumentError SimpleChains.init_params(scd, T)
       @test length(SimpleChains.init_params(scd, size(x), T)) == length(p)
       @test sprint((io, t) -> show(io, t), scd) == """
-SimpleChain with the following layers:
-TurboDense 8 with bias.
-Activation layer applying: tanh
-Dropout(p=0.2)
-TurboDense 2 with bias.
-SquaredLoss"""
+    SimpleChain with the following layers:
+    TurboDense 8 with bias.
+    Activation layer applying: tanh
+    Dropout(p=0.2)
+    TurboDense 2 with bias.
+    SquaredLoss"""
 
       valgrad!(g, scd, x, p)
       offset = 2SimpleChains.align(first(scd.layers).outputdim * size(x, 2) * sizeof(T))
@@ -171,6 +173,29 @@ SquaredLoss"""
         ),
         scd.memory,
       )
+
+      let
+        off = 8 * 24
+        A1 = reshape(view(p, 1:off), (8, 24))
+        off_old = off
+        off += 8
+        b1 = view(p, 1+off_old:off)
+        l1 = tanh.(A1 * x .+ b1)
+        vec(l1) .*= m
+
+        off_old = off
+        off += 8 * 2
+        A2 = reshape(view(p, 1+off_old:off), (2, 8))
+
+        off_old = off
+        off += 2
+        b2 = view(p, 1+off_old:off)
+        _, (W1, x1), (W2, x2) = SimpleChains.params(L2Penalty(sc, 2.3), p)
+        @test W1 == A1
+        @test x1 == b1
+        @test W2 == A2
+        @test x2 == b2
+      end
 
       gfdd = ForwardDiff.gradient(p) do p
         off = 8 * 24
@@ -243,12 +268,22 @@ SquaredLoss"""
       if T === Float64
         GC.@preserve pd pu begin
           @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
+          @test reinterpret(T, ld) ≈
+                reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
           @test reinterpret(T, l_d) ≈ reinterpret(T, td(xd, pointer(p), pointer(pu))[1])
+          @test reinterpret(T, l_d) ≈
+                reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
           @test reinterpret(T, ld_d) ≈ reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
+          @test reinterpret(T, ld_d) ≈
+                reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
 
           @test reinterpret(T, ldd) ≈ reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
           @test reinterpret(T, ldd_dd) ≈
                 reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+          @test reinterpret(T, ldd) ≈
+                reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
+          @test reinterpret(T, ldd_dd) ≈
+                reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
         end
       else
         GC.@preserve pd pu begin
@@ -262,7 +297,19 @@ SquaredLoss"""
           @test_broken reinterpret(T, ldd) ≈
                        reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
           @test_broken reinterpret(T, ldd_dd) ≈
-                       reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+            reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+          
+          @test_broken reinterpret(T, ld) ≈
+                       reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
+          @test_broken reinterpret(T, l_d) ≈
+                       reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
+          @test_broken reinterpret(T, ld_d) ≈
+                       reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
+
+          @test_broken reinterpret(T, ldd) ≈
+                       reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
+          @test_broken reinterpret(T, ldd_dd) ≈
+                       reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
         end
       end
       @testset "training" begin
@@ -421,8 +468,27 @@ SquaredLoss"""
     (g[1, 1, 1], g[1, 2, 1], g[2, 1, 1], g[2, 2, 1]) = firstcfg
     @test Ac == g
   end
-  include("mnist.jl")
+  @testset "LeNet" begin
+    include("mnist.jl")
+  end
+  @testset "params" begin
+    sc = SimpleChain(
+      static(24),
+      (
+        Activation(abs2),
+        TurboDense{true}(tanh, static(8)),
+        Dropout(0.5),
+        TurboDense{false}(identity, static(2)),
+      ),
+    )
+    p = SimpleChains.init_params(sc);
+    n0, (W1, b1), n2, W3 = SimpleChains.params(sc,p)
+    @test n0 === n2 === nothing
+    @test W1 == reshape(view(p,1:24*8),(8,24))
+    @test b1 == view(p,24*8+1:25*8)
+    @test W3 == reshape(@view(p[25*8+1:end]),(2,8))
+  end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 # For now, there are the tests at the start.
-Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false) 
+Aqua.test_all(SimpleChains, ambiguities = false, project_toml_formatting = false)
