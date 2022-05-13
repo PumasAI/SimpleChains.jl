@@ -11,6 +11,8 @@ using UnPack,
   VectorizedRNG
 using ArrayInterface:
   size,
+  strides,
+  stride,
   axes,
   StrideIndex,
   contiguous_axis,
