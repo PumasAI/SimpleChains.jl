@@ -131,7 +131,7 @@ function shuffle_chain_valgrad_thread!(
   numthread = size(g, static(2))
   batchsize, r = divrem(subrangelen, numthread)
   off = start - 1
-  goff = stride(g, 2) * sizeof(eltype(g)) * off
+  goff = stride(g, static(2)) * sizeof(eltype(g)) * off
   pm += mpt * off
 
   fm1 = off * batchsize + pstart + min(r, off)
@@ -144,7 +144,6 @@ function shuffle_chain_valgrad_thread!(
 
   loss = last(layers)
   tgt = target(loss)
-  # @show size(tgt)
   tgtpb = preserve_buffer(tgt)
   eltgt = eltype(tgt)
   szeltgt = sizeof(eltgt)
@@ -244,6 +243,7 @@ function shuffle_update!(
     pstart,
     pstop,
   )
+  
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
@@ -480,7 +480,6 @@ function train_batched!(
         # doffnext > N && break
         # batchstop = doffnext
         batchstop::Int = min(doffnext, N)
-        # @show doff:batchstop
         shuffle_update!(
           g,
           opt,

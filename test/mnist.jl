@@ -13,8 +13,8 @@ lenet = SimpleChain(
   TurboDense(identity, 10),
 )
 # 3d and 0-indexed
-xtrain3, ytrain0 = MLDatasets.MNIST.traindata(Float32);
-xtest3, ytest0 = MLDatasets.MNIST.testdata(Float32);
+xtrain3, ytrain0 = MLDatasets.MNIST(Float32, split=:train)[:];
+xtest3, ytest0 = MLDatasets.MNIST(Float32, split=:test)[:];
 xtrain4 = reshape(xtrain3, 28, 28, 1, :);
 xtest4 = reshape(xtest3, 28, 28, 1, :);
 ytrain1 = UInt32.(ytrain0 .+ 1);
