@@ -265,16 +265,20 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
       if T === Float64
         GC.@preserve pd pu begin
           @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
-          @test reinterpret(T, ld) ≈ reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
+          @test reinterpret(T, ld) ≈
+                reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
           @test reinterpret(T, l_d) ≈ reinterpret(T, td(xd, pointer(p), pointer(pu))[1])
-          @test reinterpret(T, l_d) ≈ reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
+          @test reinterpret(T, l_d) ≈
+                reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
           @test reinterpret(T, ld_d) ≈ reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
-          @test reinterpret(T, ld_d) ≈ reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
+          @test reinterpret(T, ld_d) ≈
+                reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
 
           @test reinterpret(T, ldd) ≈ reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
           @test reinterpret(T, ldd_dd) ≈
                 reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
-          @test reinterpret(T, ldd) ≈ reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
+          @test reinterpret(T, ldd) ≈
+                reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
           @test reinterpret(T, ldd_dd) ≈
                 reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
         end
@@ -451,6 +455,23 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
   end
   @testset "LeNet" begin
     include("mnist.jl")
+  end
+  @testset "params" begin
+    sc = SimpleChain(
+      static(24),
+      (
+        Activation(abs2),
+        TurboDense{true}(tanh, static(8)),
+        Dropout(0.5),
+        TurboDense{false}(identity, static(2)),
+      ),
+    )
+    p = SimpleChains.init_params(sc);
+    n0, (W1, b1), n2, W3 = SimpleChains.params(sc,p)
+    @test n0 === n2 === nothing
+    @test W1 == reshape(view(p,1:24*8),(8,24))
+    @test b1 == view(p,24*8+1:25*8)
+    @test W3 == reshape(@view(p[25*8+1:end]),(2,8))
   end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped

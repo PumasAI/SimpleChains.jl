@@ -73,7 +73,9 @@ function getparams(td::TurboDense{true}, p::Ptr{T}, inputdim::Integer) where {T}
 end
 # to support `params`
 function _getparams(layer::TurboDense{false}, p, inputdim::Tuple)
-  _getparams(layer, p, last(inputdim))
+  A, p = getparams(layer, p, last(inputdim))
+  _, outputdim = layer_output_size(Val{Float32}(), layer, inputdim)
+  A, p, outputdim
 end
 function _getparams(layer::TurboDense{true}, p, inputdim::Tuple)
   A, p = getparams(layer, p, last(inputdim))
