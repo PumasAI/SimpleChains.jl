@@ -50,10 +50,20 @@ dualeval!(
   ::typeof(identity),
   ::AbstractArray{D},
 ) where {T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
+dualeval!(
+  ::typeof(identity),
+  ::AbstractVector{D},
+) where {T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}} = nothing
+dualeval!(
+  ::typeof(identity),
+  ::AbstractVector{D},
+) where {T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
 
+
+dualeval!(f::F, Cdual::AbstractArray) where {F} = dualeval!(f, vec(Cdual))
 @generated function dualeval!(
   f::F,
-  Cdual::AbstractArray{D},
+  Cdual::AbstractVector{D},
 ) where {F,T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}}
   quote
     C = reinterpret(reshape, T, Cdual)
@@ -66,7 +76,7 @@ dualeval!(
 end
 @generated function dualeval!(
   f::F,
-  Cdual::AbstractArray{D},
+  Cdual::AbstractVector{D},
 ) where {F,T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}}
   if isa(T, Base.HWReal)
     TD = (P + 1) * (R + 1)
@@ -233,7 +243,7 @@ end
   LAO,
   U,
 }
-  if (DDC[1] & DDA[1]) & (DC[1] == DA[1])
+  if (DDC[1] & DDA[1]) & (DC[1] == DA[1]) & Bool(is_column_major(A)) & Bool(is_column_major(C))
     r = reinterpret_dual
     DCN = DC
     DAN = DA

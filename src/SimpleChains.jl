@@ -23,7 +23,8 @@ using ArrayInterface:
   static_last,
   static_step,
   indices,
-  offsets
+  offsets,
+  is_column_major
 using SIMDTypes: Bit, NativeTypes
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD, NativeTypesV
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof

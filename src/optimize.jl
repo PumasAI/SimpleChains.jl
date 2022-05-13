@@ -131,7 +131,7 @@ function shuffle_chain_valgrad_thread!(
   numthread = size(g, static(2))
   batchsize, r = divrem(subrangelen, numthread)
   off = start - 1
-  goff = stride(g, static(2)) * sizeof(eltype(g)) * off
+  goff = g isa AbstractVector ? 0 : stride(g, static(2)) * sizeof(eltype(g)) * off
   pm += mpt * off
 
   fm1 = off * batchsize + pstart + min(r, off)

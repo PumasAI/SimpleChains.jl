@@ -77,11 +77,13 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
       end
       p = SimpleChains.init_params(scflp, T)
       g = similar(p)
-      @test_throws ArgumentError sc(rand(T, 23, 2), p)
-      @test_throws ArgumentError sc(rand(T, 23), p)
-      @test_throws MethodError sc(Array{T,0}(undef), p)
-      @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
-      @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
+      let sc = SimpleChains.remove_loss(sc)
+        @test_throws ArgumentError sc(rand(T, 23, 2), p)
+        @test_throws ArgumentError sc(rand(T, 23), p)
+        @test_throws MethodError sc(Array{T,0}(undef), p)
+        @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
+        @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
+      end
       valgrad!(g, scflp, x, p)
       if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
         @test g == only(
@@ -294,7 +296,19 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
           @test_broken reinterpret(T, ldd) ≈
                        reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
           @test_broken reinterpret(T, ldd_dd) ≈
-                       reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+            reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+          
+          @test_broken reinterpret(T, ld) ≈
+                       reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
+          @test_broken reinterpret(T, l_d) ≈
+                       reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
+          @test_broken reinterpret(T, ld_d) ≈
+                       reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
+
+          @test_broken reinterpret(T, ldd) ≈
+                       reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
+          @test_broken reinterpret(T, ldd_dd) ≈
+                       reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
         end
       end
       @testset "training" begin
