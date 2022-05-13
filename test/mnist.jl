@@ -13,8 +13,8 @@ lenet = SimpleChain(
   TurboDense(identity, 10),
 )
 # 3d and 0-indexed
-xtrain3, ytrain0 = MLDatasets.MNIST.traindata(Float32);
-xtest3, ytest0 = MLDatasets.MNIST.testdata(Float32);
+xtrain3, ytrain0 = MLDatasets.MNIST(Float32, split=:train)[:];
+xtest3, ytest0 = MLDatasets.MNIST(Float32, split=:test)[:];
 xtrain4 = reshape(xtrain3, 28, 28, 1, :);
 xtest4 = reshape(xtest3, 28, 28, 1, :);
 ytrain1 = UInt32.(ytrain0 .+ 1);
@@ -26,19 +26,21 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
 
 # initialize parameters
 @time p = SimpleChains.init_params(lenet);
+@test all(isfinite, p)
 
 @testset "Cache Corrupting Results" begin
   g = similar(p)
   subset = 1:200
   x = xtrain4[:, :, :, subset]
   y = ytrain1[subset]
-  letnetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
-  lenetloss.memory .= 0x00
-  valgrad!(g, lenetloss, x, p)
-  g2 = similar(g)
-  lenetloss.memory .= 0xff
-  valgrad!(g2, lenetloss, x, p)
-  @test g == g2
+  let lenetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
+    lenetloss.memory .= 0x00
+    valgrad!(g, lenetloss, x, p)
+    g2 = similar(g)
+    lenetloss.memory .= 0xff
+    valgrad!(g2, lenetloss, x, p)
+    @test g == g2
+  end
 end
 
 # initialize a gradient buffer matrix; number of columns places an upper bound
@@ -47,15 +49,19 @@ end
 G = SimpleChains.alloc_threaded_grad(lenetloss);
 # train
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
+@test all(isfinite, p)
+@test all(isfinite, G)
 # assess training and test loss
 a0, l0 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a1, l1 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
 # train without additional memory allocations
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
+@test all(isfinite, p)
+@test all(isfinite, G)
 # assess training and test loss
 a2, l2 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a3, l3 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
-if size(G,2) <= 4
+if size(G, 2) <= 4
   @test a0 > 0.96
   @test a2 > 0.98
   @test a1 > 0.96
@@ -66,3 +72,4 @@ else
   @test a1 > 0.94
   @test a3 > 0.96
 end
+

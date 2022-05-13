@@ -212,3 +212,7 @@ end
     apply_penalty!(view(grad, lr), Λ.last, view(param, lr)),
   )
 end
+
+
+params(sc::AbstractPenalty, p::AbstractVector, inputdim = nothing) =
+  params(getchain(sc), p, inputdim)

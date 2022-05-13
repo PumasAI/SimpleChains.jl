@@ -44,7 +44,7 @@ function convlayer!(
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,3},
   _b::AbstractVector,
-  _inds::AbstractVector{<:Integer}
+  _inds::AbstractVector{<:Integer},
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -103,7 +103,7 @@ function convlayer!(
   _A::AbstractArray{<:Any,3},
   _K::AbstractArray{<:Any,3},
   _b::AbstractVector,
-  _inds::AbstractVector{<:Integer}
+  _inds::AbstractVector{<:Integer},
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -157,7 +157,7 @@ function convlayer!(
   _A::AbstractArray{<:Any,4},
   _K::AbstractArray{<:Any,4},
   _b::AbstractVector,
-  _inds::AbstractVector{<:Integer}
+  _inds::AbstractVector{<:Integer},
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -209,7 +209,7 @@ function convlayer!(
   _A::AbstractArray{<:Any,5},
   _K::AbstractArray{<:Any,5},
   _b::AbstractVector,
-  _inds::AbstractVector{<:Integer}
+  _inds::AbstractVector{<:Integer},
 ) where {F}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
@@ -274,7 +274,7 @@ function convlayer!(
   _A::AbstractArray{<:Any,4},
   _K::AbstractArray{<:Any,4},
   _b::AbstractVector,
-  _inds::AbstractVector{<:Integer}
+  _inds::AbstractVector{<:Integer},
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -283,7 +283,14 @@ function convlayer!(
   b = zero_offsets(_b)
   inds = zero_offsets(_inds)
   for d ∈ axes(C, 4)
-    convlayer!(f, zview(∂C, :, :, :, d), zview(C, :, :, :, d), zview(A, :, :, :, inds[d]), K, b)
+    convlayer!(
+      f,
+      zview(∂C, :, :, :, d),
+      zview(C, :, :, :, d),
+      zview(A, :, :, :, inds[d]),
+      K,
+      b,
+    )
   end
 end
 
@@ -337,7 +344,7 @@ function convlayer!(
   _A::AbstractArray{<:Any,5},
   _K::AbstractArray{<:Any,5},
   _b::AbstractVector,
-  _inds::AbstractVector{<:Integer}
+  _inds::AbstractVector{<:Integer},
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -839,7 +846,8 @@ end
 function valgrad_layer!(
   pg::Ptr{T},
   c::Conv{typeof(identity)},
-  A, inds,
+  A,
+  inds,
   p::Ptr{T},
   pu::Ptr{UInt8},
 ) where {T}
