@@ -86,53 +86,6 @@ end
   end
 end
 
-
-# maybe collapses dims 1 and 2 of a 3d array.
-_collapse_dims12(::AbstractArray, A) = A
-function collapse_dims12(A::PtrArray{S,(true, true),T,1,1,0,(1, 2)}) where {S,T}
-  M, N = size(A)
-  sp = stridedpointer(A)
-  o1, o2 = offsets(sp)
-  x1, _ = strides(sp)
-  si = ArrayInterface.StrideIndex{2,(1, 2),1}((x1, StaticInt(0)), (o1, o2))
-  spnew = stridedpointer(pointer(sp), si)
-  PtrArray(spnew, (M * N, StaticInt(1)), Val((true, true)))
-end
-function collapse_dims12(A::PtrArray{S,(true, true, true),T,3,1,0,(1, 2, 3)}) where {S,T}
-  M, N, P = size(A)
-  sp = stridedpointer(A)
-  o1, o2, o3 = offsets(sp)
-  x1, _, x3 = strides(sp)
-  si = ArrayInterface.StrideIndex{3,(1, 2, 3),1}((x1, StaticInt(0), x3), (o1, o2, o3))
-  spnew = stridedpointer(pointer(sp), si)
-  PtrArray(spnew, (M * N, StaticInt(1), P), Val((true, true, true)))
-end
-const Collapsible12PtrArray{S,T} = Union{
-  PtrArray{S,(true, true),T,1,1,0,(1, 2)},
-  PtrArray{S,(true, true, true),T,3,1,0,(1, 2, 3)},
-}
-function _collapse_dims12(A::Collapsible12PtrArray, O::AbstractArray)
-  StrideArray(collapse_dims12(A), O)
-end
-function collapse_dims12(A::AbstractArray)
-  _collapse_dims12(PtrArray(A), A)
-end
-collapse_dims12(::AbstractArray, ::AbstractArray, A, B) = A, B
-function collapse_dims12(A::Collapsible12PtrArray, B::Collapsible12PtrArray, OA, OB)
-  StrideArray(collapse_dims12(A), OA), StrideArray(collapse_dims12(B), OB)
-end
-function collapse_dims12(A::Collapsible12PtrArray, B::Collapsible12PtrArray)
-  collapse_dims12(A), collapse_dims12(B)
-end
-function collapse_dims12(A::AbstractArray, B::AbstractArray)
-  collapse_dims12(PtrArray(A), PtrArray(B), A, B)
-end
-
-# @inline dual_eltype(
-#   ::Type{ForwardDiff.Dual{T,V,P}},
-# ) where {T,V<:Union{Bool,Base.HWReal},P} = V
-# @inline dual_eltype(::Type{ForwardDiff.Dual{T,V,P}}) where {T,V<:ForwardDiff.Dual,P} =
-#   dual_eltype(V)
 @inline reinterpret_dual(A::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N} =
   reinterpret(V, A)
 @inline function reinterpret_reshape_dual(

@@ -33,13 +33,14 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
   subset = 1:200
   x = xtrain4[:, :, :, subset]
   y = ytrain1[subset]
-  letnetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
-  lenetloss.memory .= 0x00
-  valgrad!(g, lenetloss, x, p)
-  g2 = similar(g)
-  lenetloss.memory .= 0xff
-  valgrad!(g2, lenetloss, x, p)
-  @test g == g2
+  let lenetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
+    lenetloss.memory .= 0x00
+    valgrad!(g, lenetloss, x, p)
+    g2 = similar(g)
+    lenetloss.memory .= 0xff
+    valgrad!(g2, lenetloss, x, p)
+    @test g == g2
+  end
 end
 
 # initialize a gradient buffer matrix; number of columns places an upper bound

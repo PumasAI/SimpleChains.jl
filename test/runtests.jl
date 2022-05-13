@@ -265,12 +265,18 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
       if T === Float64
         GC.@preserve pd pu begin
           @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
+          @test reinterpret(T, ld) ≈ reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
           @test reinterpret(T, l_d) ≈ reinterpret(T, td(xd, pointer(p), pointer(pu))[1])
+          @test reinterpret(T, l_d) ≈ reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
           @test reinterpret(T, ld_d) ≈ reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
+          @test reinterpret(T, ld_d) ≈ reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
 
           @test reinterpret(T, ldd) ≈ reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
           @test reinterpret(T, ldd_dd) ≈
                 reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+          @test reinterpret(T, ldd) ≈ reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
+          @test reinterpret(T, ldd_dd) ≈
+                reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
         end
       else
         GC.@preserve pd pu begin

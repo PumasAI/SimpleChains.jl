@@ -226,7 +226,11 @@ function _getparams(layer, p, inputdim::Tuple)
   A, p, outputdim
 end
 
+"""
+    params(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
 
+Returns a tuple of the parameters of the SimpleChain `sc`, as a view of the parameter vector `p`.
+"""
 function params(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
   @unpack layers = sc
   A = _params(layers, pointer(p), chain_input_dims(sc, inputdim))
