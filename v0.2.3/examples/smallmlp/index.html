@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Small Multi-Layer Perceptron · SimpleChains.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link rel="canonical" href="https://PumasAI.github.io/SimpleChains.jl/examples/smallmlp/"/><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.044/juliamono.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">SimpleChains.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href>Small Multi-Layer Perceptron</a></li><li><a class="tocitem" href="../mnist/">MNIST - Convolutions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Small Multi-Layer Perceptron</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Small Multi-Layer Perceptron</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/PumasAI/SimpleChains.jl/blob/master/docs/src/examples/smallmlp.md#" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Small-Multi-Layer-Perceptron"><a class="docs-heading-anchor" href="#Small-Multi-Layer-Perceptron">Small Multi-Layer Perceptron</a><a id="Small-Multi-Layer-Perceptron-1"></a><a class="docs-heading-anchor-permalink" href="#Small-Multi-Layer-Perceptron" title="Permalink"></a></h1><p>Here, we&#39;ll fit a simple network:</p><pre><code class="language-julia hljs">using SimpleChains
+
+mlpd = SimpleChain(
+  static(4),
+  TurboDense(tanh, 32),
+  TurboDense(tanh, 16),
+  TurboDense(identity, 4)
+)</code></pre><p>Our goal here will be to try and approximate the matrix exponential:</p><pre><code class="language-julia hljs">function f(x)
+  N = Base.isqrt(length(x))
+  A = reshape(view(x, 1:N*N), (N,N))
+  expA = exp(A)
+  vec(expA)
+end
+
+T = Float32;
+X = randn(T, 2*2, 10_000);
+Y = reduce(hcat, map(f, eachcol(X)));
+Xtest = randn(T, 2*2, 10_000);
+Ytest = reduce(hcat, map(f, eachcol(Xtest)));</code></pre><p>Now, to train our network:</p><pre><code class="language-julia hljs">@time p = SimpleChains.init_params(mlpd);
+G = SimpleChains.alloc_threaded_grad(mlpd);
+
+mlpdloss = SimpleChains.add_loss(mlpd, SquaredLoss(Y));
+mlpdtest = SimpleChains.add_loss(mlpd, SquaredLoss(Ytest));
+
+report = let mtrain = mlpdloss, X=X, Xtest=Xtest, mtest = mlpdtest
+  p -&gt; begin
+    let train = mlpdloss(X, p), test = mlpdtest(Xtest, p)
+      @info &quot;Loss:&quot; train test
+    end
+  end
+end
+
+report(p)
+for _ in 1:3
+  @time SimpleChains.train_unbatched!(
+    G, p, mlpdloss, X, SimpleChains.ADAM(), 10_000
+  );
+  report(p)
+end</code></pre><p>I get</p><pre><code class="language-julia hljs">┌ Info: Loss:
+│   train = 0.012996411f0
+└   test = 0.021395735f0
+  0.488138 seconds
+┌ Info: Loss:
+│   train = 0.0027068993f0
+└   test = 0.009439239f0
+  0.481226 seconds
+┌ Info: Loss:
+│   train = 0.0016358295f0
+└   test = 0.0074498975f0</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../mnist/">MNIST - Convolutions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.17 on <span class="colophon-date" title="Friday 13 May 2022 17:44">Friday 13 May 2022</span>. Using Julia version 1.7.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
