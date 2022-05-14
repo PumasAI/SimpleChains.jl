@@ -180,10 +180,7 @@ end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
 
 function _alloc_grad(mem::Vector{T}, np, ::One, x) where {T}
-  StrideArray(
-    PtrArray(align(pointer(mem)), (np,), (static_sizeof(T), ), Val((true,))),
-    mem,
-  )
+  StrideArray(PtrArray(align(pointer(mem)), (np,), (static_sizeof(T),), Val((true,))), mem)
 end
 function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
   StrideArray(
@@ -197,7 +194,7 @@ function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
   )
 end
 
-_min(a,b) = ifelse(lt(a,b), a, b)
+_min(a, b) = ifelse(lt(a, b), a, b)
 """
     alloc_threaded_grad(chn, id = nothing, ::Type{T} = Float32; numthreads = min(Threads.nthreads(), SimpleChains.num_cores())
 
@@ -219,3 +216,37 @@ function alloc_threaded_grad(
   _alloc_grad(mem, np, numthreads, x * sizeof(T))
 end
 
+
+
+getparams(_, p, inputdim) = nothing, p
+_getparams(::Nothing, p, inputdim::Tuple) = nothing, p, outputdim
+function _getparams(layer, p, inputdim::Tuple)
+  A, p = getparams(layer, p, inputdim)
+  _, outputdim = layer_output_size(Val{Float32}(), layer, inputdim)
+  A, p, outputdim
+end
+
+"""
+    params(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
+
+Returns a tuple of the parameters of the SimpleChain `sc`, as a view of the parameter vector `p`.
+"""
+function params(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
+  @unpack layers = sc
+  A = _params(layers, pointer(p), chain_input_dims(sc, inputdim))
+  _add_memory(A, p)
+end
+_params(::Tuple{}, _, __) = ()
+function _params(layers, p, inputdim)
+  A, p, outputdim = _getparams(first(layers), p, inputdim)
+  B = _params(Base.tail(layers), p, outputdim)
+  (A, B...)
+end
+_add_memory(A::PtrArray, p) = StrideArray(A, p)
+_add_memory(::Tuple{}, _) = ()
+function _add_memory(t::Tuple, p)
+  A = _add_memory(first(t), p)
+  B = _add_memory(Base.tail(t), p)
+  (A, B...)
+end
+_add_memory(::Nothing, p) = nothing

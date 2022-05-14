@@ -328,7 +328,7 @@ function subset_batch(Xp::AbstractArray{T,N}, perm, pu) where {T,N}
   pX = pointer(Xp)
   Xpb = preserve_buffer(Xp)
   GC.@preserve Xpb begin
-    for i = CloseOpen(lastdim)
+    for i in CloseOpen(lastdim)
       @inbounds j = perm[i] # `perm` and `j` are zero-based
       Base.unsafe_copyto!(pXtmp, pX + Xlen * szeltx * j, Int(Xlen))
       pXtmp += Int(Xlen) * szeltx
