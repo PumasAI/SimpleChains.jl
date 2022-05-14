@@ -85,7 +85,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
       end
       valgrad!(g, scflp, x, p)
-      if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
+      if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV
         @test g == only(
           Zygote.gradient(
             p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
@@ -297,7 +297,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
                        reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
           @test_broken reinterpret(T, ldd_dd) ≈
             reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
-          
+
           @test_broken reinterpret(T, ld) ≈
                        reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
           @test_broken reinterpret(T, l_d) ≈
@@ -487,6 +487,35 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     @test b1 == view(p,24*8+1:25*8)
     @test W3 == reshape(@view(p[25*8+1:end]),(2,8))
   end
+  @testset "vector inputs" begin
+    x = rand(5)
+    y = rand(2)
+
+    sc = SimpleChain(
+      static(5),
+      TurboDense{true}(tanh, 5),
+      TurboDense{false}(tanh, 5),
+      TurboDense{true}(SimpleChains.relu, 5),
+      SimpleChains.Dropout(0.3),
+      TurboDense{false}(SimpleChains.relu, 5),
+      TurboDense{true}(identity, 2),
+      TurboDense{false}(identity, 2),
+      SquaredLoss(y)
+    )
+
+    p = SimpleChains.init_params(sc)
+    gz = Zygote.gradient(sc, x, p)[2]
+
+    g = similar(p)
+    valgrad!(g, sc, x, p)
+
+    @test size(gz) == size(p)
+    @test size(g) == size(gz)
+
+    @test !iszero(gz)
+    @test !iszero(g)
+
+    @test g ≈ gz rtol=1e-6
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 # For now, there are the tests at the start.

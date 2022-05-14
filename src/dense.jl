@@ -448,7 +448,7 @@ function dense!(
   @turbo for m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
-      Cmn += A[m, k] * B[k, 1]
+      Cmn += A[m, k] * B[k, n]
     end
     Cmnr = Cmn + A[m, Kp1]
     Cmnr_gt_0 = Cmnr > zero(Cmnr)
@@ -483,10 +483,11 @@ function dense!(
   B::AbstractVector{T2},
   ::False,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
+  K = ArrayInterface.size(A, StaticInt(2))
   n = StaticInt(1)
-  @turbo for m ∈ indices((A, C), 1) ###Error
+  @turbo for m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
-    for k ∈ indices((A, B), 2, 1)
+    for k ∈ 1:K
       Cmn += A[m, k] * B[k, n]
     end
     Cmn_gt_0 = Cmn > zero(Cmn)
