@@ -516,6 +516,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     @test !iszero(g)
 
     @test g ≈ gz rtol=1e-6
+  end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 # For now, there are the tests at the start.
