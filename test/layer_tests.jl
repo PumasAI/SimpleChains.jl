@@ -16,16 +16,19 @@ sc = SimpleChain(
 )
 
 p = SimpleChains.init_params(sc)
-gz = Zygote.gradient(sc, x, p)[2]
 
 g = similar(p)
 valgrad!(g, sc, x, p)
+
+gz = Zygote.gradient(sc, x, p)[2]
 
 @test size(gz) == size(p)
 @test size(g) == size(gz)
 
 @test !iszero(gz)
 @test !iszero(g)
+
+@test gz ≈ g rtol=1e-6
 
 xmat = rand(5, 20)
 ymat = rand(2, 20)
@@ -43,12 +46,16 @@ sc2 = SimpleChain(
 )
 
 p2 = SimpleChains.init_params(sc2)
-gz2 = Zygote.gradient(sc, xmat, p2)[2]
+
 g2 = similar(p2)
-valgrad!(g2, sc, xmat, p2)
+valgrad!(g2, sc2, xmat, p2)
+
+gz2 = Zygote.gradient(sc2, xmat, p2)[2]
 
 @test size(gz2) == size(p2)
 @test size(g2) == size(gz2)
 
 @test !iszero(gz2)
 @test !iszero(g2)
+
+@test g2 ≈ gz2 rtol=1e-6
