@@ -18,8 +18,10 @@ sc = SimpleChain(
 p = SimpleChains.init_params(sc)
 
 g = similar(p)
+SimpleChains.VectorizedRNG.seed!(1);
 valgrad!(g, sc, x, p)
 
+SimpleChains.VectorizedRNG.seed!(1);
 gz = Zygote.gradient(sc, x, p)[2]
 
 @test size(gz) == size(p)
@@ -33,23 +35,15 @@ gz = Zygote.gradient(sc, x, p)[2]
 xmat = rand(5, 20)
 ymat = rand(2, 20)
 
-sc2 = SimpleChain(
-    static(5),
-    TurboDense{true}(tanh, 5),
-    TurboDense{false}(tanh, 5),
-    TurboDense{true}(SimpleChains.relu, 5),
-    SimpleChains.Dropout(0.3),
-    TurboDense{false}(SimpleChains.relu, 5),
-    TurboDense{true}(identity, 2),
-    TurboDense{false}(identity, 2),
-    SquaredLoss(ymat)
-)
+sc2 = SimpleChains.add_loss(sc, SquaredLoss(ymat))
 
 p2 = SimpleChains.init_params(sc2)
 
 g2 = similar(p2)
+SimpleChains.VectorizedRNG.seed!(2);
 valgrad!(g2, sc2, xmat, p2)
 
+SimpleChains.VectorizedRNG.seed!(2);
 gz2 = Zygote.gradient(sc2, xmat, p2)[2]
 
 @test size(gz2) == size(p2)
