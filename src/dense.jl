@@ -418,7 +418,7 @@ function dense!(
   ∂C::AbstractArray{Bool,N},
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
-  B::AbstractArray{T2,N},
+  B::AbstractArray{T2, N},
   ::True,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
@@ -436,6 +436,29 @@ function dense!(
 end
 function dense!(
   ::typeof(relu),
+  ∂C::AbstractVector{Bool},
+  C::AbstractVector{T1},
+  A::AbstractMatrix,
+  B::AbstractVector{T2},
+  ::True,
+) where {T1<:Base.HWReal,T2<:Base.HWReal}
+  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  K = Kp1 - StaticInt(1)
+  n = StaticInt(1)
+  @turbo for m ∈ indices((A, C), 1)
+    Cmn = zero(eltype(C))
+    for k ∈ 1:K
+      Cmn += A[m, k] * B[k, n]
+    end
+    Cmnr = Cmn + A[m, Kp1]
+    Cmnr_gt_0 = Cmnr > zero(Cmnr)
+    C[m, n] = ifelse(Cmnr_gt_0, Cmnr, zero(Cmnr))
+    ∂C[m, n] = Cmnr_gt_0
+  end
+end
+
+function dense!(
+  ::typeof(relu),
   ∂C::AbstractArray{Bool,N},
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
@@ -445,6 +468,26 @@ function dense!(
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A, B), (2, 1))
+      Cmn += A[m, k] * B[k, n]
+    end
+    Cmn_gt_0 = Cmn > zero(Cmn)
+    C[m, n] = ifelse(Cmn_gt_0, Cmn, zero(Cmn))
+    ∂C[m, n] = Cmn_gt_0
+  end
+end
+function dense!(
+  ::typeof(relu),
+  ∂C::AbstractVector{Bool},
+  C::AbstractVector{T1},
+  A::AbstractMatrix,
+  B::AbstractVector{T2},
+  ::False,
+) where {T1<:Base.HWReal,T2<:Base.HWReal}
+  K = ArrayInterface.size(A, StaticInt(2))
+  n = StaticInt(1)
+  @turbo for m ∈ indices((A, C), 1)
+    Cmn = zero(eltype(C))
+    for k ∈ 1:K
       Cmn += A[m, k] * B[k, n]
     end
     Cmn_gt_0 = Cmn > zero(Cmn)
@@ -484,6 +527,19 @@ function dense!(
       Cmn += A[m, k] * B[k, n]
     end
     C[m, n] = Cmn
+  end
+end
+
+function dense!(
+  ::typeof(identity),
+  ::Nothing,
+  C::AbstractMatrix{T1},
+  A::AbstractVector,
+  B::AbstractMatrix{T2},
+  ::False,
+) where {T1<:Base.HWReal,T2<:Base.HWReal}
+  @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
+    C[m, n] = A[m] * B[1, n]
   end
 end
 

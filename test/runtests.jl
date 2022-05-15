@@ -85,7 +85,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
       end
       valgrad!(g, scflp, x, p)
-      if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV 
+      if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV
         @test g == only(
           Zygote.gradient(
             p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
@@ -297,7 +297,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
                        reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
           @test_broken reinterpret(T, ldd_dd) ≈
             reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
-          
+
           @test_broken reinterpret(T, ld) ≈
                        reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
           @test_broken reinterpret(T, l_d) ≈
@@ -469,6 +469,9 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
   end
   @testset "LeNet" begin
     include("mnist.jl")
+  end
+  @testset "Layer Tests" begin
+    include("layer_tests.jl")
   end
   @testset "params" begin
     sc = SimpleChain(
