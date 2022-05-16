@@ -7,6 +7,9 @@ end
 dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
 dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
 
+import InteractiveUtils
+InteractiveUtils.versioninfo(verbose=true)
+
 @testset "SimpleChains.jl" begin
   @test isempty(Test.detect_unbound_args(SimpleChains))
   @test isempty(Test.detect_ambiguities(SimpleChains))
@@ -93,7 +96,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
           ),
         )
         _gzyg = Zygote.gradient(p) do p
-          0.5 / size(x)[end] * sum(abs2, Base.front(sc)(x, p) .- y)
+          sum(abs2, Base.front(sc)(x, p) .- y)/2# / size(x)[end]
         end
         gzyg = copy(_gzyg[1])
         g2 = similar(g)
@@ -118,12 +121,10 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
         b2 = view(p, 1+off_old:off)
         l2 = (A2 * l1 .+ b2)
 
-        l = 0.5mapreduce(+, vec(l2), y.data) do xi, yi
+        l = mapreduce(+, vec(l2), y.data) do xi, yi
           abs2(xi - yi)
-        end
-        l / size(x)[end] +
-        2.3 * (sum(abs2, A1) + sum(abs2, b1)) +
-        0.45 * (sum(abs, A2) + sum(abs, b2))
+        end/2 #/size(x)[end]
+        l + 2.3 * (sum(abs2, A1) + sum(abs2, b1)) + 0.45 * (sum(abs, A2) + sum(abs, b2))
       end
       @test g ≈ gfd
       scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
@@ -214,9 +215,9 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
         b2 = view(p, 1+off_old:off)
         l2 = (A2 * l1 .+ b2)
 
-        (0.5 / size(x)[end]) * mapreduce(+, vec(l2), y.data) do xi, yi
+        mapreduce(+, vec(l2), y.data) do xi, yi
           abs2(xi - yi)
-        end
+        end / 2# / size(x)[end]
       end
       if T === Float64
         @test g ≈ gfdd
@@ -380,20 +381,20 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     function convlayertest(x, y, K, b)
       closuresshouldntbeabletomutatebindings = clt(relu, x, K, b)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y)
-      0.5 / size(x)[end] * (δ'δ)
+      (δ'δ) / 2
     end
     function convlayertest(x, y, K0, b0, K1, b1)
       csbamb = clt(identity, clt(relu, x, K0, b0), K1, b1)
       closuresshouldntbeabletomutatebindings = tanh.(csbamb)
       δ = vec(closuresshouldntbeabletomutatebindings) .- vec(y)
-      0.5 / size(x)[end] * (δ'δ)
+      (δ'δ) / 2
     end
 
     scconv = SimpleChain(
       Conv(relu, (3, 3), 4),
       #  Conv(tanh, (5,5), 4, 3)
     )
-    batch = 2
+    batch = 3
     x = rand(Float32, 28, 28, 1, batch)
     y = rand(Float32, 26, 26, 4, batch)
     scconvl = SimpleChains.add_loss(scconv, SquaredLoss(y))
@@ -403,7 +404,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     refloss = convlayertest(x, y, K, b)
     @test scconvl(x, p) ≈ refloss
     g = similar(p)
-    @test valgrad!(g, scconvl, x, p) ≈ refloss
+    @test 0.5*@inferred(valgrad!(g, scconvl, x, p)) ≈ refloss
 
     # gK = ForwardDiff.gradient(k -> convlayertest(x,y,k, b), K);
     # @test Float32.(vec(gK)) ≈ g
@@ -429,7 +430,7 @@ dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
     refloss = convlayertest(x, z, K0, b0, K1, b1)
     @test @inferred(scconv2l(x, p)) ≈ refloss
     g = similar(p)
-    @test @inferred(valgrad!(g, scconv2l, x, p)) ≈ refloss
+    @test 0.5*@inferred(valgrad!(g, scconv2l, x, p)) ≈ refloss
 
     gK0 = ForwardDiff.gradient(k -> convlayertest(x, z, k, b0, K1, b1), K0)
     gb0 = ForwardDiff.gradient(b -> convlayertest(x, z, K0, b, K1, b1), b0)

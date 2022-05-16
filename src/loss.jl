@@ -76,6 +76,9 @@ squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
 
 Base.show(io::IO, ::SquaredLoss) = print(io, "SquaredLoss")
 
+@inline loss_multiplier(::AbstractLoss, N, ::Type{T}) where {T} = inv(T(N))
+@inline loss_multiplier(::SquaredLoss, N, ::Type{T}) where {T} = T(2) / T(N)
+
 function chain_valgrad!(
   _,
   arg::AbstractArray{T,D},
@@ -84,15 +87,14 @@ function chain_valgrad!(
   pu::Ptr{UInt8},
 ) where {T,D}
   y = getfield(getfield(layers, 1), :y)
-  invN = T(inv(size(arg, D)))
+  # invN = T(inv(size(arg, D)))
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
-    δdN = δ * invN
-    arg[i] = δdN
-    s += δ * δdN
+    arg[i] = δ
+    s += δ * δ
   end
-  return T(0.5) * s, arg, pu# + sizeof(T)*length(g)
+  return s, arg, pu
 end
 function (sl::SquaredLoss{<:AbstractArray{<:Number}})(
   arg::AbstractArray{T,N},
@@ -105,7 +107,8 @@ function (sl::SquaredLoss{<:AbstractArray{<:Number}})(
     δ = arg[i] - y[i]
     s += δ * δ
   end
-  T(0.5 / size(arg, N)) * s, p, pu
+  # NOTE: we're not dividing by size(arg,N)
+  T(0.5)*s, p, pu
 end
 
 """
@@ -227,14 +230,13 @@ function chain_valgrad!(
   @turbo for i in eachindex(y)
     s -= arg[y[i], i]
   end
-  Ninv = inv(T(N))
   @turbo for i in eachindex(arg)
-    arg[i] = exp(arg[i]) * Ninv
+    arg[i] = exp(arg[i])
   end
   @turbo for i in eachindex(y)
-    arg[y[i], i] -= Ninv
+    arg[y[i], i] -= one(T)
   end
-  return s * Ninv, arg, pu
+  return s, arg, pu
 end
 function Base.getindex(sl::LogitCrossEntropyLoss, r)
   LogitCrossEntropyLoss(view(target(sl), r))
