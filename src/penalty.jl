@@ -33,7 +33,10 @@ function Base.show(io::IO, p::AbstractPenalty)
   λ === nothing || print(io, " (λ=$λ)")
   _penalty_applied_to_sc(io, getchain(p))
 end
-
+alloc_threaded_grad(c::AbstractPenalty, id::Union{Nothing,InputDim} = nothing,
+  ::Type{T} = Float32;
+  numthreads = _min(num_threads(), num_cores()),
+) where {T} = alloc_threaded_grad(getchain(c), id, T; numthreads)
 
 UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:layers}) =
   getfield(getchain(c), :layers)

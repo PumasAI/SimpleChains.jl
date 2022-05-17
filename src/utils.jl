@@ -215,7 +215,7 @@ function alloc_threaded_grad(
   mem = Vector{T}(undef, x * numthreads + register_size() ÷ sizeof(T) - 1)
   _alloc_grad(mem, np, numthreads, x * sizeof(T))
 end
-
+alloc_threaded_grad(x, ::Type{T}) where {T} = alloc_threaded_grad(x, nothing, T)
 
 
 getparams(_, p, inputdim) = nothing, p
