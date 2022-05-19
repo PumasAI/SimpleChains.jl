@@ -434,6 +434,23 @@ function matmul!(
   )
 end
 
+function matmul!(
+  C::AbstractMatrix{D},
+  A::AbstractMatrix,
+  B::AbstractVector,
+  bias::StaticBool,
+) where {D<:ForwardDiff.Dual}
+  matmul!(vec(C), A, B, bias)
+end
+function matmul!(
+  C::AbstractVector{D},
+  A::AbstractMatrix,
+  B::AbstractMatrix,
+  bias::StaticBool,
+) where {D<:ForwardDiff.Dual}
+  matmul!(C, A, vec(B), bias)
+end
+
 function dense!(
   f::F,
   Cdual::PtrArray{<:Any,<:Any,D},
