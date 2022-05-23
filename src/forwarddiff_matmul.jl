@@ -392,34 +392,35 @@ end
   q
 end
 
+using StrideArraysCore: PtrVector, PtrMatrix
 function matmul!(
-  C::AbstractVector{D},
-  A::AbstractMatrix,
-  B::AbstractVector,
+  C::PtrVector{<:Any,<:Any,D},
+  A::PtrMatrix,
+  B::PtrVector,
   ::True,
 ) where {D<:ForwardDiff.Dual}
   contract!(C, A, B, Val{(0,)}(), Val{(0, 1)}(), Val{(1,)}(), Val{true}(), Val{false}())
 end
 function matmul!(
-  C::AbstractMatrix{D},
-  A::AbstractMatrix,
-  B::AbstractMatrix,
+  C::PtrMatrix{<:Any,<:Any,D},
+  A::PtrMatrix,
+  B::PtrMatrix,
   ::True,
 ) where {D<:ForwardDiff.Dual}
   contract!(C, A, B, Val{(0, 1)}(), Val{(0, 2)}(), Val{(2, 1)}(), Val{true}(), Val{false}())
 end
 function matmul!(
-  C::AbstractVector{D},
-  A::AbstractMatrix{},
-  B::AbstractVector,
+  C::PtrVector{<:Any,<:Any,D},
+  A::PtrMatrix{},
+  B::PtrVector,
   ::False,
 ) where {D<:ForwardDiff.Dual}
   contract!(C, A, B, Val{(0,)}(), Val{(0, 1)}(), Val{(1,)}(), Val{false}(), Val{false}())
 end
 function matmul!(
-  Cdual::AbstractMatrix{D},
-  Adual::AbstractMatrix,
-  B::AbstractMatrix,
+  C::PtrMatrix{<:Any,<:Any,D},
+  A::PtrMatrix,
+  B::PtrMatrix,
   ::False,
 ) where {D<:ForwardDiff.Dual}
   contract!(
@@ -435,20 +436,24 @@ function matmul!(
 end
 
 function matmul!(
-  C::AbstractMatrix{D},
-  A::AbstractMatrix,
-  B::AbstractVector,
+  C::PtrMatrix{<:Any,<:Any,D},
+  A::PtrMatrix,
+  B::PtrVector,
   bias::StaticBool,
 ) where {D<:ForwardDiff.Dual}
   matmul!(vec(C), A, B, bias)
 end
 function matmul!(
-  C::AbstractVector{D},
-  A::AbstractMatrix,
-  B::AbstractMatrix,
+  C::PtrVector{<:Any,<:Any,D},
+  A::PtrMatrix,
+  B::PtrMatrix,
   bias::StaticBool,
 ) where {D<:ForwardDiff.Dual}
   matmul!(C, A, vec(B), bias)
+end
+
+function matmul!(C, A, B, bias::StaticBool)
+  GC.@preserve C A B matmul!(PtrArray(C), PtrArray(A), PtrArray(B), bias)
 end
 
 function dense!(

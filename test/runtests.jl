@@ -474,6 +474,9 @@ InteractiveUtils.versioninfo(verbose=true)
   @testset "Layer Tests" begin
     include("layer_tests.jl")
   end
+  @testset "Matmul Tests" begin
+    include("matmul_tests.jl")
+  end
   @testset "params" begin
     sc = SimpleChain(
       static(24),
