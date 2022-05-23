@@ -315,11 +315,13 @@ InteractiveUtils.versioninfo(verbose=true)
       @testset "training" begin
         p .= randn.() .* 100
         # small penalties since we don't care about overfitting here
-        vg1 = valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p)
+        scpen = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4));
+        vg1 = valgrad!(g, scpen, x, p)
+        gt = SimpleChains.alloc_threaded_grad(scpen, T);
         SimpleChains.train!(
-          g,
+          gt,
           p,
-          FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)),
+          scpen,
           x,
           SimpleChains.ADAM(),
           1000,
@@ -329,7 +331,7 @@ InteractiveUtils.versioninfo(verbose=true)
         p .= randn.() .* 100
         vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p)
         SimpleChains.train!(
-          g,
+          gt,
           p,
           FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)),
           x,
@@ -342,11 +344,13 @@ InteractiveUtils.versioninfo(verbose=true)
         p .= randn.() .* 100
         ys = [@. y + 0.1randn() for _ = 1:1000]
         # small penalties since we don't care about overfitting here
-        vg1 = valgrad!(g, FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)), x, p)
+        scpen = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4));
+        vg1 = valgrad!(g, scpen, x, p)
+        gt = SimpleChains.alloc_threaded_grad(scpen, T);
         SimpleChains.train_unbatched!(
-          g,
+          gt,
           p,
-          FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4)),
+          scpen,
           x,
           SimpleChains.ADAM(),
           ys,
@@ -356,7 +360,7 @@ InteractiveUtils.versioninfo(verbose=true)
         p .= randn.() .* 100
         vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p)
         SimpleChains.train_unbatched!(
-          g,
+          gt,
           p,
           FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)),
           x,
