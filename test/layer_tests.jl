@@ -17,9 +17,20 @@ sc = SimpleChain(
 
 p = SimpleChains.init_params(sc)
 
-g = similar(p)
+g = similar(p);
+g2 = similar(g);
+g3 = similar(g);
+g4 = similar(g);
 SimpleChains.VectorizedRNG.seed!(1);
 valgrad!(g, sc, x, p)
+xm = reshape(x,length(x),static(1));
+yml = SquaredLoss(reshape(y,length(y),static(1)));
+SimpleChains.VectorizedRNG.seed!(1);
+valgrad!(g2, sc, xm, p)
+SimpleChains.VectorizedRNG.seed!(1);
+valgrad!(g3, SimpleChains.add_loss(sc, yml), xm, p)
+SimpleChains.VectorizedRNG.seed!(1);
+valgrad!(g4, SimpleChains.add_loss(sc, yml), x, p)
 
 SimpleChains.VectorizedRNG.seed!(1);
 gz = Zygote.gradient(sc, x, p)[2]
@@ -29,8 +40,14 @@ gz = Zygote.gradient(sc, x, p)[2]
 
 @test !iszero(gz)
 @test !iszero(g)
+@test !iszero(g2)
+@test !iszero(g3)
+@test !iszero(g4)
 
 @test gz ≈ g rtol=1e-6
+@test gz ≈ g2 rtol=1e-6
+@test gz ≈ g3 rtol=1e-6
+@test gz ≈ g4 rtol=1e-6
 
 xmat = rand(5, 20)
 ymat = rand(2, 20)
