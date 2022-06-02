@@ -63,11 +63,12 @@ dualeval!(
 function dualeval!(f::F, Cdual::AbstractArray) where {F}
   dualeval!(f, vec(Cdual))
 end
+const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? length(LoopVectorization.EXTRACTFUNS) : 14
 @generated function dualeval!(
   f::F,
   Cdual::AbstractVector{D},
 ) where {F,T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  if (P+1) <= 14#length(LoopVectorization.EXTRACTFUNS)
+  if (P+1) <= MAX_NUM_LV_EXTRACT
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualCall(f)
@@ -89,7 +90,7 @@ end
   Cdual::AbstractVector{D},
 ) where {F,T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}}
   TD = (P + 1) * (R + 1)
-  if isa(T, Base.HWReal) && TD <= 14#length(LoopVectorization.EXTRACTFUNS)
+  if isa(T, Base.HWReal) && TD <= MAX_NUM_LV_EXTRACT
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualDualCall{$R}(f)
