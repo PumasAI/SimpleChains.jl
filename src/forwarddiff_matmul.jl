@@ -67,7 +67,7 @@ end
   f::F,
   Cdual::AbstractVector{D},
 ) where {F,T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  if (P+1) <= length(LoopVectorization.EXTRACTFUNS)
+  if (P+1) <= 14#length(LoopVectorization.EXTRACTFUNS)
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualCall(f)
@@ -89,7 +89,7 @@ end
   Cdual::AbstractVector{D},
 ) where {F,T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}}
   TD = (P + 1) * (R + 1)
-  if isa(T, Base.HWReal) && TD <= length(LoopVectorization.EXTRACTFUNS)
+  if isa(T, Base.HWReal) && TD <= 14#length(LoopVectorization.EXTRACTFUNS)
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualDualCall{$R}(f)
