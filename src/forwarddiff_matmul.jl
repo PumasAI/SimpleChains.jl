@@ -60,17 +60,28 @@ dualeval!(
 ) where {T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
 
 
-dualeval!(f::F, Cdual::AbstractArray) where {F} = dualeval!(f, vec(Cdual))
+function dualeval!(f::F, Cdual::AbstractArray) where {F}
+  dualeval!(f, vec(Cdual))
+end
+const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? length(LoopVectorization.EXTRACTFUNS) : 14
 @generated function dualeval!(
   f::F,
   Cdual::AbstractVector{D},
 ) where {F,T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  quote
-    C = reinterpret(reshape, T, Cdual)
-    g = DualCall(f)
-    @turbo for m ∈ eachindex(Cdual)
-      (Base.Cartesian.@ntuple $(P + 1) p -> C[p, m]) =
-        Base.Cartesian.@ncall $(P + 1) g p -> C[p, m]
+  if (P+1) <= MAX_NUM_LV_EXTRACT
+    quote
+      C = reinterpret(reshape, T, Cdual)
+      g = DualCall(f)
+      @turbo for m ∈ eachindex(Cdual)
+        (Base.Cartesian.@ntuple $(P + 1) p -> C[p, m]) =
+          Base.Cartesian.@ncall $(P + 1) g p -> C[p, m]
+      end
+    end
+  else
+    quote
+      @inbounds for i ∈ eachindex(Cdual)
+        Cdual[i] = f(Cdual[i])
+      end
     end
   end
 end
@@ -78,8 +89,8 @@ end
   f::F,
   Cdual::AbstractVector{D},
 ) where {F,T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}}
-  if isa(T, Base.HWReal)
-    TD = (P + 1) * (R + 1)
+  TD = (P + 1) * (R + 1)
+  if isa(T, Base.HWReal) && TD <= MAX_NUM_LV_EXTRACT
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualDualCall{$R}(f)

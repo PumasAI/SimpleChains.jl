@@ -38,6 +38,7 @@ using IfElse: ifelse
 import Random
 import ChainRulesCore
 import ForwardDiff
+import LoopVectorization
 
 using LoopVectorization: matmul_params, @turbo
 # using LoopVectorization: matmul_params
