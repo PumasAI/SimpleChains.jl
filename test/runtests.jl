@@ -492,11 +492,17 @@ InteractiveUtils.versioninfo(verbose=true)
       ),
     )
     p = SimpleChains.init_params(sc);
-    n0, (W1, b1), n2, W3 = SimpleChains.params(sc,p)
+    n0, (W1, b1), n2, W3 = SimpleChains.params(sc,p);
     @test n0 === n2 === nothing
     @test W1 == reshape(view(p,1:24*8),(8,24))
     @test b1 == view(p,24*8+1:25*8)
     @test W3 == reshape(@view(p[25*8+1:end]),(2,8))
+    n01, W11, n21, W31 = SimpleChains.weights(sc,p);
+    n02, b12, n22, n3 = SimpleChains.biases(sc,p);
+    @test n01 === n21 === n02 === n22 === n3
+    @test W11 === W1
+    @test W31 === W3
+    @test b12 === b1
   end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
