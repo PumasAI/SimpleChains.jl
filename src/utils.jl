@@ -233,15 +233,56 @@ Returns a tuple of the parameters of the SimpleChain `sc`, as a view of the para
 """
 function params(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
   @unpack layers = sc
-  A = _params(layers, pointer(p), chain_input_dims(sc, inputdim))
+  A = _walk_chain(Val{:param}(), layers, pointer(p), chain_input_dims(sc, inputdim))
   _add_memory(A, p)
 end
-_params(::Tuple{}, _, __) = ()
-function _params(layers, p, inputdim)
-  A, p, outputdim = _getparams(first(layers), p, inputdim)
-  B = _params(Base.tail(layers), p, outputdim)
+"""
+    weights(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
+
+Returns a tuple of the weights (parameters other than biases) of the SimpleChain `sc`, as a view of the parameter vector `p`.
+"""
+function weights(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
+  @unpack layers = sc
+  A = _walk_chain(Val{:weight}(), layers, pointer(p), chain_input_dims(sc, inputdim))
+  _add_memory(A, p)
+end
+"""
+    biases(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
+
+Returns a tuple of the biases of the SimpleChain `sc`, as a view of the parameter vector `p`.
+"""
+function biases(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
+  @unpack layers = sc
+  A = _walk_chain(Val{:bias}(), layers, pointer(p), chain_input_dims(sc, inputdim))
+  _add_memory(A, p)
+end
+
+# definitions that happen to be right in most cases to save up
+# from implementing too much
+_get(::Val{:param}, x) = x
+_get(::Val{:weight}, ::Nothing) = nothing
+_get(::Val{:weight}, x) where {A,B} = x
+_get(::Val{:weight}, x::Tuple{A,B}) where {A,B} = first(x)
+_get(::Val{:bias}, ::Nothing) = nothing
+_get(::Val{:bias}, x) where {A,B} = nothing
+_get(::Val{:bias}, x::Tuple{A,B}) where {A,B} = last(x)
+@inline function _getparams(f::F, layer, p, inputdim) where {F}
+  A, p, outputdim = _getparams(layer, p, inputdim)
+  _get(f, A), p, outputdim
+end
+# TODO: support nesting simple chains; below definition should enable recursive params
+#=
+function _getparams(f::F, layer::Union{AbstractPenalty,SimpleChain}, p, inputdim) where {F}
+  _walk_chain(f, layer, p, inputdim)
+end
+=#
+_walk_chain(___, ::Tuple{}, _, __) = ()
+function _walk_chain(f::F, layers, p, inputdim) where {F}
+  A, p, outputdim = _getparams(f, first(layers), p, inputdim)
+  B = _walk_chain(f, Base.tail(layers), p, outputdim)
   (A, B...)
 end
+
 _add_memory(A::PtrArray, p) = StrideArray(A, p)
 _add_memory(::Tuple{}, _) = ()
 function _add_memory(t::Tuple, p)
