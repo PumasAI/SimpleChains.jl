@@ -261,7 +261,7 @@ end
 # from implementing too much
 _get(::Val{:param}, x) = x
 _get(::Val{:weight}, ::Nothing) = nothing
-_get(::Val{:weight}, x) where {A,B} = x
+_get(::Val{:weight}, x) = x
 _get(::Val{:weight}, x::Tuple{A,B}) where {A,B} = first(x)
 _get(::Val{:bias}, ::Nothing) = nothing
 _get(::Val{:bias}, x) where {A,B} = nothing
