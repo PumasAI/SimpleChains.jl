@@ -264,7 +264,7 @@ _get(::Val{:weight}, ::Nothing) = nothing
 _get(::Val{:weight}, x) = x
 _get(::Val{:weight}, x::Tuple{A,B}) where {A,B} = first(x)
 _get(::Val{:bias}, ::Nothing) = nothing
-_get(::Val{:bias}, x) where {A,B} = nothing
+_get(::Val{:bias}, x) = nothing
 _get(::Val{:bias}, x::Tuple{A,B}) where {A,B} = last(x)
 @inline function _getparams(f::F, layer, p, inputdim) where {F}
   A, p, outputdim = _getparams(layer, p, inputdim)
