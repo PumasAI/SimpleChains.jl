@@ -259,16 +259,16 @@ end
 
 # definitions that happen to be right in most cases to save up
 # from implementing too much
-_get(::Val{:param}, x) = x
-_get(::Val{:weight}, ::Nothing) = nothing
-_get(::Val{:weight}, x) = x
-_get(::Val{:weight}, x::Tuple{A,B}) where {A,B} = first(x)
-_get(::Val{:bias}, ::Nothing) = nothing
-_get(::Val{:bias}, x) = nothing
-_get(::Val{:bias}, x::Tuple{A,B}) where {A,B} = last(x)
+_get(::Val{:param}, _, x) = x
+_get(::Val{:weight}, _, ::Nothing) = nothing
+_get(::Val{:weight}, _, x) = x
+_get(::Val{:weight}, _, x::Tuple{A,B}) where {A,B} = first(x)
+_get(::Val{:bias}, _, ::Nothing) = nothing
+_get(::Val{:bias}, _, x) = nothing
+_get(::Val{:bias}, _, x::Tuple{A,B}) where {A,B} = last(x)
 @inline function _getparams(f::F, layer, p, inputdim) where {F}
   A, p, outputdim = _getparams(layer, p, inputdim)
-  _get(f, A), p, outputdim
+  _get(f, layer, A), p, outputdim
 end
 # TODO: support nesting simple chains; below definition should enable recursive params
 #=
