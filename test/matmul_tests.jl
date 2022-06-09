@@ -16,9 +16,9 @@ for bias in (true, false)
   M = 16
   K = 20
   N = 17
-  A = rand(M, K + bias)
-  B = rand(K, N)
-  bm = rand(K, 1)
+  A = rand(M, K + bias);
+  B = rand(K, N);
+  bm = rand(K, 1);
 
   for fa1 in (identity, dual4x3),
     fa2 in (identity, dual4x3),
@@ -44,15 +44,15 @@ for bias in (true, false)
       end
       
       SimpleChains.matmul!(C, A, B, static(bias))
-      @test C ≈ AB
+      @test reinterpret(Float64,C) ≈ reinterpret(Float64,AB)
       SimpleChains.matmul!(c, A, b, static(bias))
-      @test c ≈ Ab
+      @test reinterpret(Float64,c) ≈ reinterpret(Float64,Ab)
       SimpleChains.matmul!(c, A, bm, static(bias))
-      @test c ≈ Ab
+      @test reinterpret(Float64,c) ≈ reinterpret(Float64,Ab)
       SimpleChains.matmul!(cm, A, b, static(bias))
-      @test vec(cm) ≈ Ab
+      @test reinterpret(Float64,vec(cm)) ≈ reinterpret(Float64,Ab)
       SimpleChains.matmul!(cm, A, bm, static(bias))
-      @test vec(cm) ≈ Ab
+      @test reinterpret(Float64,vec(cm)) ≈ reinterpret(Float64,Ab)
     end
   end
 end
