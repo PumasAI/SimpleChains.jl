@@ -86,12 +86,12 @@ function chain_valgrad_pullback!(
 end
 
 # No loss: chain closures.
-function _rrule(sc, arg, params, ::False)
-  valgrad_noloss(sc, arg, params)
+function _rrule(sc, arg, params, memory, ::False)
+  valgrad_noloss(sc, arg, params, memory)
 end
-function valgrad_noloss(sc, arg, params::AbstractVector{T}) where {T}
+function valgrad_noloss(sc, arg, params::AbstractVector{T}, memory = sc.memory) where {T}
   c = getchain(sc)
-  @unpack layers, memory = c
+  @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   barg = preserve_buffer(arg)
   off = align(resize_memory!(layers, memory, parg, length(parg) * sizeof(eltype(parg))))
@@ -106,8 +106,8 @@ end
 
 
 # Loss: call `valgrad`.
-function _rrule(sc, arg, params, ::True)
-  l, g = valgrad(sc, arg, params)
+function _rrule(sc, arg, params, memory, ::True)
+  l, g = valgrad(sc, arg, params, memory)
   # assumes no grad w/ respect to arg
   pullback = let g = g
     l̄ -> begin
@@ -122,6 +122,13 @@ function _rrule(sc, arg, params, ::True)
   l, pullback
 end
 
-ChainRulesCore.rrule(sc::AbstractPenalty, arg, params) = _rrule(sc, arg, params, True())
-ChainRulesCore.rrule(sc::SimpleChain, arg, params) =
-  _rrule(sc, arg, params, has_loss_typed(sc))
+function ChainRulesCore.rrule(
+  sc::AbstractPenalty, arg, params, memory = task_local_memory()
+)
+  _rrule(sc, arg, params, memory, True())
+end
+function ChainRulesCore.rrule(
+  sc::SimpleChain, arg, params, memory = task_local_memory()
+)
+  _rrule(sc, arg, params, memory, has_loss_typed(sc))
+end

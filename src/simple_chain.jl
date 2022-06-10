@@ -161,9 +161,18 @@ function verify_arg(c, arg)
     throw(ArgumentError("Input argument: !matches(chain_input_dims(c), size(arg))"))
   end
 end
-function (c::SimpleChain)(arg, params)
+
+function task_local_memory()::Vector{UInt8}
+  get!(
+    task_local_storage(),
+    Symbol("#SIMPLE#CHAINS#TASK#LOCAL#STORAGE#"),
+    UInt8[]
+  )::Vector{UInt8}
+end
+
+function (c::SimpleChain)(arg, params, memory = task_local_memory())
   verify_arg(c, arg)
-  @unpack layers, memory = c
+  @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   resize_memory!(layers, memory, parg)
   GC.@preserve arg unsafe_chain(layers, params, memory, parg)
@@ -277,9 +286,9 @@ Accepts adjoint of its return (`C̄`). It is allowed to destroy this.
 It is also allowed to destroy the previous layer's return `B` to produce `B̄` (the `C̄` it receives).
 Thus, the pullback is not allowed to depend on `C`, as it may have been destroyed in producing `C̄`.
 """
-function valgrad!(g, c::SimpleChain, arg, params)
+function valgrad!(g, c::SimpleChain, arg, params, memory = c.memory)
   verify_arg(c, arg)
-  @unpack layers, memory = c
+  @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   resize_memory!(layers, memory, parg)
   GC.@preserve arg begin
@@ -366,9 +375,12 @@ function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where
   return val, lgrad, pu3
 end
 @inline getchain(sc::SimpleChain) = sc
-function valgrad(sc, arg, params::AbstractVector{T}) where {T}
+function valgrad(
+  sc, arg, params::AbstractVector{T},
+  memory = task_local_memory()
+) where {T}
   c = getchain(sc)
-  @unpack layers, memory = c
+  @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   off = align(resize_memory!(layers, memory, parg))
   GC.@preserve memory arg begin
