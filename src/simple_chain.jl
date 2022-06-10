@@ -31,27 +31,6 @@ struct SimpleChain{N,I<:InputDim,L<:Tuple{Vararg{Any,N}}}
   memory::Vector{UInt8}
 end
 
-#=
-input_dims(_) = nothing
-function _check_input_dims(x, i)
-  d = input_dims(x)
-  d === nothing || d == i || throw(ArgumentError("Input size of one layer did not match the next."))
-end
-function _input_dims(t::Tuple{L,Vararg}) where {L}
-  l = first(t)
-  d = input_dims(l)
-  d === nothing ? _input_dims(Base.tail(t)) : d
-end 
-
-
-_verify_chain(::Tuple{}, _) = nothing
-function _verify_chain(layers::Tuple{L,Vararg}, inputdim = _input_dims(layers)) where {L}
-  l = first(layers)
-  _check_input_dims(l, inputdim)
-  d = output_size(Val(Float32), l, (inputdim,))[2][1]
-  _verify_chain(Base.tail(layers), d)
-end
-=#
 chain_input_dims(c::SimpleChain) = c.inputdim
 
 SimpleChain(input_dim::Integer, l::Vararg) = SimpleChain((input_dim,), l, UInt8[])

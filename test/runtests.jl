@@ -4,8 +4,10 @@ using Test, Aqua, ForwardDiff, Zygote
 function countallocations!(g, sc, x, p)
   @allocated valgrad!(g, sc, x, p)
 end
-dual(x) = ForwardDiff.Dual(x, randn(), randn(), randn())
-dual(x::ForwardDiff.Dual) = ForwardDiff.Dual(x, dual(randn()), dual(randn()))
+dual(x::T) where {T} = ForwardDiff.Dual(x, 4randn(T), 4randn(T), 4randn(T))
+function dual(x::ForwardDiff.Dual{<:Any,T}) where {T}
+  ForwardDiff.Dual(x, dual(4randn(T)), dual(4randn(T)))
+end
 
 import InteractiveUtils
 InteractiveUtils.versioninfo(verbose=true)
@@ -252,65 +254,37 @@ InteractiveUtils.versioninfo(verbose=true)
         undef,
         first(SimpleChains.layer_output_size(Val(eltype(xdd)), td, size(x))),
       )
-
-      A = reshape(view(p, 1:8*24), (8, 24))
-      b = view(p, 1+8*24:8*25)
-      Ad = reshape(view(pd, 1:8*24), (8, 24))
-      bd = view(pd, 1+8*24:8*25)
+      dim = size(x,1);
+      A = reshape(view(p, 1:8dim), (8, dim))
+      b = view(p, 1+8dim:8*25)
+      Ad = reshape(view(pd, 1:8dim), (8, dim))
+      bd = view(pd, 1+8dim:8*25)
       ld = tanh.(Ad * x .+ bd)
       l_d = tanh.(A * xd .+ b)
       ld_d = tanh.(Ad * xd .+ bd)
 
-      Add = reshape(view(pdd, 1:8*24), (8, 24))
-      bdd = view(pdd, 1+8*24:8*25)
+      Add = reshape(view(pdd, 1:8dim), (8, dim))
+      bdd = view(pdd, 1+8dim:8*25)
       ldd = tanh.(Add * x .+ bdd)
       ldd_dd = tanh.(Add * xdd .+ bdd)
-      if T === Float64
-        GC.@preserve pd pu begin
-          @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
-          @test reinterpret(T, ld) ≈
-                reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
-          @test reinterpret(T, l_d) ≈ reinterpret(T, td(xd, pointer(p), pointer(pu))[1])
-          @test reinterpret(T, l_d) ≈
-                reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
-          @test reinterpret(T, ld_d) ≈ reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
-          @test reinterpret(T, ld_d) ≈
-                reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
+      GC.@preserve pd pu begin
+        @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
+        @test reinterpret(T, ld) ≈
+          reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
+        @test reinterpret(T, l_d) ≈ reinterpret(T, td(xd, pointer(p), pointer(pu))[1])
+        @test reinterpret(T, l_d) ≈
+          reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
+        @test reinterpret(T, ld_d) ≈ reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
+        @test reinterpret(T, ld_d) ≈
+          reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
 
-          @test reinterpret(T, ldd) ≈ reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
-          @test reinterpret(T, ldd_dd) ≈
-                reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
-          @test reinterpret(T, ldd) ≈
-                reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
-          @test reinterpret(T, ldd_dd) ≈
-                reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
-        end
-      else
-        GC.@preserve pd pu begin
-          @test_broken reinterpret(T, ld) ≈
-                       reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
-          @test_broken reinterpret(T, l_d) ≈
-                       reinterpret(T, td(xd, pointer(p), pointer(pu))[1])
-          @test_broken reinterpret(T, ld_d) ≈
-                       reinterpret(T, td(xd, pointer(pd), pointer(pu))[1])
-
-          @test_broken reinterpret(T, ldd) ≈
-                       reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
-          @test_broken reinterpret(T, ldd_dd) ≈
-            reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
-
-          @test_broken reinterpret(T, ld) ≈
-                       reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])
-          @test_broken reinterpret(T, l_d) ≈
-                       reinterpret(T, td(permutedims(xd)', pointer(p), pointer(pu))[1])
-          @test_broken reinterpret(T, ld_d) ≈
-                       reinterpret(T, td(permutedims(xd)', pointer(pd), pointer(pu))[1])
-
-          @test_broken reinterpret(T, ldd) ≈
-                       reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
-          @test_broken reinterpret(T, ldd_dd) ≈
-                       reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
-        end
+        @test reinterpret(T, ldd) ≈ reinterpret(T, td(x, pointer(pdd), pointer(pu))[1])
+        @test reinterpret(T, ldd_dd) ≈
+          reinterpret(T, td(xdd, pointer(pdd), pointer(pu))[1])
+        @test reinterpret(T, ldd) ≈
+          reinterpret(T, td(permutedims(x)', pointer(pdd), pointer(pu))[1])
+        @test reinterpret(T, ldd_dd) ≈
+          reinterpret(T, td(permutedims(xdd)', pointer(pdd), pointer(pu))[1])
       end
       @testset "training" begin
         p .= randn.() .* 100
@@ -492,11 +466,17 @@ InteractiveUtils.versioninfo(verbose=true)
       ),
     )
     p = SimpleChains.init_params(sc);
-    n0, (W1, b1), n2, W3 = SimpleChains.params(sc,p)
+    n0, (W1, b1), n2, W3 = SimpleChains.params(sc,p);
     @test n0 === n2 === nothing
     @test W1 == reshape(view(p,1:24*8),(8,24))
     @test b1 == view(p,24*8+1:25*8)
     @test W3 == reshape(@view(p[25*8+1:end]),(2,8))
+    n01, W11, n21, W31 = SimpleChains.weights(sc,p);
+    n02, b12, n22, n3 = SimpleChains.biases(sc,p);
+    @test n01 === n21 === n02 === n22 === n3
+    @test W11 === W1
+    @test W31 === W3
+    @test b12 === b1
   end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
