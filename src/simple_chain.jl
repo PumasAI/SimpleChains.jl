@@ -165,9 +165,10 @@ end
 function task_local_memory()::Vector{UInt8}
   get!(
     task_local_storage(),
-    Symbol("#SIMPLE#CHAINS#TASK#LOCAL#STORAGE#"),
+    Symbol("#SIMPLE#CHAINS#TASK#LOCAL#STORAGE#")
+  ) do
     UInt8[]
-  )::Vector{UInt8}
+  end
 end
 
 function (c::SimpleChain)(arg, params, memory = task_local_memory())
