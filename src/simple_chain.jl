@@ -176,7 +176,11 @@ function (c::SimpleChain)(arg, params, memory = task_local_memory())
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   resize_memory!(layers, memory, parg)
-  GC.@preserve arg unsafe_chain(layers, params, memory, parg)
+  if typeof(arg)<:AbstractVector
+    GC.@preserve arg unsafe_chain(layers, params, memory, parg)[1:end]
+  else
+    GC.@preserve arg unsafe_chain(layers, params, memory, parg)
+  end
 end
 @inline function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
   GC.@preserve params memory _chain(arg, layers, pointer(params), pointer(memory))
