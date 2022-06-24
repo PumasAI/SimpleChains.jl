@@ -54,7 +54,7 @@ function numparam(d::TurboDense, inputdim::Tuple)
   np, (d.outputdim, Base.tail(inputdim)...)
 end
 _numparam(d::TurboDense{false}, inputdim::Integer) = inputdim * d.outputdim
-_numparam(d::TurboDense{true}, inputdim::Integer) = (inputdim + 1) * d.outputdim
+_numparam(d::TurboDense{true}, inputdim::Integer) = (inputdim + static(1)) * d.outputdim
 parameter_free(::TurboDense) = false
 function layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
   g1, outputdim = numparam(td, inputdim)

@@ -84,14 +84,10 @@ include("optimize.jl")
 if VERSION >= v"1.7.0"
   if hasfield(Method, :recursion_relation)
     dont_limit = Returns(true)
-    for m in methods(chain_valgrad!)
-      m.recursion_relation = dont_limit
-    end
-    for m in methods(_chain)
-      m.recursion_relation = dont_limit
-    end
-    for m in methods(output_size)
-      m.recursion_relation = dont_limit
+    for f = (chain_valgrad!, _chain, output_size, _numparam)
+      for m in methods(f)
+        m.recursion_relation = dont_limit
+      end
     end
   end
 end
