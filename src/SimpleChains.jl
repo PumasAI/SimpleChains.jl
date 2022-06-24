@@ -29,7 +29,7 @@ using SIMDTypes: Bit, NativeTypes
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD, NativeTypesV
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
-using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
+using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets, val_dense_dims
 using Static: One, lt
 using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview

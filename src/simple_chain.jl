@@ -113,7 +113,7 @@ end
   additional_per_thread,
   nthread,
 ) where {T}
-  base_mem_per_thread = 2output_size(Val(T), layers, sx) + additional_per_thread
+  base_mem_per_thread = output_size(Val(T), layers, sx) + additional_per_thread
   mem_total = additional + base_mem_per_thread * nthread
   if mem_total > length(memory)
     empty!(memory)

@@ -54,13 +54,13 @@ function numparam(d::TurboDense, inputdim::Tuple)
   np, (d.outputdim, Base.tail(inputdim)...)
 end
 _numparam(d::TurboDense{false}, inputdim::Integer) = inputdim * d.outputdim
-_numparam(d::TurboDense{true}, inputdim::Integer) = (inputdim + static(1)) * d.outputdim
+_numparam(d::TurboDense{true}, inputdim::Integer) = inputdim * d.outputdim + d.outputdim
 parameter_free(::TurboDense) = false
 function layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
-  g1, outputdim = numparam(td, inputdim)
-  g2 = prod(outputdim)
-  align(static_sizeof(T) * g1) + 2align(static_sizeof(T) * g2), outputdim
+  _, outputdim = numparam(td, inputdim)
+  2align(static_sizeof(T) * prod(outputdim)), outputdim
 end
+
 fast_fuse(td::TurboDense) = fast_fuse(getfield(td, :f))
 
 function getparams(td::TurboDense{false}, p::Ptr{T}, inputdim::Integer) where {T}
@@ -153,7 +153,6 @@ function (td::TurboDense{O})(
     put = Base.unsafe_convert(Ptr{T}, pu)
     A, p = getparams(td, p, size(B, StaticInt(1)))
     C, _pu =
-    # alloc_return(td, size(pB, StaticInt(2)), put, contiguous_axis(B), stride_rank(B))
       alloc_return(
         td,
         size(pB, StaticInt(2)),
@@ -429,13 +428,13 @@ function dense!(
 end
 function dense!(
   ::typeof(relu),
-  ∂C::AbstractArray{Bool,N},
-  C::AbstractArray{T1,N},
+  ∂C::AbstractMatrix{Bool},
+  C::AbstractMatrix{T1},
   A::AbstractMatrix,
-  B::AbstractArray{T2,N},
+  B::AbstractMatrix{T2},
   ::True,
-) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+) where {T1<:Base.HWReal,T2<:Base.HWReal}
+  Kp1 = size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -456,29 +455,28 @@ function dense!(
   B::AbstractVector{T2},
   ::True,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  n = StaticInt(1)
   @turbo for m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
-      Cmn += A[m, k] * B[k, n]
+      Cmn += A[m, k] * B[k]
     end
     Cmnr = Cmn + A[m, Kp1]
     Cmnr_gt_0 = Cmnr > zero(Cmnr)
-    C[m, n] = ifelse(Cmnr_gt_0, Cmnr, zero(Cmnr))
-    ∂C[m, n] = Cmnr_gt_0
+    C[m] = ifelse(Cmnr_gt_0, Cmnr, zero(Cmnr))
+    ∂C[m] = Cmnr_gt_0
   end
 end
 
 function dense!(
   ::typeof(relu),
-  ∂C::AbstractArray{Bool,N},
-  C::AbstractArray{T1,N},
+  ∂C::AbstractMatrix{Bool},
+  C::AbstractMatrix{T1},
   A::AbstractMatrix,
-  B::AbstractArray{T2,N},
+  B::AbstractMatrix{T2},
   ::False,
-) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
+) where {T1<:Base.HWReal,T2<:Base.HWReal}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A, B), (2, 1))
@@ -498,15 +496,14 @@ function dense!(
   ::False,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
   K = ArrayInterface.size(A, StaticInt(2))
-  n = StaticInt(1)
   @turbo for m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
-      Cmn += A[m, k] * B[k, n]
+      Cmn += A[m, k] * B[k]
     end
     Cmn_gt_0 = Cmn > zero(Cmn)
-    C[m, n] = ifelse(Cmn_gt_0, Cmn, zero(Cmn))
-    ∂C[m, n] = Cmn_gt_0
+    C[m] = ifelse(Cmn_gt_0, Cmn, zero(Cmn))
+    ∂C[m] = Cmn_gt_0
   end
 end
 function dense!(
@@ -874,7 +871,7 @@ alloc_return_B_dense(B::PtrArray, pu::Ptr{UInt8}, _) = (B, pu) # assume `PtrArra
 function alloc_return_B_dense(B::AbstractArray{T}, pu::Ptr{UInt8}, input_dim) where {T}
   si = bytestrideindex(B)
   sp = stridedpointer(reinterpret(Ptr{T}, pu), si)
-  B̄ = PtrArray(sp, (input_dim, size(B, static(2))), StrideArraysCore.val_dense_dims(B))
+  B̄ = PtrArray(sp, (input_dim, size(B, static(2))), val_dense_dims(B))
   B̄, pu + align(length(B̄) * sizeof(T))
 end
 function pullback!(
