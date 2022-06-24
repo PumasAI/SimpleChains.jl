@@ -178,6 +178,28 @@ function (c::SimpleChain)(arg, params, memory = task_local_memory())
   resize_memory!(layers, memory, parg)
   GC.@preserve arg unsafe_chain(layers, params, memory, parg)
 end
+using StaticArrays
+@inline _maybe_sarray(x) = x
+@inline _maybe_sarray(x::AbstractArray) = _maybe_sarray(x, size(x))
+@inline _maybe_sarray(x::AbstractArray, _) = x
+@generated function _maybe_sarray(A::AbstractArray, s::Tuple{Vararg{StaticInt}})
+  k = known(s)
+  t = Expr(:tuple)
+  ct = Expr(:curly, :Tuple)
+  for x = k
+    push!(ct.args, x)
+  end
+  for i = 1:prod(k)::Int
+    push!(t.args, :(unsafe_load(p, $i)))
+  end
+  Expr(:block, Expr(:meta,:inline), :(p = pointer(A)), :(GC.@preserve A SArray{$ct}($t)))
+end
+function (c::SimpleChain)(arg::SArray, params, memory = task_local_memory())
+  marg = MArray(arg)
+  GC.@preserve marg begin
+    _maybe_sarray(c(PtrArray(marg), params, memory))
+  end
+end
 @inline function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
   GC.@preserve params memory _chain(arg, layers, pointer(params), pointer(memory))
 end

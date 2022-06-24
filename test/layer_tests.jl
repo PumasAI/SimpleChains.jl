@@ -18,6 +18,8 @@ sc = SimpleChain(
 p = SimpleChains.init_params(sc)
 
 @test SimpleChains.remove_loss(sc)(x, p) isa AbstractVector
+using StaticArrays
+@test SimpleChains.remove_loss(sc)(SVector{5}(x), p) isa SVector
 
 g = similar(p);
 g2 = similar(g);
