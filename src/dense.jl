@@ -106,15 +106,17 @@ function _init_params!(td::TurboDense{false}, p, inputdim::Integer)
   return p, td.outputdim
 end
 
+
 function alloc_return(
   td::TurboDense,
-  batch_size,
+  ::StaticInt{1},
   p::Ptr{T},
   ::StaticInt{1},
-  ::Tuple{StaticInt{1}},
+  ::Tuple,
+  ::Val{1},
 ) where {T}
   O = td.outputdim
-  PtrArray(p, (O,)), p + align(O * batch_size * sizeof(T))
+  PtrArray(p, (O,)), p + align(O * sizeof(T))
 end
 function alloc_return(
   td::TurboDense,
@@ -122,6 +124,7 @@ function alloc_return(
   p::Ptr{T},
   ::StaticInt{1},
   ::Tuple{StaticInt{1},StaticInt{2}},
+  ::Val{2},
 ) where {T}
   O = td.outputdim
   PtrArray(p, (O, batch_size)), p + align(O * batch_size * sizeof(T))
@@ -132,6 +135,7 @@ function alloc_return(
   p::Ptr{T},
   ::StaticInt{2},
   ::Tuple{StaticInt{2},StaticInt{1}},
+  ::Val{2},
 ) where {T}
   O = td.outputdim
   PtrArray(p, (batch_size, O))', p + align(O * batch_size * sizeof(T))
@@ -149,8 +153,15 @@ function (td::TurboDense{O})(
     put = Base.unsafe_convert(Ptr{T}, pu)
     A, p = getparams(td, p, size(B, StaticInt(1)))
     C, _pu =
-      # alloc_return(td, size(pB, StaticInt(2)), put, contiguous_axis(B), stride_rank(B))
-      alloc_return(td, size(pB, StaticInt(2)), put, contiguous_axis(A), stride_rank(A))
+    # alloc_return(td, size(pB, StaticInt(2)), put, contiguous_axis(B), stride_rank(B))
+      alloc_return(
+        td,
+        size(pB, StaticInt(2)),
+        put,
+        contiguous_axis(A),
+        stride_rank(A),
+        Val(ndims(B)),
+      )
     pu = Base.unsafe_convert(Ptr{UInt8}, _pu)
     f = td.f
     dense!(f, C, A, pB, static(O), fast_fuse(f))
@@ -421,7 +432,7 @@ function dense!(
   ∂C::AbstractArray{Bool,N},
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
-  B::AbstractArray{T2, N},
+  B::AbstractArray{T2,N},
   ::True,
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
@@ -843,7 +854,14 @@ function valgrad_layer!(
   input_dim = size(B, StaticInt(1))
   batch_size = size(B, StaticInt(2))
   pu2 = Base.unsafe_convert(Ptr{T}, pu + align(batch_size * td.outputdim * sizeof(T)))
-  C, _pu3 = alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(B))
+  C, _pu3 = alloc_return(
+    td,
+    batch_size,
+    pu2,
+    contiguous_axis(B),
+    (static(1), static(2)),
+    Val(ndims(B)),
+  )
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
   ∂C, _ = get∂C(td, C, pu)
   A, p2 = getparams(td, p, input_dim)
