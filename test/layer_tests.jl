@@ -23,8 +23,9 @@ g3 = similar(g);
 g4 = similar(g);
 SimpleChains.VectorizedRNG.seed!(1);
 valgrad!(g, sc, x, p)
-xm = reshape(x,length(x),static(1));
-yml = SquaredLoss(reshape(y,length(y),static(1)));
+xm = reshape(x,length(x),1);
+
+yml = SquaredLoss(reshape(y,length(y),1));
 SimpleChains.VectorizedRNG.seed!(1);
 valgrad!(g2, sc, xm, p)
 SimpleChains.VectorizedRNG.seed!(1);

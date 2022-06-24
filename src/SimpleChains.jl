@@ -65,6 +65,8 @@ export SimpleChain,
   L2Penalty,
   FrontLastPenalty
 
+const Integer = Union{StaticInt,Base.Integer}
+
 include("simple_chain.jl")
 include("utils.jl")
 include("activation.jl")
