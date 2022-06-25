@@ -163,9 +163,12 @@ function verify_arg(c, arg)
 end
 
 function task_local_memory()::Vector{UInt8}
-  get!(task_local_storage(), Symbol("#SIMPLE#CHAINS#TASK#LOCAL#STORAGE#")) do
+  (get!(
+    task_local_storage(),
+    Symbol("#SIMPLE#CHAINS#TASK#LOCAL#STORAGE#")
+  ) do
     UInt8[]
-  end
+  end)::Vector{UInt8}
 end
 
 function (c::SimpleChain)(arg, params, memory = task_local_memory())
