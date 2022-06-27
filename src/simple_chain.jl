@@ -404,10 +404,10 @@ function valgrad(sc, arg, params::AbstractVector{T}, memory = task_local_memory(
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  off = align(resize_memory!(layers, memory, parg))
+  glen = _try_static(numparam(sc), static_length(params))
+  off = align(resize_memory!(layers, memory, parg, glen*static_sizeof(T)))
   GC.@preserve memory arg begin
-    glen = _try_static(numparam(sc), static_length(params))
-    g = PtrArray(reinterpret(Ptr{T}, pointer(memory) + off), (glen,))
+    g = PtrArray(Ptr{T}(pointer(memory) + off), (glen,))
     l = Base.FastMath.add_fast(
       unsafe_valgrad!(g, layers, params, memory, parg),
       apply_penalty!(g, getpenalty(sc), params, size(parg)),
