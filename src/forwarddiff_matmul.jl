@@ -68,7 +68,7 @@ const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? Int(leng
   f::F,
   Cdual::AbstractVector{D},
 ) where {F,T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  if (P+1) <= MAX_NUM_LV_EXTRACT
+  if (P+1) <= min(MAX_NUM_LV_EXTRACT,16)
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualCall(f)
@@ -90,7 +90,7 @@ end
   Cdual::AbstractVector{D},
 ) where {F,T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}}
   TD = (P + 1) * (R + 1)
-  if isa(T, Base.HWReal) && TD <= MAX_NUM_LV_EXTRACT
+  if isa(T, Base.HWReal) && TD <= MAX_NUM_LV_EXTRACT && ((P+1) <= 16) && ((R+1) <= 16)
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualDualCall{$R}(f)
