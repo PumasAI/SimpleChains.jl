@@ -163,12 +163,12 @@ function verify_arg(c, arg)
 end
 
 function task_local_memory()::Vector{UInt8}
-  get!(
+  (get!(
     task_local_storage(),
     Symbol("#SIMPLE#CHAINS#TASK#LOCAL#STORAGE#")
   ) do
     UInt8[]
-  end
+  end)::Vector{UInt8}
 end
 
 function (c::SimpleChain)(arg, params, memory = task_local_memory())
@@ -198,15 +198,15 @@ function _chain(arg, l::Tuple{T1,T2,Vararg}, p::Ptr, pu::Ptr{UInt8}) where {T1,T
   _chain(res, Base.tail(l), p, pu)
 end
 
-@inline function _try_static(i::Integer, j::Integer)
+@inline function _try_static(i::Base.Integer, j::Base.Integer)
   @assert i == j
   return i
 end
-@inline function _try_static(::StaticInt{I}, j::Integer) where {I}
+@inline function _try_static(::StaticInt{I}, j::Base.Integer) where {I}
   @assert I == j
   return StaticInt{I}()
 end
-@inline function _try_static(j::Integer, ::StaticInt{I}) where {I}
+@inline function _try_static(j::Base.Integer, ::StaticInt{I}) where {I}
   @assert I == j
   return StaticInt{I}()
 end

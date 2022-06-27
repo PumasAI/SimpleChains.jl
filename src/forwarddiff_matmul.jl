@@ -63,7 +63,7 @@ dualeval!(
 function dualeval!(f::F, Cdual::AbstractArray) where {F}
   dualeval!(f, vec(Cdual))
 end
-const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? length(LoopVectorization.EXTRACTFUNS) : 14
+const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? Int(length(LoopVectorization.EXTRACTFUNS)) : 14
 _isstaticone(::One) = True()
 _isstaticone(_) = False()
 static_len_one(x) = _isstaticone(static_length(x))
@@ -244,19 +244,19 @@ end
   ::Val{U},
   ::Val{SB}
 ) where {TC<:NativeTypes,TA<:NativeTypes,TB<:NativeTypes,DC,DA,DB,LAO,U,SB}
-  dc = Vector{Int}(undef, length(DC))
+  dc = Vector{Int}(undef, Int(length(DC)))
   for i in eachindex(DC)
     dc[i] = DC[i]
   end
-  da = Vector{Int}(undef, length(DA))
+  da = Vector{Int}(undef, Int(length(DA)))
   for i in eachindex(DA)
     da[i] = DA[i]
   end
-  db = Vector{Int}(undef, length(DB))
+  db = Vector{Int}(undef, Int(length(DB)))
   for i in eachindex(DB)
     db[i] = DB[i]
   end
-  sb = LAO ? Vector{Int}(undef, length(SB)) : dc
+  sb = LAO ? Vector{Int}(undef, Int(length(SB))) : dc
   for i in eachindex(SB)
     sb[i] = SB[i]
   end
