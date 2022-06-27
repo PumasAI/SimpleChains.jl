@@ -90,7 +90,7 @@ end
   Cdual::AbstractVector{D},
 ) where {F,T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}}
   TD = (P + 1) * (R + 1)
-  if isa(T, Base.HWReal) && TD <= MAX_NUM_LV_EXTRACT && ((P+1) <= 16) && ((R+1) <= 16)
+  if (T <: Base.HWReal) && TD <= MAX_NUM_LV_EXTRACT && ((P+1) <= 16) && ((R+1) <= 16)
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualDualCall{$R}(f)
