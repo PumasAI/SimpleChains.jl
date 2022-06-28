@@ -27,16 +27,19 @@ end
 struct DualDualCall{I,F}
   f::F
 end
+DualDualCall{I}(f::F) where {I,F} = DualDualCall{I,F}(f)
 
 @generated function (dc::DualDualCall{I})(x::Vararg{Any,P}) where {P,I}
   # I is the inner size
   # O is the outer
   # P = (I + 1) * (O + 1)
-  O = (P ÷ (I + 1)) - 1
+  II = I + 1
+  OO = (P ÷ II)  
+  D = ForwardDiff.Dual
   quote
     $(Expr(:meta, :inline))
-    @inbounds d = Base.Cartesian.@ncall $O ForwardDiff.Dual o ->
-      Base.Cartesian.@ncall $I ForwardDiff.Dual i -> x[i+o*$I-$I]
+    @inbounds d = Base.Cartesian.@ncall $OO $D o ->
+      Base.Cartesian.@ncall $II $D i -> x[i+o*$II-$II]
     _flatten(dc.f(d))
   end
 end
