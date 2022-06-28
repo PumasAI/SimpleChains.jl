@@ -18,26 +18,31 @@ struct DualCall{F}
   f::F
 end
 @generated function (dc::DualCall)(x::T, y::Vararg{T,P}) where {P,T}
+  c = VERSION >= v"1.8-beta0" ? :(@inline dc.f(d)) : :(dc.f(d))
   quote
     $(Expr(:meta, :inline))
     @inbounds d = Base.Cartesian.@ncall $P ForwardDiff.Dual x p -> y[p]
-    _flatten(dc.f(d))
+    _flatten($c)
   end
 end
 struct DualDualCall{I,F}
   f::F
 end
+DualDualCall{I}(f::F) where {I,F} = DualDualCall{I,F}(f)
 
 @generated function (dc::DualDualCall{I})(x::Vararg{Any,P}) where {P,I}
   # I is the inner size
   # O is the outer
   # P = (I + 1) * (O + 1)
-  O = (P ÷ (I + 1)) - 1
+  II = I + 1
+  OO = (P ÷ II)  
+  D = ForwardDiff.Dual
+  c = VERSION >= v"1.8-beta0" ? :(@inline dc.f(d)) : :(dc.f(d))
   quote
     $(Expr(:meta, :inline))
-    @inbounds d = Base.Cartesian.@ncall $O ForwardDiff.Dual o ->
-      Base.Cartesian.@ncall $I ForwardDiff.Dual i -> x[i+o*$I-$I]
-    _flatten(dc.f(d))
+    @inbounds d = Base.Cartesian.@ncall $OO $D o ->
+      Base.Cartesian.@ncall $II $D i -> x[i+o*$II-$II]
+    _flatten($c)
   end
 end
 
@@ -61,7 +66,7 @@ dualeval!(
 
 
 function dualeval!(f::F, Cdual::AbstractArray) where {F}
-  dualeval!(f, vec(Cdual))
+  dualeval!(f, @gc_preserve(vec(Cdual)))
 end
 const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? Int(length(LoopVectorization.EXTRACTFUNS)) : 14
 @generated function dualeval!(
@@ -481,7 +486,7 @@ function matmul!(
   B::PtrVector,
   bias::StaticBool,
 ) where {D<:ForwardDiff.Dual}
-  matmul!(zero_offsets(vec(C)), zero_offsets(A), zero_offsets(B), bias)
+  matmul!(zero_offsets(@gc_preserve(vec(C))), zero_offsets(A), zero_offsets(B), bias)
 end
 function matmul!(
   C::PtrVector{<:Any,<:Any,D},
@@ -489,7 +494,7 @@ function matmul!(
   B::PtrMatrix,
   bias::StaticBool,
 ) where {D<:ForwardDiff.Dual}
-  matmul!(zero_offsets(C), zero_offsets(A), zero_offsets(vec(B)), bias)
+  matmul!(zero_offsets(C), zero_offsets(A), zero_offsets(@gc_preserve(vec(B))), bias)
 end
 
 function matmul!(C, A, B, bias::StaticBool)

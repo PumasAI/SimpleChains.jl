@@ -32,7 +32,7 @@ using CPUSummary: cache_linesize, num_threads, num_cores
 using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets, val_dense_dims
 using Static: One, lt
 using CloseOpenIntervals: CloseOpen
-using StrideArraysCore: zview
+using StrideArraysCore: zview, @gc_preserve
 import ManualMemory: preserve_buffer
 using IfElse: ifelse
 import Random
