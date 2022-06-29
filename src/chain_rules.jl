@@ -89,7 +89,7 @@ end
 function _rrule(sc, arg, params, memory, ::False)
   valgrad_noloss(sc, arg, params, memory)
 end
-function valgrad_noloss(sc, arg, params::AbstractVector{T}, memory = sc.memory) where {T}
+function valgrad_noloss(sc, arg, params::AbstractVector{T}) where {T}
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)

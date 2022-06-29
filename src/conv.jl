@@ -792,9 +792,9 @@ function getparams(c::Conv, p::Ptr{T}, inputdim::Tuple{Vararg{Integer}}) where {
   (K, b), p + sizeof(T) * length(b)
 end
 
-function layer_output_size(::Val{T}, c::Conv, inputdim::Tuple) where {T}
+function forward_layer_output_size(::Val{T}, c::Conv, inputdim::Tuple) where {T}
   _, outputdim = numparam(c, inputdim)
-  2align(static_sizeof(T) * prod(outputdim)), outputdim
+  align(static_sizeof(T) * prod(outputdim)), outputdim
 end
 
 function init_params!(c::Conv, p, inputdim)

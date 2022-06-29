@@ -56,9 +56,9 @@ end
 _numparam(d::TurboDense{false}, inputdim::Integer) = inputdim * d.outputdim
 _numparam(d::TurboDense{true}, inputdim::Integer) = inputdim * d.outputdim + d.outputdim
 parameter_free(::TurboDense) = false
-function layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
+function forward_layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
   _, outputdim = numparam(td, inputdim)
-  2align(static_sizeof(T) * prod(outputdim)), outputdim
+  align(static_sizeof(T) * prod(outputdim)), outputdim
 end
 
 fast_fuse(td::TurboDense) = fast_fuse(getfield(td, :f))
@@ -77,14 +77,14 @@ end
 # to support `params`
 function _getparams(layer::TurboDense{false}, p, inputdim::Tuple)
   A, p = getparams(layer, p, last(inputdim))
-  _, outputdim = layer_output_size(Val{Float32}(), layer, inputdim)
+  _, outputdim = numparam(layer, inputdim)
   A, p, outputdim
 end
 function _getparams(layer::TurboDense{true}, p, inputdim::Tuple)
   A, p = getparams(layer, p, last(inputdim))
   Kp1 = size(A, static(2))
   K = Kp1 - static(1)
-  _, outputdim = layer_output_size(Val{Float32}(), layer, inputdim)
+  _, outputdim = numparam(layer, inputdim)
   (view(A, :, static(1):K), view(A, :, Kp1)), p, outputdim
 end
 function init_params!(td::TurboDense, p, inputdim::Tuple)

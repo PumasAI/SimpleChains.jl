@@ -10,9 +10,9 @@ should hold the target you're trying to fit.
 function add_loss(sc::SimpleChain, l::AbstractLoss)
   id = chain_input_dims(sc)
   if has_loss(sc)
-    SimpleChain(id, (Base.front(sc.layers)..., l), sc.memory)
+    SimpleChain(id, (Base.front(sc.layers)..., l))
   else
-    SimpleChain(id, (sc.layers..., l), sc.memory)
+    SimpleChain(id, (sc.layers..., l))
   end
 end
 function remove_loss(sc::SimpleChain)
@@ -21,7 +21,7 @@ end
 pop_loss(sc::SimpleChain) = last(sc.layers)
 function split_loss(sc::SimpleChain)
   layers = sc.layers
-  SimpleChain(chain_input_dims(sc), Base.front(layers), sc.memory), last(layers)
+  SimpleChain(chain_input_dims(sc), Base.front(layers)), last(layers)
 end
 
 target(_) = nothing
@@ -49,9 +49,9 @@ function _layer_output_size_needs_temp_of_equal_len_as_target(
   align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 end
 function _layer_output_size_no_temp(::Val{T}, sl::AbstractLoss, s) where {T}
-  0, static_sizeof(T)
+  static(0), static_sizeof(T)
 end
-function layer_output_size(::Val{T}, sl::AbstractLoss, s) where {T}
+function forward_layer_output_size(::Val{T}, sl::AbstractLoss, s) where {T}
   _layer_output_size_no_temp(Val{T}(), sl, s)
 end
 
@@ -108,7 +108,7 @@ function (sl::SquaredLoss{<:AbstractArray{<:Number}})(
     s += δ * δ
   end
   # NOTE: we're not dividing by size(arg,N)
-  T(0.5)*s, p, pu
+  T(0.5) * s, p, pu
 end
 
 """
@@ -203,6 +203,9 @@ target(sl::LogitCrossEntropyLoss) = getfield(sl, :y)
 function layer_output_size(::Val{T}, sl::LogitCrossEntropyLoss, s) where {T}
   _layer_output_size_needs_temp_of_equal_len_as_target(Val{T}(), sl, s)
 end
+function forward_layer_output_size(::Val{T}, sl::LogitCrossEntropyLoss, s) where {T}
+  _layer_output_size_needs_temp_of_equal_len_as_target(Val{T}(), sl, s)
+end
 
 function (lcel::LogitCrossEntropyLoss)(arg::AbstractArray{T}, p::Ptr, pu) where {T}
   y = lcel.y
@@ -264,15 +267,8 @@ function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, p) where {T
   cnl, loss = split_loss(c)
   Ŷ = cnl(X, p)
   ec = correct_count(Ŷ, target(loss))
-  mem = c.memory
   os = first(layer_output_size(Val(T), loss, size(X)))
-  ((length(mem) == 0) & (os != 0)) && resize!(mem, os)
-  pu = pointer(mem)
-  pX = pointer(X)
-  if (os != 0) & (UInt(pu) <= UInt(pX)) & (UInt(pX) <= (UInt(pu) + UInt(os)))
-    pu += os
-  end
-  GC.@preserve mem p return ec, first(loss(Ŷ, pointer(p), pu))
+  GC.@preserve p return ec, with_memory(loss, os, Ŷ, pointer(p))
 end
 function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, Y, p) where {T}
   correct_count_and_loss(add_loss(c, pop_loss(c)(Y)), X, p)

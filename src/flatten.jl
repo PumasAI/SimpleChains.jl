@@ -30,8 +30,8 @@ function getoutputdim(::Flatten{N}, inputdim) where {N}
   getoutputdim(_dec(Flatten{N}()), (d0 * d1, t1...))
 end
 
-function layer_output_size(::Val{T}, ::Flatten{N}, inputdim::Tuple) where {T,N}
-  0, getoutputdim(Flatten{N}(), inputdim)
+function forward_layer_output_size(::Val{T}, ::Flatten{N}, inputdim::Tuple) where {T,N}
+  static(0), getoutputdim(Flatten{N}(), inputdim)
 end
 
 init_params!(::Flatten{N}, p, id) where {N} = p, getoutputdim(Flatten{N}(), id)

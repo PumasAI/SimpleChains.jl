@@ -9,9 +9,13 @@ MaxPool(x::Tuple{Vararg{Integer}}) = MaxPool{map(Int, x)}()
 MaxPool(x::Vararg{Integer}) = MaxPool{map(Int, x)}()
 
 parameter_free(::MaxPool) = true
+function forward_layer_output_size(::Val{T}, ::MaxPool{D}, inputdim::Tuple) where {T,D}
+  outdim = getoutputdim(MaxPool{D}(), inputdim)
+  align(sizeof(T) * Static.reduce_tup(*, outdim)), outdim
+end
 function layer_output_size(::Val{T}, ::MaxPool{D}, inputdim::Tuple) where {T,D}
   outdim = getoutputdim(MaxPool{D}(), inputdim)
-  align(sizeof(T) * ArrayInterface.reduce_tup(*, outdim)), outdim
+  align(sizeof(T) * Static.reduce_tup(*, outdim)), outdim
 end
 
 _maxpooloutputdim(::Tuple{}, inputdim) = inputdim
