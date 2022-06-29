@@ -29,7 +29,7 @@ using SIMDTypes: Bit, NativeTypes
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD, NativeTypesV
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
-using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets
+using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets, val_dense_dims
 using Static: One, lt
 using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview, @gc_preserve
@@ -84,14 +84,10 @@ include("optimize.jl")
 if VERSION >= v"1.7.0"
   if hasfield(Method, :recursion_relation)
     dont_limit = Returns(true)
-    for m in methods(chain_valgrad!)
-      m.recursion_relation = dont_limit
-    end
-    for m in methods(_chain)
-      m.recursion_relation = dont_limit
-    end
-    for m in methods(output_size)
-      m.recursion_relation = dont_limit
+    for f = (chain_valgrad!, _chain, output_size, _numparam)
+      for m in methods(f)
+        m.recursion_relation = dont_limit
+      end
     end
   end
 end

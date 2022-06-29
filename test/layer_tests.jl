@@ -18,6 +18,9 @@ sc = SimpleChain(
 p = SimpleChains.init_params(sc)
 
 @test SimpleChains.remove_loss(sc)(x, p) isa AbstractVector
+using SimpleChains.StaticArrays
+@test @inferred(SimpleChains.remove_loss(sc)(SVector{5}(x), p)) isa SVector{2,Float64}
+@test @inferred(SimpleChains.valgrad(sc, SVector{5}(x), p)) isa Tuple{Float64,SVector{126,Float32}}
 
 g = similar(p);
 g2 = similar(g);

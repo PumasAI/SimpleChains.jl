@@ -80,7 +80,7 @@ Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers..., l)
 
 function numparam(c::SimpleChain, id = nothing)
   _id = chain_input_dims(c, id)
-  _numparam(0, c.layers, _id)
+  _numparam(static(0), c.layers, _id)
 end
 _numparam(s, ::Tuple{}, _) = s
 function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
@@ -113,7 +113,7 @@ end
   additional_per_thread,
   nthread,
 ) where {T}
-  base_mem_per_thread = 2output_size(Val(T), layers, sx) + additional_per_thread
+  base_mem_per_thread = output_size(Val(T), layers, sx) + additional_per_thread
   mem_total = additional + base_mem_per_thread * nthread
   if mem_total > length(memory)
     empty!(memory)
@@ -178,6 +178,28 @@ function (c::SimpleChain)(arg, params, memory = task_local_memory())
   resize_memory!(layers, memory, parg)
   GC.@preserve arg unsafe_chain(layers, params, memory, parg)
 end
+using StaticArrays
+@inline _maybe_sarray(x) = x
+@inline _maybe_sarray(x::AbstractArray) = _maybe_sarray(x, size(x))
+@inline _maybe_sarray(x::AbstractArray, _) = x
+@generated function _maybe_sarray(A::AbstractArray, s::Tuple{Vararg{StaticInt}})
+  k = known(s)
+  t = Expr(:tuple)
+  ct = Expr(:curly, :Tuple)
+  for x in k
+    push!(ct.args, x)
+  end
+  for i = 1:prod(k)::Int
+    push!(t.args, :(unsafe_load(p, $i)))
+  end
+  Expr(:block, Expr(:meta, :inline), :(p = pointer(A)), :(GC.@preserve A SArray{$ct}($t)))
+end
+function (c::SimpleChain)(arg::SArray, params, memory = task_local_memory())
+  marg = MArray(arg)
+  GC.@preserve marg begin
+    _maybe_sarray(c(PtrArray(marg), params, memory))
+  end
+end
 @inline function unsafe_chain(layers, params, memory::Vector{UInt8}, arg)
   GC.@preserve params memory _chain(arg, layers, pointer(params), pointer(memory))
 end
@@ -186,7 +208,9 @@ end
 @inline function (output_size(::Val{T}, x::Tuple{X}, s1)::Int) where {T,X}
   first(layer_output_size(Val{T}(), getfield(x, 1), s1))
 end
-@inline function (output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int) where {T,X1,X2}
+@inline function (
+  output_size(::Val{T}, x::Tuple{X1,X2,Vararg}, s1::Tuple)::Int
+) where {T,X1,X2}
   b, s2 = layer_output_size(Val{T}(), getfield(x, 1), s1)
   b + output_size(Val{T}(), Base.tail(x), s2)
 end
@@ -258,7 +282,7 @@ function init_params(
   ::Type{T} = Float32,
 ) where {T}
   _id = chain_input_dims(Λ, id)
-  init_params!(Λ, Vector{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id))
+  init_params!(Λ, StrideArray{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id))
 end
 """
     SimpleChains.init_params(chn[, id = nothing][, ::Type{T} = Float32])
@@ -376,22 +400,25 @@ function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where
   return val, lgrad, pu3
 end
 @inline getchain(sc::SimpleChain) = sc
-function valgrad(
-  sc, arg, params::AbstractVector{T},
-  memory = task_local_memory()
-) where {T}
+function valgrad(sc, arg, params::AbstractVector{T}, memory = task_local_memory()) where {T}
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  off = align(resize_memory!(layers, memory, parg))
+  glen = _try_static(numparam(sc), static_length(params))
+  off = align(resize_memory!(layers, memory, parg, glen*static_sizeof(T)))
   GC.@preserve memory arg begin
-    g = PtrArray(reinterpret(Ptr{T}, pointer(memory) + off), (static_length(params),))
+    g = PtrArray(Ptr{T}(pointer(memory) + off), (glen,))
     l = Base.FastMath.add_fast(
       unsafe_valgrad!(g, layers, params, memory, parg),
       apply_penalty!(g, getpenalty(sc), params, size(parg)),
     )
   end
-  return l, StrideArraysCore.StrideArray(g, memory)
+  gv = StrideArraysCore.StrideArray(g, memory)
+  if arg isa SArray
+    return l, _maybe_sarray(gv)
+  else
+    return l, gv
+  end
 end
 
 isstochastic(_) = false

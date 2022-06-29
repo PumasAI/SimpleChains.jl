@@ -33,7 +33,7 @@ _iterate_over_losses(_) = false
 iterate_over_losses(sc) = _iterate_over_losses(target(sc))
 
 parameter_free(::AbstractLoss) = true
-numparam(::AbstractLoss, _) = 0, 1
+numparam(::AbstractLoss, _) = static(0), 1
 function _layer_output_size_needs_temp(
   ::Val{T},
   sl::AbstractLoss{<:AbstractArray{<:AbstractArray}},
