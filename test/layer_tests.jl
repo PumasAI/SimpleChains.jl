@@ -17,6 +17,8 @@ sc = SimpleChain(
 
 p = SimpleChains.init_params(sc)
 
+@test SimpleChains.remove_loss(sc)(x, p) isa AbstractVector
+
 g = similar(p);
 g2 = similar(g);
 g3 = similar(g);
