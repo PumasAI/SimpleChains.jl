@@ -1,5 +1,5 @@
 
-@static if isdefined(ChainRulesCore, :NoTangent)
+if isdefined(ChainRulesCore, :NoTangent)
   const NoTangent = ChainRulesCore.NoTangent
 else
   const NoTangent = ChainRulesCore.DoesNotExist
@@ -41,11 +41,20 @@ function (pb::PullBack)(x)
 end
 
 
-function unsafe_valgrad_pullback!(g, layers, params, memory::Vector{UInt8}, arg)
+function unsafe_valgrad_pullback(
+  layers,
+  params::AbstractVector{T},
+  memory::Vector{UInt8},
+  arg,
+  glen,
+) where {T}
+  pm = align(pointer(memory))
+  g = PtrArray(Ptr{T}(pm), (glen,))
+  off = align(glen * static_sizeof(T))
+
   GC.@preserve g params memory begin
     # @show pointer(g) pointer(params) pointer(memory)
-    l, pbl =
-      chain_valgrad_pullback!(pointer(g), arg, layers, pointer(params), pointer(memory))
+    l, pbl = chain_valgrad_pullback!(pointer(g), arg, layers, pointer(params), pm + off)
   end
   l, PullBack(pbl, g, params, memory)
 end
@@ -60,12 +69,9 @@ function chain_valgrad_pullback!(
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
 
-  # val, grad, pu3, pbl = chain_valgrad_pullback!(pg2, larg, Base.tail(layers), p2, pu2)
   val, pbl = chain_valgrad_pullback!(pg2, larg, Base.tail(layers), p2, pu2)
   pbl_ret = PullBackLayer(pg, l, arg, p, pu, pbl)
   return val, pbl_ret
-  # lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
-  # return val, lgrad, pu4
 end
 function chain_valgrad_pullback!(
   pg,
@@ -77,58 +83,54 @@ function chain_valgrad_pullback!(
   l = getfield(layers, 1)
   pg2, val, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
 
-  # val, grad, pu3, pbl = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
   # pu2 gets fed into eventual `pullback!` call
   pbl_ret = PullBackLayer(pg, l, arg, p, pu, pu2)
   return val, pbl_ret
-  # lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
-  # return val, lgrad, pu4
 end
 
 # No loss: chain closures.
-function _rrule(sc, arg, params, memory, ::False)
-  valgrad_noloss(sc, arg, params, memory)
+function _rrule(sc, arg, params, ::False)
+  valgrad_noloss(sc, arg, params)
 end
 function valgrad_noloss(sc, arg, params::AbstractVector{T}) where {T}
+
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   barg = preserve_buffer(arg)
-  off = align(resize_memory!(layers, memory, parg, length(parg) * sizeof(eltype(parg))))
+  glen = _try_static(numparam(sc), static_length(params))
+  off = align(glen * static_sizeof(T))
+  num_bytes = required_bytes(Val{T}(), layers, size(parg), off)
+  memory = get_heap_memory(sc, num_bytes)
   GC.@preserve barg memory begin
-    g = PtrArray(reinterpret(Ptr{T}, pointer(memory) + off), (static_length(params),))
-    l, pullback = unsafe_valgrad_pullback!(g, layers, params, memory, parg)
+    l, pullback = unsafe_valgrad_pullback(layers, params, memory, parg, glen)
   end
   return l, pullback
   # return StrideArraysCore.StrideArray(l, memory), pullback
 end
 
-
-
-# Loss: call `valgrad`.
-function _rrule(sc, arg, params, memory, ::True)
-  l, g = valgrad(sc, arg, params, memory)
-  # assumes no grad w/ respect to arg
-  pullback = let g = g
-    l̄ -> begin
-      if !isone(l̄)
-        @turbo for i ∈ eachindex(g)
-          g[i] *= l̄
-        end
-      end
-      NoTangent(), NoTangent(), g
+struct ElementwisePullback{G}
+  g::G
+end
+function (ep::ElementwisePullback)(l̄)
+  g = ep.g
+  if !isone(l̄)
+    @turbo for i ∈ eachindex(g)
+      g[i] *= l̄
     end
   end
-  l, pullback
+  # assumes no grad w/ respect to arg
+  NoTangent(), NoTangent(), g
+end
+# Loss: call `valgrad`.
+function _rrule(sc, arg, params, ::True)
+  l, g = valgrad(sc, arg, params)
+  l, ElementwisePullback(g)
 end
 
-function ChainRulesCore.rrule(
-  sc::AbstractPenalty, arg, params, memory = task_local_memory()
-)
-  _rrule(sc, arg, params, memory, True())
+function ChainRulesCore.rrule(sc::AbstractPenalty, arg, params)
+  _rrule(sc, arg, params, True())
 end
-function ChainRulesCore.rrule(
-  sc::SimpleChain, arg, params, memory = task_local_memory()
-)
-  _rrule(sc, arg, params, memory, has_loss_typed(sc))
+function ChainRulesCore.rrule(sc::SimpleChain, arg, params)
+  _rrule(sc, arg, params, has_loss_typed(sc))
 end

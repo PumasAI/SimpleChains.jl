@@ -25,7 +25,7 @@ p = SimpleChains.init_params(c);
 c(X, p) # X are the independent variables, and `p` the parameter vector.
 ```
 """
-struct SimpleChain{N,I<:InputDim,L<:Tuple{Vararg{Any,N}}}
+struct SimpleChain{I<:InputDim,L<:Tuple}
   inputdim::I
   layers::L
 end
@@ -44,8 +44,12 @@ const Chain = Union{AbstractPenalty{<:SimpleChain},SimpleChain}
 
 chain_input_dims(c::SimpleChain) = c.inputdim
 
-SimpleChain(input_dim::Integer, l::Vararg) = SimpleChain((input_dim,), l)
-SimpleChain(input_dim::InputDim, l::Vararg) = SimpleChain(input_dim, l)
+SimpleChain(input_dim::Integer, lf, lm, lt::Vararg) =
+  SimpleChain((input_dim,), (lf, lm, lt...))
+SimpleChain(input_dim::InputDim, lf, lm, lt::Vararg) =
+  SimpleChain(input_dim, (lf, lm, lt...))
+
+SimpleChain(input_dim::Integer, l::Tuple) = SimpleChain((input_dim,), l)
 
 SimpleChain(l::Vararg) = SimpleChain(InputDimUnknown(), l)
 SimpleChain(l::Tuple) = SimpleChain(InputDimUnknown(), l)
@@ -83,8 +87,7 @@ end
 
 Useful for popping off a loss layer.
 """
-Base.front(c::SimpleChain) =
-  SimpleChain(chain_input_dims(c), Base.front(c.layers))
+Base.front(c::SimpleChain) = SimpleChain(chain_input_dims(c), Base.front(c.layers))
 Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers..., l))
 
 function numparam(c::SimpleChain, id = nothing)
@@ -114,15 +117,16 @@ function verify_arg(c, arg)
 end
 
 function (c::SimpleChain)(arg::AbstractArray{T}, params) where {T}
+  verify_arg(c, arg)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   num_bytes = required_forward_bytes(Val(T), layers, size(parg), static(0))
   if has_loss(c)
-    GC.@preserve arg params with_memory(_chain, c, num_bytes, parg, params)
+    GC.@preserve arg params with_memory(_chain, c, num_bytes, parg, pointer(params))
   else
     GC.@preserve arg params begin
-      res, heap_memory = with_heap_memory(_chain, c, num_bytes, parg, params)
-      return StrideArray(res, heap_memory)
+      res, heap_memory = with_heap_memory(_chain, c, num_bytes, parg, pointer(params))
+      StrideArray(res, heap_memory)
     end
   end
 end
@@ -148,9 +152,7 @@ end
 end
 function (c::SimpleChain)(arg::StaticArrays.SArray, params)
   marg = StaticArrays.MArray(arg)
-  GC.@preserve marg begin
-    _maybe_sarray(c(PtrArray(marg), params))
-  end
+  GC.@preserve marg _maybe_sarray(c(PtrArray(marg), params))
 end
 function (c::SimpleChain)(memory::Ptr{UInt8}, arg, params)
   verify_arg(c, arg)
@@ -220,9 +222,9 @@ end
 @inline function _try_static(j::Integer, i::Tuple{I,Vararg}) where {I}
   (_try_static(j, first(i)), Base.tail(i)...)
 end
-chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, inputdim::Tuple{Vararg{Integer}}) =
+chain_input_dims(::SimpleChain{InputDimUnknown}, inputdim::Tuple{Vararg{Integer}}) =
   inputdim
-function chain_input_dims(::SimpleChain{<:Any,InputDimUnknown}, ::Nothing)
+function chain_input_dims(::SimpleChain{InputDimUnknown}, ::Nothing)
   throw(
     ArgumentError(
       "SimpleChains without an explicitly provided InputDim require manually providing it when calling `init_params`",
@@ -289,9 +291,7 @@ function valgrad!(memory::Ptr{UInt8}, g, c::SimpleChain, arg, params)
   verify_arg(c, arg)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  GC.@preserve arg begin
-    unsafe_valgrad!(c, memory, g, params, parg)
-  end
+  GC.@preserve arg unsafe_valgrad!(c, memory, g, params, parg)
 end
 function valgrad!(g, c::SimpleChain, arg::AbstractArray{T}, params) where {T}
   verify_arg(c, arg)
@@ -382,17 +382,23 @@ function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where
   return val, lgrad, pu3
 end
 @inline getchain(sc::SimpleChain) = sc
-function valgrad_core(c::Chain, pu::Ptr{UInt}, arg, params::AbstractVector{T}, glen) where {T}
+function valgrad_core(
+  c::Chain,
+  pu::Ptr{UInt8},
+  arg,
+  params::AbstractVector{T},
+  glen,
+) where {T}
   @unpack layers = c
   g = PtrArray(Ptr{T}(pu), (glen,))
-  Base.FastMath.add_fast(
-    unsafe_valgrad!(pu + align(glen * static_sizeof(T)), g, layers, params, arg),
+Base.FastMath.add_fast(
+    unsafe_valgrad!(c, pu + align(glen * static_sizeof(T)), g, params, arg),
     apply_penalty!(g, getpenalty(c), params, size(arg)),
   )
 end
 function valgrad_core_sarray(
   c::Chain,
-  pu::Ptr{UInt},
+  pu::Ptr{UInt8},
   arg,
   params::AbstractVector{T},
   ::StaticInt{L},
@@ -400,7 +406,7 @@ function valgrad_core_sarray(
   @unpack layers = c
   g = PtrArray(Ptr{T}(pu), (static(L),))
   l = Base.FastMath.add_fast(
-    unsafe_valgrad!(pu + align(static(L) * static_sizeof(T)), g, layers, params, arg),
+    unsafe_valgrad!(c, pu + align(static(L) * static_sizeof(T)), g, params, arg),
     apply_penalty!(g, getpenalty(c), params, size(arg)),
   )
   return l, _maybe_sarray(g, (static(L),))
@@ -413,7 +419,7 @@ function valgrad(sc::Chain, arg, params::AbstractVector{T}) where {T}
   num_bytes = required_bytes(Val{T}(), layers, size(parg), glen * static_sizeof(T))
   l, heap_memory = with_heap_memory(valgrad_core, sc, num_bytes, parg, params, glen)
   gv = StrideArraysCore.StrideArray(
-    PtrArray(Ptr{T}(pointer(heap_memory)), (glen,)),
+    PtrArray(align(Ptr{T}(pointer(heap_memory))), (glen,)),
     heap_memory,
   )
   return l, gv

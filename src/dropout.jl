@@ -49,7 +49,7 @@ function getpcmp(::StaticInt{W}, ::StaticInt{WU}, x::UInt32, ::False) where {W,W
 end
 
 forward_layer_output_size(::Val{T}, d::Dropout, s) where {T} = static(0), s
-layer_output_size(::Val{T}, d::Dropout, s) where {T} =
+layer_output_size(::Val{T}, d::Dropout, s::Tuple) where {T} =
   align((prod(s) + static(7)) >>> static(3)), s
 
 function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) where {T}

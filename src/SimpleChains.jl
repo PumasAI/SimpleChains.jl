@@ -83,13 +83,18 @@ include("penalty.jl")
 include("chain_rules.jl")
 include("optimize.jl")
 
-if VERSION >= v"1.7.0"
-  if hasfield(Method, :recursion_relation)
-    dont_limit = Returns(true)
-    for f = (chain_valgrad!, _chain, output_size, forward_output_size, _numparam)
-      for m in methods(f)
-        m.recursion_relation = dont_limit
-      end
+if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+  dont_limit = Returns(true)
+  for f in (
+    chain_valgrad!,
+    chain_valgrad_pullback!,
+    _chain,
+    output_size,
+    forward_output_size,
+    _numparam,
+  )
+    for m in methods(f)
+      m.recursion_relation = dont_limit
     end
   end
 end

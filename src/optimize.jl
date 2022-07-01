@@ -413,7 +413,7 @@ end
 function train_unbatched!(
   p::AbstractVector{T},
   _chn::Chain,
-  X,
+  X::AbstractArray,
   opt::AbstractOptimizer,
   t,
 ) where {T}
@@ -438,7 +438,7 @@ function train_unbatched!(
   end
   p
 end
-function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer)
+function train_unbatched!(g, p::AbstractVector, _chn::Chain, X, opt::AbstractOptimizer)
   t = target(_chn)
   if _iterate_over_losses(t)
     train_unbatched!(g, p, _chn, X, opt, t)

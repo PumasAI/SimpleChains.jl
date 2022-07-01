@@ -51,7 +51,7 @@ InteractiveUtils.versioninfo(verbose=true)
       y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10
       sc = SimpleChains.add_loss(scbase, SquaredLoss(y))
 
-      @test first(Dropout(0.5)(x, pointer(x), pointer(sc.memory))) === x
+      @test first(Dropout(0.5)(x, pointer(x), pointer(SimpleChains.get_heap_memory(sc,0)))) === x
       @test sum(iszero, x) == 0
       x .= rand.()
 
@@ -146,16 +146,17 @@ InteractiveUtils.versioninfo(verbose=true)
         (SimpleChains.StaticInt(1),),
         (SimpleChains.StaticInt(1),),
       )
+      scdmem = SimpleChains.get_heap_memory(scd, 0);
       m = SimpleChains.StrideArray(
         SimpleChains.PtrArray(
           SimpleChains.stridedpointer(
-            reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset),
+            reinterpret(Ptr{SimpleChains.Bit}, pointer(scdmem) + offset),
             si,
           ),
           (size(x, 2) * 8,),
           Val((true,)),
         ),
-        scd.memory,
+        scdmem,
       )
 
       valgrad!(g, scd, x, p)
@@ -167,13 +168,13 @@ InteractiveUtils.versioninfo(verbose=true)
       m = SimpleChains.StrideArray(
         SimpleChains.PtrArray(
           SimpleChains.stridedpointer(
-            reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset),
+            reinterpret(Ptr{SimpleChains.Bit}, pointer(scdmem) + offset),
             si,
           ),
           (size(x, 2) * 8,),
           Val((true,)),
         ),
-        scd.memory,
+        scdmem,
       )
 
       let
