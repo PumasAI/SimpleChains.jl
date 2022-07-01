@@ -162,7 +162,15 @@ function valgrad_layer!(pg::Ptr, ::MaxPool{D}, A, p, pu) where {D}
   B, p, pu = MaxPool{D}()(A, p, pu)
   return pg, B, p, pu
 end
-function pullback!(::Ptr, ::MaxPool{D}, B̄, A, p, pu, pu2) where {D}
+function pullback!(
+  ::Ptr,
+  ::MaxPool{D},
+  B̄,
+  A,
+  p::Ptr,
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8},
+) where {D}
   ∂maxpool!(A, B̄, MaxPool{D}())
   return A, pu2
 end

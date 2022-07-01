@@ -49,6 +49,6 @@ function valgrad_layer!(pg::Ptr, ::Flatten{N}, A, p, pu) where {N}
   B, p, pu = Flatten{N}()(A, p, pu)
   return pg, B, p, pu
 end
-function pullback!(::Ptr, ::Flatten, B̄, A, p, pu, pu2)
+function pullback!(::Ptr, ::Flatten, B̄, A, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
   return reshape(B̄, size(A)), pu2
 end
