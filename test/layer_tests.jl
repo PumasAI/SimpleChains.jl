@@ -41,7 +41,12 @@ for seed = 1:4
   valgrad!(g4, SimpleChains.add_loss(sc, yml), x, p)
 
   SimpleChains.VectorizedRNG.seed!(seed);
+  gzyg = Zygote.gradient(p) do p
+    sum(abs2, Base.front(sc)(x, p) .- y)/2
+  end |> only |> Vector
+  SimpleChains.VectorizedRNG.seed!(seed);
   gz = Zygote.gradient(sc, x, p)[2]
+  @test gzyg ≈ gz
 
   @test size(gz) == size(p)
   @test size(g) == size(gz)
@@ -57,6 +62,7 @@ for seed = 1:4
   @test gz ≈ g3 rtol=1e-6
   @test gz ≈ g4 rtol=1e-6
 end
+
 xmat = rand(5, 20)
 ymat = rand(2, 20)
 
@@ -78,3 +84,6 @@ gz2 = Zygote.gradient(sc2, xmat, p2)[2]
 @test !iszero(g2)
 
 @test g2 ≈ gz2 rtol=1e-6
+
+
+

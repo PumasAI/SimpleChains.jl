@@ -877,8 +877,8 @@ end
 function pullback!(
   pg::Ptr{T},
   td::TurboDense{O},
-  C̄,
-  B,
+  C̄::PtrArray,
+  B::PtrArray,
   p::Ptr{T},
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8},
@@ -892,6 +892,17 @@ function pullback!(
   B̄, pu2 = alloc_return_B_dense(B, pu2, intput_dims)
   dense!(identity, nothing, B̄, matrix_view(td, A)', C̄, False())
   B̄, pu2
+end
+function pullback!(
+  pg,
+  td,
+  C̄,
+  B,
+  p::Ptr,
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8},
+)
+  @gc_preserve pullback!(pg, td, C̄, B, p, pu, pu2)
 end
 matrix_view(::TurboDense{false}, A) = A
 function matrix_view(::TurboDense{true}, A)
