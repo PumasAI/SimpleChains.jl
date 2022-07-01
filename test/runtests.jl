@@ -90,21 +90,19 @@ InteractiveUtils.versioninfo(verbose=true)
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
       end
       valgrad!(g, scflp, x, p)
-      if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV
-        @test g == only(
-          Zygote.gradient(
-            p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
-            p,
-          ),
-        )
-        _gzyg = Zygote.gradient(p) do p
-          sum(abs2, Base.front(sc)(x, p) .- y)/2# / size(x)[end]
-        end
-        gzyg = copy(_gzyg[1])
-        g2 = similar(g)
-        valgrad!(g2, sc, x, p)
-        @test g2 ≈ gzyg
+      @test g == only(
+        Zygote.gradient(
+          p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
+          p,
+        ),
+      )
+      _gzyg = Zygote.gradient(p) do p
+        sum(abs2, Base.front(sc)(x, p) .- y)/2# / size(x)[end]
       end
+      gzyg = copy(_gzyg[1])
+      g2 = similar(g)
+      valgrad!(g2, sc, x, p)
+      @test g2 ≈ gzyg
 
       gfd = ForwardDiff.gradient(p) do p
         off = 8 * 24
