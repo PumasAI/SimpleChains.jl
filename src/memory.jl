@@ -23,7 +23,7 @@ end
 end
 function get_heap_memory(sc, num_bytes)
   heap_memory = task_local_memory(sc)
-  length(heap_memory) >= num_bytes || resize!(empty!(heap_memory), num_bytes)
+  length(heap_memory) >= num_bytes || resize!(empty!(heap_memory), Int(num_bytes))
   return heap_memory
 end
 function with_heap_memory(f::F, sc, num_bytes, args::Vararg{Any,K}) where {F,K}
