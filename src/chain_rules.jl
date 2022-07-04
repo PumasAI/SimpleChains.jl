@@ -134,6 +134,10 @@ end
 function _rrule(sc, arg, params, ::False)
   valgrad_noloss(sc, arg, params)
 end
+function valgrad_noloss(sc, arg::AbstractArray{S}, params::StaticArrays.SVector{T}) where {T,S}
+  mp = StaticArrays.MVector(params);
+  @gc_preserve valgrad_noloss(sc, arg, mp)
+end
 function valgrad_noloss(sc, arg::AbstractArray{S}, params::AbstractVector{T}) where {T,S}
   c = getchain(sc)
   @unpack layers = c
@@ -185,10 +189,10 @@ function _rrule(sc, arg, params, ::True)
   l, g = valgrad(sc, arg, params)
   l, ElementwisePullback(g)
 end
+# TODO: support penalties without returning scalars
+_returns_scalar(::AbstractPenalty) = True()
+_returns_scalar(sc::SimpleChain) = has_loss_typed(sc)
 
-function ChainRulesCore.rrule(sc::AbstractPenalty, arg, params)
-  _rrule(sc, arg, params, True())
-end
-function ChainRulesCore.rrule(sc::SimpleChain, arg, params)
-  _rrule(sc, arg, params, has_loss_typed(sc))
+function ChainRulesCore.rrule(sc::Chain, arg, params)
+  _rrule(sc, arg, params, _returns_scalar(sc))
 end

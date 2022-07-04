@@ -172,6 +172,10 @@ end
 #     :B
 #   )
 # end
+@inline function (c::SimpleChain)(arg::StaticArrays.SArray, params::StaticArrays.SArray)
+  mparams = StaticArrays.MArray(params)
+  @gc_preserve c(arg, mparams)
+end
 @inline function (c::SimpleChain)(arg::StaticArrays.SArray, params)
   verify_arg(c, arg)
   @unpack layers = c

@@ -24,17 +24,20 @@ y = @SArray [1.6832f0, -0.174f0]
 
 λ = @SArray [1.44533f0, 0.34325f0]
 
-_dy, back = Zygote.pullback(y, p_nn) do u, p
-                f(u,p,t)
-            end
+p_nn_sv = SVector{252}(p_nn);
 
-tmp1, tmp2 = @inferred(back(λ))
+for pv = (p_nn, p_nn_sv)
+  _dy, back = Zygote.pullback(y, pv) do u, p
+    f(u,p,t)
+  end
 
-@test tmp1 isa SVector{2,Float32}
-@test tmp2 isa SVector{252,Float32}
-@test _dy isa SVector{2,Float32}
+  tmp1, tmp2 = @inferred(back(λ))
 
-forw = f(y, p_nn, t)
-@test forw isa SVector{2,Float32}
+  @test tmp1 isa SVector{2,Float32}
+  @test tmp2 isa SVector{252,Float32}
+  @test _dy isa SVector{2,Float32}
 
+  forw = f(y, pv, t)
+  @test forw isa SVector{2,Float32}
+end
 
