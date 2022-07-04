@@ -482,6 +482,9 @@ InteractiveUtils.versioninfo(verbose=true)
     SimpleChains.dualeval!(tanh, x)
     @test reinterpret(reshape, Float64, x) ≈ reinterpret(reshape, Float64, fill((-0.9216685544064713,-0.21073790614559954,-0.18063249098194248,-0.1505270758182854,-0.12042166065462832,-0.09031624549097124,-0.06021083032731416,-0.03010541516365708,0.0,0.03010541516365708,0.06021083032731416,0.09031624549097124,0.12042166065462832,0.1505270758182854,0.18063249098194248,0.21073790614559954,0.24084332130925665,0.27094873647291373), 10))
   end
+  @testset "SArray" begin
+    include("staticarrays.jl")
+  end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 # For now, there are the tests at the start.

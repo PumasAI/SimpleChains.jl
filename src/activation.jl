@@ -11,7 +11,7 @@ struct Activation{F}
   f::F
 end
 parameter_free(::Activation) = true
-numparam(::Activation, id) = 0, id
+numparam(::Activation, id) = static(0), id
 init_params!(::Activation, p, id) = p, id
 _check_input_dims(::Activation, _) = nothing
 

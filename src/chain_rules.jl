@@ -49,7 +49,7 @@ struct PullBack{SA,PBL<:PullBackLayer,G,P,M}
     new{SA,PBL,G,P,M}(pbl, grad, params, memory)
   end
 end
-@inline function (pb::PullBack{SA,<:PullBackLayer})(x) where {SA}
+@inline function (pb::PullBack{SA})(x) where {SA}
   @unpack pbl, grad, params, memory = pb
   GC.@preserve grad params memory begin
     lgrad, _ = pullback_layer!(pbl, x)
@@ -63,6 +63,16 @@ end
     StrideArraysCore.StrideArray(lgrad, memory),
     StrideArraysCore.StrideArray(grad, memory)
   end
+end
+@inline function (pb::PullBack)(x::StaticArrays.SArray)
+  @unpack pbl, grad, params, memory = pb
+  mx = StaticArrays.MArray(x);
+  GC.@preserve mx grad params memory begin
+    lgrad, _ = pullback_layer!(pbl, PtrArray(mx))
+  end
+  NoTangent(),
+  _maybe_sarray(StrideArraysCore.StrideArray(lgrad, memory)),
+  _maybe_sarray(StrideArraysCore.StrideArray(grad, memory))
 end
 # function (pb::PullBack{<:PullBackParam})(x)
 #   @unpack pbl, grad, params, memory = pb
@@ -149,7 +159,11 @@ function valgrad_noloss(sc, arg::AbstractArray{S}, params::AbstractVector{T}) wh
     # @show pointer(g) pointer(params) pointer(memory)
     l, pbl = chain_valgrad_pullback!(pointer(g), parg2, layers, pointer(params), pm)
   end
-  l, PullBack{arg isa StaticArrays.SArray}(pbl, g, params, memory)
+  if arg isa StaticArrays.SArray
+    _maybe_sarray(l), PullBack{true}(pbl, g, params, memory)
+  else
+    l, PullBack{true}(pbl, g, params, memory)
+  end
 end
 
 struct ElementwisePullback{G}
