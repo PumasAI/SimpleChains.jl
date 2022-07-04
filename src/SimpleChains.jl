@@ -9,6 +9,7 @@ using UnPack,
   StrideArraysCore,
   Static,
   VectorizedRNG
+using ArrayInterfaceCore: CPUPointer
 using ArrayInterface:
   size,
   strides,
@@ -29,7 +30,7 @@ using SIMDTypes: Bit, NativeTypes
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD, NativeTypesV
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
-using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets, val_dense_dims
+using LayoutPointers: bytestrideindex, stridedpointer, zstridedpointer, zero_offsets, val_dense_dims
 using Static: One, lt
 using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview, @gc_preserve
@@ -88,7 +89,7 @@ if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
   for f in (
     chain_valgrad!,
     chain_valgrad_pullback!,
-    _chain,
+    __chain,
     output_size,
     forward_output_size,
     _numparam,

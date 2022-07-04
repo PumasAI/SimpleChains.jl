@@ -133,26 +133,58 @@ end
 @inline _maybe_sarray(x) = x
 @inline _maybe_sarray(x::AbstractArray) = _maybe_sarray(x, size(x))
 @inline _maybe_sarray(x::AbstractArray, _) = x
-@generated function _maybe_sarray(A::AbstractArray, s::Tuple{Vararg{StaticInt}})
+@generated function _marray_type(s::Tuple{Vararg{StaticInt}})
   k = known(s)
   t = Expr(:tuple)
   ct = Expr(:curly, :Tuple)
   for x in k
     push!(ct.args, x)
   end
-  for i = 1:prod(k)::Int
-    push!(t.args, :(unsafe_load(p, $i)))
-  end
-  Expr(
-    :block,
-    Expr(:meta, :inline),
-    :(p = pointer(A)),
-    :(GC.@preserve A StaticArrays.SArray{$ct}($t)),
-  )
+  :($StaticArrays.MArray{$ct})
 end
-function (c::SimpleChain)(arg::StaticArrays.SArray, params)
+@inline function _maybe_sarray(A::AbstractArray{T}, s::Tuple{Vararg{StaticInt}}) where {T}
+  B = _marray_type(s){T}(undef)
+  @turbo for i = eachindex(B)
+    B[i] = A[i]
+  end
+  StaticArrays.SArray(B)
+end
+# @generated function _maybe_sarray(A::AbstractArray, s::Tuple{Vararg{StaticInt}})
+#   k = known(s)
+#   t = Expr(:tuple)
+#   ct = Expr(:curly, :Tuple)
+#   for x in k
+#     push!(ct.args, x)
+#   end
+#   K = prod(k)::Int;
+#   for i = 1:K
+#     push!(t.args, :(unsafe_load(p, $i)))
+#   # for i = 0:K-1
+#     # push!(t.args, :($(VectorizationBase.vload)(p, (static($i),))))
+#   end
+#   Expr(
+#     :block,
+#     Expr(:meta, :inline),
+#     # :(p = $zstridedpointer(A)),
+#     :(p = pointer(A)),
+#     :(B = GC.@preserve A StaticArrays.SArray{$ct}($t)),
+#     :($(VectorizationBase.lifetime_end!)(p, Val{$K}())),
+#     :B
+#   )
+# end
+@inline function (c::SimpleChain)(arg::StaticArrays.SArray, params)
+  verify_arg(c, arg)
+  @unpack layers = c
   marg = StaticArrays.MArray(arg)
-  GC.@preserve marg _maybe_sarray(c(PtrArray(marg), params))
+  GC.@preserve marg params begin
+    parg = maybe_static_size_arg(c.inputdim, marg)
+    num_bytes = required_forward_bytes(Val(eltype(arg)), layers, size(parg), static(0))
+    if has_loss(c)
+      with_memory(_chain, c, num_bytes, parg, pointer(params))
+    else
+      with_memory(_sarray_chain, c, num_bytes, parg, pointer(params))
+    end
+  end
 end
 function (c::SimpleChain)(memory::Ptr{UInt8}, arg, params)
   verify_arg(c, arg)
@@ -187,17 +219,22 @@ end
   b, s2 = forward_layer_output_size(Val{T}(), getfield(x, 1), s1)
   b + forward_output_size(Val{T}(), Base.tail(x), s2)
 end
-__chain(::Tuple{}, arg, p::Ptr, pu::Ptr{UInt8}) = arg
-__chain(l::Tuple{T}, arg, p::Ptr, pu::Ptr{UInt8}) where {T} =
+@inline __chain(::Tuple{}, arg, p::Ptr, pu::Ptr{UInt8}) = arg
+@inline __chain(l::Tuple{T}, arg, p::Ptr, pu::Ptr{UInt8}) where {T} =
   getfield(getfield(l, 1)(arg, p, pu), 1)
-function __chain(l::Tuple{T1,T2,Vararg}, arg, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
+@inline function __chain(l::Tuple{T1,T2,Vararg}, arg, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
   res, p, pu = getfield(l, 1)(arg, p, pu)
   __chain(Base.tail(l), res, p, pu)
 end
-function _chain(c::Chain, pu::Ptr{UInt8}, arg, p)
+@inline function _chain(c::Chain, pu::Ptr{UInt8}, arg, p)
   @unpack layers = c
   __chain(layers, arg, p, pu)
 end
+@inline function _sarray_chain(c::Chain, pu::Ptr{UInt8}, arg, p)
+  @unpack layers = c
+  _maybe_sarray(__chain(layers, arg, p, pu))
+end
+
 @inline function _try_static(i::Base.Integer, j::Base.Integer)
   @assert i == j
   return i
@@ -270,9 +307,19 @@ function init_params(Λ::SimpleChain, ::Type{T}) where {T}
   init_params(Λ, nothing, T)
 end
 
-@inline maybe_static_size_arg(_, arg) = arg
-@inline function maybe_static_size_arg(s::Tuple, arg::Array)
-  PtrArray(pointer(arg), _try_static(s, size(arg)))
+@inline function maybe_static_size_arg(s::Tuple, arg)
+  if SimpleChains.ArrayInterface.device(arg) === CPUPointer()
+    PtrArray(pointer(arg), _try_static(s, size(arg)))
+  else
+    arg
+  end
+end
+@inline function maybe_static_size_arg(s::InputDimUnknown, arg)
+  if SimpleChains.ArrayInterface.device(arg) === CPUPointer()
+    PtrArray(pointer(arg), size(arg))
+  else
+    arg
+  end
 end
 
 """
@@ -391,7 +438,7 @@ function valgrad_core(
 ) where {T}
   @unpack layers = c
   g = PtrArray(Ptr{T}(pu), (glen,))
-Base.FastMath.add_fast(
+  Base.FastMath.add_fast(
     unsafe_valgrad!(c, pu + align(glen * static_sizeof(T)), g, params, arg),
     apply_penalty!(g, getpenalty(c), params, size(arg)),
   )
@@ -424,7 +471,11 @@ function valgrad(sc::Chain, arg, params::AbstractVector{T}) where {T}
   )
   return l, gv
 end
-function valgrad(sc::Chain, arg::StaticArrays.SArray, params::AbstractVector{T}) where {T}
+@inline function valgrad(
+  sc::Chain,
+  arg::StaticArrays.SArray,
+  params::AbstractVector{T},
+) where {T}
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)

@@ -40,20 +40,29 @@ pullback_layer!(pbl::Ptr{UInt8}, grad) = grad, pbl
 # end
 
 # struct PullBack{PBL<:Union{PullBackLayer,PullBackParam},G,P,M}
-struct PullBack{PBL<:PullBackLayer,G,P,M}
+struct PullBack{SA,PBL<:PullBackLayer,G,P,M}
   pbl::PBL
   grad::G
   params::P
   memory::M
+  function PullBack{SA}(pbl::PBL, grad::G, params::P, memory::M) where {SA,PBL,G,P,M}
+    new{SA,PBL,G,P,M}(pbl, grad, params, memory)
+  end
 end
-function (pb::PullBack{<:PullBackLayer})(x)
+@inline function (pb::PullBack{SA,<:PullBackLayer})(x) where {SA}
   @unpack pbl, grad, params, memory = pb
   GC.@preserve grad params memory begin
-    lgrad, pu4 = pullback_layer!(pbl, x)
+    lgrad, _ = pullback_layer!(pbl, x)
   end
-  NoTangent(),
-  StrideArraysCore.StrideArray(lgrad, memory),
-  StrideArraysCore.StrideArray(grad, memory)
+  if SA
+    NoTangent(),
+    _maybe_sarray(StrideArraysCore.StrideArray(lgrad, memory)),
+    _maybe_sarray(StrideArraysCore.StrideArray(grad, memory))
+  else
+    NoTangent(),
+    StrideArraysCore.StrideArray(lgrad, memory),
+    StrideArraysCore.StrideArray(grad, memory)
+  end
 end
 # function (pb::PullBack{<:PullBackParam})(x)
 #   @unpack pbl, grad, params, memory = pb
@@ -82,7 +91,7 @@ end
 #   #   return val, pbl_ret
 #   # end
 # end
-function chain_valgrad_pullback!(
+@inline function chain_valgrad_pullback!(
   pg,
   arg,
   layers::Tuple{X1,X2,Vararg},
@@ -96,7 +105,7 @@ function chain_valgrad_pullback!(
   pbl_ret = PullBackLayer(pg, l, arg, p, pu, pbl)
   return val, pbl_ret
 end
-function chain_valgrad_pullback!(
+@inline function chain_valgrad_pullback!(
   pg,
   arg,
   layers::Tuple{X1},
@@ -104,7 +113,7 @@ function chain_valgrad_pullback!(
   pu::Ptr{UInt8},
 ) where {X1}
   l = getfield(layers, 1)
-  pg2, val, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
+  _, val, __, pu2 = valgrad_layer!(pg, l, arg, p, pu)
 
   # pu2 gets fed into eventual `pullback!` call
   pbl_ret = PullBackLayer(pg, l, arg, p, pu, pu2)
@@ -124,15 +133,15 @@ function valgrad_noloss(sc, arg::AbstractArray{S}, params::AbstractVector{T}) wh
   glen = _try_static(numparam(sc), static_length(params))
   goff = align(glen * static_sizeof(T))
   aoff = align(arglen * static_sizeof(S))
-  
+
   num_bytes = required_bytes(Val{T}(), layers, size(parg), aoff + goff)
   memory = get_heap_memory(sc, num_bytes)
 
   GC.@preserve barg params memory begin
     pm = align(pointer(memory))
     parg2 = PtrArray(Ptr{S}(pm), _try_static(c.inputdim, size(parg)))
-    @inbounds @simd ivdep for i = eachindex(parg)
-      parg2[i]=parg[i]
+    @inbounds @simd ivdep for i in eachindex(parg)
+      parg2[i] = parg[i]
     end
     pm += aoff
     g = PtrArray(Ptr{T}(pm), (glen,))
@@ -140,7 +149,7 @@ function valgrad_noloss(sc, arg::AbstractArray{S}, params::AbstractVector{T}) wh
     # @show pointer(g) pointer(params) pointer(memory)
     l, pbl = chain_valgrad_pullback!(pointer(g), parg2, layers, pointer(params), pm)
   end
-  l, PullBack(pbl, g, params, memory)
+  l, PullBack{arg isa StaticArrays.SArray}(pbl, g, params, memory)
 end
 
 struct ElementwisePullback{G}

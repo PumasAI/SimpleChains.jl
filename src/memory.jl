@@ -10,13 +10,16 @@ function task_local_memory(sc)::Vector{UInt8}
   )::Vector{UInt8}
 end
 
-function with_stack_memory(f::F, sc, args::Vararg{Any,K}) where {F,K}
-  stack_memory = Ref{NTuple{524351,UInt8}}()
-  GC.@preserve stack_memory f(
+@inline function with_stack_memory(f::F, ::StaticInt{N}, sc, args::Vararg{Any,K}) where {F,N,K}
+  stack_memory = Ref{NTuple{N,UInt8}}()
+  p = Base.unsafe_convert(Ptr{UInt8}, stack_memory)
+  ret = GC.@preserve stack_memory f(
     sc,
-    align(Base.unsafe_convert(Ptr{UInt8}, stack_memory)),
+    align(p),
     args...,
   )
+  VectorizationBase.lifetime_end!(p, Val{N}())
+  return ret
 end
 function get_heap_memory(sc, num_bytes)
   heap_memory = task_local_memory(sc)
@@ -32,17 +35,24 @@ function with_heap_memory(f::F, sc, num_bytes, args::Vararg{Any,K}) where {F,K}
   ),
   heap_memory
 end
-
-function with_memory(f::F, sc, num_bytes, args::Vararg{Any,K}) where {F,K}
+@inline function with_memory(f::F, sc, ::StaticInt{num_bytes}, args::Vararg{Any,K}) where {F,K,num_bytes}
   if num_bytes <= 16384
-    with_stack_memory(f, sc, args...)
+    with_stack_memory(f, StaticInt{num_bytes}(), sc, args...)
+  else
+    first(with_heap_memory(f, sc, num_bytes, args...))
+  end
+end
+
+@inline function with_memory(f::F, sc, num_bytes, args::Vararg{Any,K}) where {F,K}
+  if num_bytes <= 16384
+    with_stack_memory(f, StaticInt{16384}(), sc, args...)
   else
     first(with_heap_memory(f, sc, num_bytes, args...))
   end
 end
 
 function required_bytes(::Val{T}, layers, sx, additional = static(0)) where {T}
-  output_size(Val(T), layers, sx) + additional
+  output_size(Val(T), layers, sx) + additional + static(63)
 end
 function required_bytes(
   ::Val{T},
@@ -53,10 +63,10 @@ function required_bytes(
   nthread,
 ) where {T}
   base_mem_per_thread = output_size(Val(T), layers, sx) + additional_per_thread
-  base_mem_per_thread, additional + base_mem_per_thread * nthread
+  base_mem_per_thread, additional + base_mem_per_thread * nthread + static(63)
 end
 function required_forward_bytes(::Val{T}, layers, sx, additional = static(0)) where {T}
-  forward_output_size(Val(T), layers, sx) + additional
+  forward_output_size(Val(T), layers, sx) + additional + static(63)
 end
 
 
