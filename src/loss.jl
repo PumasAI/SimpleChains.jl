@@ -271,7 +271,7 @@ function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, p) where {T
   Ŷ = cnl(X, p)
   ec = correct_count(Ŷ, target(loss))
   os = first(layer_output_size(Val(T), loss, size(X)))
-  GC.@preserve p ec, with_memory(__loss, c, os, loss, Ŷ, pointer(p))
+  GC.@preserve p (ec, with_memory(__loss, c, os, loss, Ŷ, pointer(p))...)
 end
 function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, Y, p) where {T}
   correct_count_and_loss(add_loss(c, pop_loss(c)(Y)), X, p)
