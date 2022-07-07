@@ -9,6 +9,7 @@ using UnPack,
   StrideArraysCore,
   Static,
   VectorizedRNG
+using ArrayInterfaceCore: CPUPointer
 using ArrayInterface:
   size,
   strides,
@@ -29,7 +30,7 @@ using SIMDTypes: Bit, NativeTypes
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD, NativeTypesV
 using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
-using LayoutPointers: bytestrideindex, stridedpointer, zero_offsets, val_dense_dims
+using LayoutPointers: bytestrideindex, stridedpointer, zstridedpointer, zero_offsets, val_dense_dims
 using Static: One, lt
 using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview, @gc_preserve
@@ -39,6 +40,7 @@ import Random
 import ChainRulesCore
 import ForwardDiff
 import LoopVectorization
+import StaticArrays
 
 using LoopVectorization: matmul_params, @turbo
 # using LoopVectorization: matmul_params
@@ -67,6 +69,7 @@ export SimpleChain,
 
 const Integer = Union{StaticInt,Base.Integer}
 
+include("memory.jl")
 include("simple_chain.jl")
 include("utils.jl")
 include("activation.jl")
@@ -81,13 +84,19 @@ include("penalty.jl")
 include("chain_rules.jl")
 include("optimize.jl")
 
-if VERSION >= v"1.7.0"
-  if hasfield(Method, :recursion_relation)
-    dont_limit = Returns(true)
-    for f = (chain_valgrad!, _chain, output_size, _numparam)
-      for m in methods(f)
-        m.recursion_relation = dont_limit
-      end
+if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+  dont_limit = Returns(true)
+  for f in (
+    chain_valgrad!,
+    chain_valgrad_pullback!,
+    __chain,
+    output_size,
+    forward_output_size,
+    _numparam,
+    pullback_layer!,
+  )
+    for m in methods(f)
+      m.recursion_relation = dont_limit
     end
   end
 end

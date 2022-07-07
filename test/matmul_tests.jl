@@ -10,15 +10,13 @@ function dual4x3(x::T) where {T<:ForwardDiff.Dual}
   ForwardDiff.Dual{tagtype(T)}(x, dual4x3(randn()), dual4x3(randn()), dual4x3(randn()))
 end
 
-
-
 for bias in (true, false)
-  M = 16
-  K = 20
-  N = 17
-  A = rand(M, K + bias);
-  B = rand(K, N);
-  bm = rand(K, 1);
+  local M = 16
+  local K = 20
+  local N = 17
+  local A = rand(M, K + bias);
+  local B = rand(K, N);
+  local bm = rand(K, 1);
 
   for fa1 in (identity, dual4x3),
     fa2 in (identity, dual4x3),

@@ -19,7 +19,7 @@ tssum(x) = ArrayInterface.reduce_tup(+, x)
 tssum(::Tuple{}) = static(0)
 
 function maximum_turbo!(m, y)
-  @turbo for i in indices((m,y),(1,2))
+  @turbo for i in indices((m, y), (1, 2))
     mi = typemin(eltype(y))
     for j in axes(y, 1)
       mi = max(mi, y[j, i])
@@ -31,10 +31,10 @@ end
 
 function unnormalized_logsoftmax!(z, m, y::AbstractMatrix)
   maximum_turbo!(m, y)
-  @turbo for j in indices((y,z), 2)
+  @turbo for j in indices((y, z), 2)
     mj = m[j]
     s = zero(eltype(m))
-    for i in indices((y,z), 1)
+    for i in indices((y, z), 1)
       yij = y[i, j]
       zij = mj == Inf ? (yij == Inf ? zero(eltype(y)) : -Inf) : yij - m[j]
       z[i, j] = zij
@@ -179,22 +179,19 @@ function randpermzero!(
 end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
 
-function _alloc_grad(mem::Vector{T}, np, ::One, x) where {T}
-  StrideArray(PtrArray(align(pointer(mem)), (np,), (static_sizeof(T),), Val((true,))), mem)
+function _alloc_grad(pg::Ptr{T}, np, numthreads, x) where {T}
+  PtrArray(pg, (np, numthreads), (static_sizeof(T), x), Val((true, false)))
 end
+function _alloc_grad(pg::Ptr{T}, np, ::One, x) where {T}
+  PtrArray(pg, (np,), (static_sizeof(T),), Val((true,)))
+end
+
 function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
-  StrideArray(
-    PtrArray(
-      align(pointer(mem)),
-      (np, numthreads),
-      (static_sizeof(T), x),
-      Val((true, false)),
-    ),
-    mem,
-  )
+  StrideArray(_alloc_grad(align(pointer(mem)), np, numthreads, x), mem)
 end
 
 _min(a, b) = ifelse(lt(a, b), a, b)
+_numthreads() = _min(num_threads(), num_cores())
 """
     alloc_threaded_grad(chn, id = nothing, ::Type{T} = Float32; numthreads = min(Threads.nthreads(), SimpleChains.num_cores())
 
@@ -208,7 +205,7 @@ function alloc_threaded_grad(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32;
-  numthreads = _min(num_threads(), num_cores()),
+  numthreads = _numthreads(),
 ) where {T}
   np = numparam(Λ, id)
   x = align(np, T)

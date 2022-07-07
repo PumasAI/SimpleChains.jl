@@ -1,17 +1,4 @@
 
-"""
-    AbstractPenalty
-
-The `AbstractPenalty` interface requires supporting the following methods:
-
-1. `getchain(::AbstractPenalty)::SimpleChain` returns a `SimpleChain` if it is carrying one.
-2. `apply_penalty(::AbstractPenalty, params)::Number` returns the penalty
-3. `apply_penalty!(grad, ::AbstractPenalty, params)::Number` returns the penalty and updates `grad` to add the gradient.
-"""
-abstract type AbstractPenalty{NN<:Union{SimpleChain,Nothing}} end
-
-const Chain = Union{AbstractPenalty{<:SimpleChain},SimpleChain}
-
 function (Λ::AbstractPenalty{<:SimpleChain})(arg, params)
   Base.FastMath.add_fast(getchain(Λ)(arg, params), apply_penalty(Λ, params, size(arg)))
 end
@@ -47,6 +34,7 @@ Base.front(Λ::AbstractPenalty) = Base.front(getchain(Λ))
 numparam(Λ::AbstractPenalty, id = nothing) = numparam(getchain(Λ), id)
 
 remove_loss(Λ::AbstractPenalty) = remove_loss(getchain(Λ))
+_type_sym(c::Chain) = __type_sym(remove_loss(c))
 
 function init_params(
   Λ::AbstractPenalty,

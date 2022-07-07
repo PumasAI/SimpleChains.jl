@@ -48,7 +48,9 @@ function getpcmp(::StaticInt{W}, ::StaticInt{WU}, x::UInt32, ::False) where {W,W
   (x % UInt64) << 32
 end
 
-layer_output_size(::Val{T}, d::Dropout, s) where {T} = align((prod(s) + 7) & -8), s
+forward_layer_output_size(::Val{T}, d::Dropout, s) where {T} = static(0), s
+layer_output_size(::Val{T}, d::Dropout, s::Tuple) where {T} =
+  align((prod(s) + static(7)) >>> static(3)), s
 
 function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
   si = StrideIndex{1,(1,),1}((StaticInt(1),), (StaticInt(0),))
@@ -68,15 +70,15 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
     pcmp = getpcmp(W, WU, _pcmp)
     # n = MM(W, 0)
     n = 0
-    while n < VectorizedRNG.vadd(N, 1 - 2W)
+    while n < VectorizationBase.vadd(N, 1 - 2W)
       state, zvu2 = VectorizedRNG.random_unsigned(state, Val{2}(), UInt64)
       m₂ = reinterpret(typeof(pcmp), zvu2) > pcmp
       u₂ = Unroll{1,Int(W),2,1,Int(W),0x0000000000000000,1}((n,))
       vstore!(ptrx, vload(ptrx, u₂, m₂), u₂)
       vstore!(ptrm, m₂, u₂)
-      n = VectorizedRNG.vadd(W2, n)
+      n = VectorizationBase.vadd(W2, n)
     end
-    if n < VectorizedRNG.vsub(N, W)
+    if n < VectorizationBase.vsub(N, W)
       msk = VectorizationBase.mask(W, N)
       state, zvu2 = VectorizedRNG.random_unsigned(state, Val{2}(), UInt64)
       m₂ = reinterpret(typeof(pcmp), zvu2) > pcmp
@@ -87,7 +89,7 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
     elseif n < N
       msk = VectorizationBase.mask(W, N)
       state, _zvu1 = VectorizedRNG.random_unsigned(state, Val{1}(), UInt64)
-      (z₁,) = VectorizedRNG.data(_zvu1)
+      (z₁,) = VectorizationBase.data(_zvu1)
       m₁ = reinterpret(typeof(pcmp), z₁) > pcmp
       m₁msk = m₁ & msk
       u₁ = (MM(W, n),)
@@ -97,7 +99,7 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
     VectorizedRNG.storestate!(rng, state)
   end # GC preserve  
 
-  pg, x, p, align(pu + ((7 + N) & -8))
+  pg, x, p, align(pu + ((static(7) + N) >>> static(3)))
 end
 @inline pullback_param!(::Ptr, ::Dropout, _, __, ::Ptr, ::Ptr{UInt8}) = nothing
 

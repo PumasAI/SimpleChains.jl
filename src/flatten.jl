@@ -30,8 +30,8 @@ function getoutputdim(::Flatten{N}, inputdim) where {N}
   getoutputdim(_dec(Flatten{N}()), (d0 * d1, t1...))
 end
 
-function layer_output_size(::Val{T}, ::Flatten{N}, inputdim::Tuple) where {T,N}
-  0, getoutputdim(Flatten{N}(), inputdim)
+function forward_layer_output_size(::Val{T}, ::Flatten{N}, inputdim::Tuple) where {T,N}
+  static(0), getoutputdim(Flatten{N}(), inputdim)
 end
 
 init_params!(::Flatten{N}, p, id) where {N} = p, getoutputdim(Flatten{N}(), id)
@@ -49,6 +49,6 @@ function valgrad_layer!(pg::Ptr, ::Flatten{N}, A, p, pu) where {N}
   B, p, pu = Flatten{N}()(A, p, pu)
   return pg, B, p, pu
 end
-function pullback!(::Ptr, ::Flatten, B̄, A, p, pu, pu2)
+function pullback!(::Ptr, ::Flatten, B̄, A, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
   return reshape(B̄, size(A)), pu2
 end
