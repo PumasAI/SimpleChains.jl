@@ -144,8 +144,16 @@ end
 end
 @inline function _maybe_sarray(A::AbstractArray{T}, s::Tuple{Vararg{StaticInt}}) where {T}
   B = _marray_type(s){T}(undef)
-  @turbo for i = eachindex(B)
-    B[i] = A[i]
+  if T <: Base.HWReal
+    @turbo for i = eachindex(B)
+      B[i] = A[i]
+    end
+  elseif Base.isbitstype(T)
+    GC.@preserve B A begin
+      ccall(:memmove, Ptr{Cvoid}, (Ptr{Cvoid},Ptr{Cvoid},Csize_t), pointer(B), pointer(A), (length(B)*Base.aligned_sizeof(T))%UInt)
+    end
+  else
+    copyto!(B, A)
   end
   StaticArrays.SArray(B)
 end
