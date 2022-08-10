@@ -2,8 +2,8 @@
 
 import MLDatasets
 function get_data()
-  xtrain, ytrain = MLDatasets.MNIST.traindata(Float32)
-  xtest, ytest = MLDatasets.MNIST.testdata(Float32)
+  xtrain, ytrain = MLDatasets.MNIST(:train)[:]
+  xtest, ytest = MLDatasets.MNIST(:test)[:]
 
   (
     (reshape(xtrain, 28, 28, 1, :), UInt32.(ytrain .+ 1)),
