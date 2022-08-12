@@ -25,7 +25,7 @@ schain = SimpleChain(
   SquaredLoss(y)
 );
 
-p = randn(SimpleChains.numparam(schain)*1);
+p = SimpleChains.init_params(schain)
 g = similar(p);
 
 # Entirely in place evaluation
