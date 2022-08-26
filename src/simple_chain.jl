@@ -50,6 +50,7 @@ SimpleChain(input_dim::InputDim, lf, lm, lt::Vararg) =
   SimpleChain(input_dim, (lf, lm, lt...))
 
 SimpleChain(input_dim::Integer, l::Tuple) = SimpleChain((input_dim,), l)
+SimpleChain(input_dim::Integer, l::Vararg) = SimpleChain((input_dim,), l)
 
 SimpleChain(l::Vararg) = SimpleChain(InputDimUnknown(), l)
 SimpleChain(l::Tuple) = SimpleChain(InputDimUnknown(), l)
