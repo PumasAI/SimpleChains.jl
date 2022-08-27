@@ -91,17 +91,35 @@ Useful for popping off a loss layer.
 Base.front(c::SimpleChain) = SimpleChain(chain_input_dims(c), Base.front(c.layers))
 Base.vcat(c::SimpleChain, l) = SimpleChain(chain_input_dims(c), (c.layers..., l))
 
-function numparam(c::SimpleChain, id = nothing)
+@inline function numparam(c::SimpleChain, id = nothing)
   _id = chain_input_dims(c, id)
   _numparam(static(0), c.layers, _id)
 end
-_numparam(s, ::Tuple{}, _) = s
-function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
-  np, od = numparam(getfield(layers, 1), id)
-  _numparam(s + np, Base.tail(layers), od)
+if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+  @inline _numparam(s, ::Tuple{}, _) = s
+  @inline function _numparam(s, layers::Tuple{L,Vararg}, id) where {L}
+    np, od = numparam(getfield(layers, 1), id)
+    _numparam(s + np, Base.tail(layers), od)
+  end
+else
+  @generated function _numparam(np_0, layers::Tuple{Vararg{Any,N}}, id_0) where {N}
+    N == 0 && return :np_0
+    q = Expr(:block, Expr(:meta,:inline))
+    prev_np = :np_0
+    prev_id = :id_0
+    for n = 1:N
+      tmp = Symbol(:tmp_,n)
+      next_id = Symbol(:id_,n)
+      next_np = Symbol(:np_,n)
+      push!(q.args, :(($tmp, $next_id) = numparam(getfield(layers,$n),$prev_id)))
+      push!(q.args, :($next_np = $tmp + $prev_np))
+      prev_np = next_np
+      prev_id = next_id
+    end
+    return q
+  end
 end
 parameter_free(x) = numparam(x) == 0
-
 
 matches(::InputDimUnknown, _) = true
 matches(x::Integer, y::Integer) = x == y
@@ -212,6 +230,8 @@ function layer_output_size(::Val{T}, l, inputdim::Tuple) where {T}
 end
 
 
+if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+  
 @inline output_size(::Val{T}, x::Tuple{}, _) where {T} = static(0)
 @inline function output_size(::Val{T}, x::Tuple{X}, s1) where {T,X}
   first(layer_output_size(Val{T}(), getfield(x, 1), s1))
@@ -232,17 +252,66 @@ end
   b, s2 = forward_layer_output_size(Val{T}(), getfield(x, 1), s1)
   b + forward_output_size(Val{T}(), Base.tail(x), s2)
 end
-@inline __chain(::Tuple{}, arg, p::Ptr, pu::Ptr{UInt8}) = arg
-@inline __chain(l::Tuple{T}, arg, p::Ptr, pu::Ptr{UInt8}) where {T} =
-  getfield(getfield(l, 1)(arg, p, pu), 1)
-@inline function __chain(l::Tuple{T1,T2,Vararg}, arg, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
-  res, p, pu = getfield(l, 1)(arg, p, pu)
-  __chain(Base.tail(l), res, p, pu)
+
+
+  @inline __chain(::Tuple{}, arg, p::Ptr, pu::Ptr{UInt8}) = arg
+  @inline __chain(l::Tuple{T}, arg, p::Ptr, pu::Ptr{UInt8}) where {T} =
+    getfield(getfield(l, 1)(arg, p, pu), 1)
+  @inline function __chain(l::Tuple{T1,T2,Vararg}, arg, p::Ptr, pu::Ptr{UInt8}) where {T1,T2}
+    res, p, pu = getfield(l, 1)(arg, p, pu)
+    __chain(Base.tail(l), res, p, pu)
+  end
+else
+  function _output_size_expr(VT::Expr, N::Int, f::Symbol)
+    N == 0 && return static(0)
+    q = Expr(:block, Expr(:meta,:inline))
+    prev_s = :s_0
+    prev_a = :acc_0
+    for n = 1:N
+      next_s = Symbol(:s_,n)
+      next_a = Symbol(:acc_,n)
+      tmp = n == 1 ? next_a : Symbol(:tmp_,n)
+      push!(q.args, :(($tmp,$next_s) = $f($VT, getfield(x,$n), $prev_s)))
+      n == 1 || push!(q.args, :($next_a = $prev_a + $tmp))
+      prev_s = next_s
+      prev_a = next_a
+    end
+    push!(q.args, prev_a)
+    return q
+  end
+  @generated function output_size(::Val{T}, x::Tuple{Vararg{Any,N}}, s_0) where {T,N}
+    _output_size_expr(:(Val{$T}()), N, :layer_output_size)
+  end
+  @generated function forward_output_size(::Val{T}, x::Tuple{Vararg{Any,N}}, s_0) where {T,N}
+    _output_size_expr(:(Val{$T}()), N, :forward_layer_output_size)
+  end
+  
+  @generated function __chain(l::Tuple{Vararg{Any,N}}, res_0, p_0::Ptr, pu_0::Ptr{UInt8}) where {N}
+    N == 0 && return :res_0
+    q = Expr(:block, Expr(:meta,:inline))
+    prev_p = :p_0
+    prev_pu = :pu_0
+    prev_res = :res_0
+    for n = 1:N
+      next_p = Symbol(:p, n)
+      next_pu = Symbol(:pu, n)
+      next_res = Symbol(:res, n)
+      push!(q.args, :(($next_res, $next_p, $next_pu) = getfield(l,$n)($prev_res, $prev_p, $prev_pu)))
+      prev_p = next_p
+      prev_pu = next_pu
+      prev_res = next_res
+    end
+    push!(q.args, prev_res)
+    return q
+  end
 end
+  
 @inline function _chain(c::Chain, pu::Ptr{UInt8}, arg, p)
   @unpack layers = c
   __chain(layers, arg, p, pu)
 end
+
+
 @inline function _sarray_chain(c::Chain, pu::Ptr{UInt8}, arg, p)
   @unpack layers = c
   _maybe_sarray(__chain(layers, arg, p, pu))
@@ -421,26 +490,73 @@ function chain_valgrad_entry!(
   chain_valgrad_entry!(pg, arg_subset, layers, p, pu)
 end
 
-function chain_valgrad!(
-  pg,
-  arg,
-  layers::Tuple{X1,X2,Vararg},
-  p::Ptr,
-  pu::Ptr{UInt8},
-) where {X1,X2}
-  l = getfield(layers, 1)
-  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-  val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-  lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
-  return val, lgrad, pu4
+if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+  function chain_valgrad!(
+    pg,
+    arg,
+    layers::Tuple{X1,X2,Vararg},
+    p::Ptr,
+    pu::Ptr{UInt8},
+    ) where {X1,X2}
+    l = getfield(layers, 1)
+    pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
+    val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+    lgrad, pu4 = pullback!(pg, l, grad, arg, p, pu, pu3)
+    return val, lgrad, pu4
+  end
+  function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where {X}
+    l = getfield(layers, 1)
+    __, val, _, pu2 = valgrad_layer!(pg, l, arg, p, pu)
+    # val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
+    lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
+    return val, lgrad, pu3
+  end
+else
+  function _chain_valgrad_expr(n::Int, r::Int)
+    # note n + r == N
+    q = Expr(:block)
+    ((n == 0) & (r == 1)) && push!(q.args, Expr(:meta,:inline))
+    pg_now = Symbol(:pg_,n)
+    pg_next = Symbol(:pg_,n+1)
+    arg_now = Symbol(:arg_,n)
+    arg_next = Symbol(:arg_,n+1)
+    p_now = Symbol(:p_,n)
+    p_next = Symbol(:p_,n+1)
+    pu_now = Symbol(:pu_,n)
+    pu_next = Symbol(:pu_,n+1)
+    layer = Symbol(:layer_,n)
+    push!(q.args, :($layer = getfield(layers, $(n+1))))
+    push!(q.args, :(($pg_next,$arg_next,$p_next,$pu_next) = valgrad_layer!($pg_now,$layer,$arg_now,$p_now, $pu_now)))
+    pu_final = Symbol(:pu_,2*n + r)
+    if r == 1
+      grad_next = :(One())
+      pu_pullback = pu_next
+    else
+      pu_pullback = Symbol(:pu_,2n+r+1)
+      grad_next = Symbol(:grad_,n+1)
+      if r == 2
+        # Many loss functions are implemented in terms of chain_valgrad, so we
+        # do have to recurse here in case we ought to dispatch to a specialized method
+        push!(q.args, :(($(Symbol(:arg_,n+r)),$grad_next, $pu_pullback) = chain_valgrad!($pg_next,$arg_next, (getfield(layers,$(n+r)),), $p_next, $pu_next)))
+      else
+        # pu_pullback is pu_final of n+=1, r-=1
+        push!(q.args, _chain_valgrad_expr(n+1,r-1))
+      end
+    end
+    grad_now = Symbol(:grad_,n)
+    push!(q.args, :(($grad_now,$pu_final)=pullback!($pg_now,$layer,$grad_next,$arg_now,$p_now,$pu_now,$pu_pullback)))
+    if n == 0 # we're done
+      push!(q.args, Expr(:tuple, Symbol(:arg_,r), grad_now, pu_final))
+    end
+    return q
+  end
+  @generated function chain_valgrad!(
+    pg_0, arg_0, layers::Tuple{Vararg{Any,N}}, p_0::Ptr, pu_0::Ptr{UInt8}
+    ) where {N}
+    _chain_valgrad_expr(0, N)
+  end
 end
-function chain_valgrad!(pg, arg, layers::Tuple{X}, p::Ptr, pu::Ptr{UInt8}) where {X}
-  l = getfield(layers, 1)
-  __, val, _, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-  # val, pullback, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-  lgrad, pu3 = pullback!(pg, l, One(), arg, p, pu, pu2)
-  return val, lgrad, pu3
-end
+
 @inline getchain(sc::SimpleChain) = sc
 function valgrad_core(
   c::Chain,
