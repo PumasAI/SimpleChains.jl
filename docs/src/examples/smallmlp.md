@@ -54,16 +54,30 @@ end
 ```
 I get
 ```julia
+  5.811325 seconds (8.14 M allocations: 557.295 MiB, 3.70% gc time, 64.41% compilation time)
 ┌ Info: Loss:
-│   train = 0.012996411f0
-└   test = 0.021395735f0
-  0.488138 seconds
+│   train = 115.98687f0
+└   test = 917.22003f0
+  2.102444 seconds
 ┌ Info: Loss:
-│   train = 0.0027068993f0
-└   test = 0.009439239f0
-  0.481226 seconds
+│   train = 19.950096f0
+└   test = 481.5731f0
+  2.125819 seconds
 ┌ Info: Loss:
-│   train = 0.0016358295f0
-└   test = 0.0074498975f0
+│   train = 11.962397f0
+└   test = 444.16312f0
+
+julia> versioninfo()
+Julia Version 1.9.0-DEV.1189
+Commit 293031b4a5* (2022-08-26 20:24 UTC)
+Platform Info:
+  OS: Linux (x86_64-redhat-linux)
+  CPU: 8 × 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
+  WORD_SIZE: 64
+  LIBM: libopenlibm
+  LLVM: libLLVM-14.0.5 (ORCJIT, tigerlake)
+  Threads: 8 on 8 virtual cores
+Environment:
+  JULIA_NUM_THREADS = 8
 ```
 
