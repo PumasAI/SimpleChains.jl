@@ -54,18 +54,24 @@ end
 ```
 I get
 ```julia
-  5.811325 seconds (8.14 M allocations: 557.295 MiB, 3.70% gc time, 64.41% compilation time)
+julia> for _ in 1:3
+         @time SimpleChains.train_unbatched!(
+           G, p, mlpdloss, X, SimpleChains.ADAM(), 10_000
+         );
+         report(p)
+       end
+  5.258996 seconds (7.83 M allocations: 539.553 MiB, 4.18% gc time, 69.59% compilation time)
 ┌ Info: Loss:
-│   train = 115.98687f0
-└   test = 917.22003f0
-  2.102444 seconds
+│   train = 1243.1248f0
+└   test = 483.38852f0
+  1.638860 seconds
 ┌ Info: Loss:
-│   train = 19.950096f0
-└   test = 481.5731f0
-  2.125819 seconds
+│   train = 96.98259f0
+└   test = 210.4579f0
+  1.654781 seconds
 ┌ Info: Loss:
-│   train = 11.962397f0
-└   test = 444.16312f0
+│   train = 44.350838f0
+└   test = 164.85913f0
 
 julia> versioninfo()
 Julia Version 1.9.0-DEV.1189
