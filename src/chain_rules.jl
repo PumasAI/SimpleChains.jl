@@ -74,13 +74,6 @@ end
   _maybe_sarray(StrideArraysCore.StrideArray(lgrad, memory)),
   _maybe_sarray(StrideArraysCore.StrideArray(grad, memory))
 end
-# function (pb::PullBack{<:PullBackParam})(x)
-#   @unpack pbl, grad, params, memory = pb
-#   GC.@preserve grad params memory pullback_layer!(pbl, x)
-#   NoTangent(),
-#   NoTangent(),
-#   StrideArraysCore.StrideArray(grad, memory)
-# end
 
 
 # function chain_valgrad_pullback_entry!(
