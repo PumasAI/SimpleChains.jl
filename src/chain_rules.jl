@@ -76,24 +76,6 @@ end
 end
 
 
-# function chain_valgrad_pullback_entry!(
-#   pg,
-#   arg,
-#   layers::Tuple{X1,X2,Vararg},
-#   p::Ptr,
-#   pu::Ptr{UInt8},
-# ) where {X1,X2}
-#   l = getfield(layers, 1)
-#   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-#   val, pbl = chain_valgrad_pullback!(pg2, larg, Base.tail(layers), p2, pu2)
-#   # if parameter_free(l)
-#     pbl_ret = PullBackLayer(pg, l, arg, p, pu, pbl)
-#     return val, pbl_ret
-#   # else
-#   #   pbl_ret = PullBackParam(pg, l, arg, p, pu, pbl)
-#   #   return val, pbl_ret
-#   # end
-# end
 @inline function chain_valgrad_pullback!(
   pg,
   arg,
