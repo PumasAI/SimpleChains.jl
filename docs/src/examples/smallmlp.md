@@ -54,16 +54,36 @@ end
 ```
 I get
 ```julia
+julia> for _ in 1:3
+         @time SimpleChains.train_unbatched!(
+           G, p, mlpdloss, X, SimpleChains.ADAM(), 10_000
+         );
+         report(p)
+       end
+  5.258996 seconds (7.83 M allocations: 539.553 MiB, 4.18% gc time, 69.59% compilation time)
 ┌ Info: Loss:
-│   train = 0.012996411f0
-└   test = 0.021395735f0
-  0.488138 seconds
+│   train = 1243.1248f0
+└   test = 483.38852f0
+  1.638860 seconds
 ┌ Info: Loss:
-│   train = 0.0027068993f0
-└   test = 0.009439239f0
-  0.481226 seconds
+│   train = 96.98259f0
+└   test = 210.4579f0
+  1.654781 seconds
 ┌ Info: Loss:
-│   train = 0.0016358295f0
-└   test = 0.0074498975f0
+│   train = 44.350838f0
+└   test = 164.85913f0
+
+julia> versioninfo()
+Julia Version 1.9.0-DEV.1189
+Commit 293031b4a5* (2022-08-26 20:24 UTC)
+Platform Info:
+  OS: Linux (x86_64-redhat-linux)
+  CPU: 8 × 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
+  WORD_SIZE: 64
+  LIBM: libopenlibm
+  LLVM: libLLVM-14.0.5 (ORCJIT, tigerlake)
+  Threads: 8 on 8 virtual cores
+Environment:
+  JULIA_NUM_THREADS = 8
 ```
 
