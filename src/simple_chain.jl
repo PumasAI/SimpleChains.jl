@@ -45,12 +45,12 @@ const Chain = Union{AbstractPenalty{<:SimpleChain},SimpleChain}
 chain_input_dims(c::SimpleChain) = c.inputdim
 
 SimpleChain(input_dim::Integer, lf, lm, lt::Vararg) =
-  SimpleChain((input_dim,), (lf, lm, lt...))
+  SimpleChain((static(input_dim),), (lf, lm, lt...))
 SimpleChain(input_dim::InputDim, lf, lm, lt::Vararg) =
   SimpleChain(input_dim, (lf, lm, lt...))
 
-SimpleChain(input_dim::Integer, l::Tuple) = SimpleChain((input_dim,), l)
-SimpleChain(input_dim::Integer, l::Vararg) = SimpleChain((input_dim,), l)
+SimpleChain(input_dim::Integer, l::Tuple) = SimpleChain((static(input_dim),), l)
+SimpleChain(input_dim::Integer, l::Vararg) = SimpleChain((static(input_dim),), l)
 
 SimpleChain(l::Vararg) = SimpleChain(InputDimUnknown(), l)
 SimpleChain(l::Tuple) = SimpleChain(InputDimUnknown(), l)

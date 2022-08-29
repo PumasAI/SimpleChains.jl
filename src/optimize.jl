@@ -585,7 +585,7 @@ function train_batched_core!(
   N_bs,
 ) where {T}
   numthreads = _numthreads()
-  glen = _try_static(numparam(getchain(c)), static_length(params))
+  glen = _try_static(numparam(getchain(c)), static_length(p))
   aligned_glen = align(glen)
   g = _alloc_grad(Ptr{T}(pu), glen, numthreads, aligned_glen)
   offset = static_sizeof(T) * aligned_glen * numthreads
@@ -633,7 +633,7 @@ function train_batched!(
   perm_mem = align(sizeof(Int) * N)
   if g === nothing
     base_mem =
-      optoff + perm_mem + align(_try_static(numparam(chn), static_length(params))) * nthread
+      optoff + perm_mem + align(_try_static(numparam(chn), static_length(p))) * nthread
   else
     base_mem = optoff + perm_mem
   end

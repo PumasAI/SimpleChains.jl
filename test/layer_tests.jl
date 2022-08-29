@@ -4,7 +4,18 @@ x = rand(5)
 y = rand(2)
 
 sc = SimpleChain(
-  static(5),
+  5,
+  TurboDense{true}(tanh, 5),
+  TurboDense{false}(tanh, 5),
+  TurboDense{true}(SimpleChains.relu, 5),
+  SimpleChains.Dropout(0.3),
+  TurboDense{false}(SimpleChains.relu, 5),
+  TurboDense{true}(identity, 2),
+  TurboDense{false}(identity, 2),
+  SquaredLoss(y)
+)
+sc_dynamic = SimpleChain(
+  (5,),
   TurboDense{true}(tanh, 5),
   TurboDense{false}(tanh, 5),
   TurboDense{true}(SimpleChains.relu, 5),
@@ -43,6 +54,9 @@ for seed = 1:4
   SimpleChains.VectorizedRNG.seed!(seed);
   gzyg = Zygote.gradient(p) do p
     sum(abs2, Base.front(sc)(x, p) .- y)/2
+  end |> only |> Vector
+  gzyg2 = Zygote.gradient(p) do p
+    sum(abs2, Base.front(sc_dynamic)(x, p) .- y)/2
   end |> only |> Vector
   SimpleChains.VectorizedRNG.seed!(seed);
   gz = Zygote.gradient(sc, x, p)[2]

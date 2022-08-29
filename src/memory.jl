@@ -35,17 +35,11 @@ function with_heap_memory(f::F, sc, num_bytes, args::Vararg{Any,K}) where {F,K}
   ),
   heap_memory
 end
-@inline function with_memory(f::F, sc, ::StaticInt{num_bytes}, args::Vararg{Any,K}) where {F,K,num_bytes}
-  if num_bytes <= 16384
-    with_stack_memory(f, StaticInt{num_bytes}(), sc, args...)
-  else
-    first(with_heap_memory(f, sc, num_bytes, args...))
-  end
-end
-
+_static_max_16384(::StaticInt{N}) where {N} = StaticInt{N}()
+_static_max_16384(_) = StaticInt{16384}()
 @inline function with_memory(f::F, sc, num_bytes, args::Vararg{Any,K}) where {F,K}
   if num_bytes <= 16384
-    with_stack_memory(f, StaticInt{16384}(), sc, args...)
+    with_stack_memory(f, _static_max_16384(num_bytes), sc, args...)
   else
     first(with_heap_memory(f, sc, num_bytes, args...))
   end

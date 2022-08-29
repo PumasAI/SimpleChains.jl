@@ -1,5 +1,5 @@
 using SimpleChains
-using Test, Aqua, ForwardDiff, Zygote
+using Test, Aqua, ForwardDiff, Zygote, ChainRules
 
 function countallocations!(g, sc, x, p)
   @allocated valgrad!(g, sc, x, p)
@@ -96,6 +96,7 @@ InteractiveUtils.versioninfo(verbose=true)
           p,
         ),
       )
+      @test (ChainRules.rrule(FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45)), x, p)[2](2.0)[3] .*= 0.5) == g
       _gzyg = Zygote.gradient(p) do p
         sum(abs2, Base.front(sc)(x, p) .- y)/2# / size(x)[end]
       end
