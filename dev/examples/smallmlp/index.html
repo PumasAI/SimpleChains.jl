@@ -37,14 +37,34 @@ for _ in 1:3
     G, p, mlpdloss, X, SimpleChains.ADAM(), 10_000
   );
   report(p)
-end</code></pre><p>I get</p><pre><code class="language-julia hljs">┌ Info: Loss:
-│   train = 0.012996411f0
-└   test = 0.021395735f0
-  0.488138 seconds
+end</code></pre><p>I get</p><pre><code class="language-julia hljs">julia&gt; for _ in 1:3
+         @time SimpleChains.train_unbatched!(
+           G, p, mlpdloss, X, SimpleChains.ADAM(), 10_000
+         );
+         report(p)
+       end
+  5.258996 seconds (7.83 M allocations: 539.553 MiB, 4.18% gc time, 69.59% compilation time)
 ┌ Info: Loss:
-│   train = 0.0027068993f0
-└   test = 0.009439239f0
-  0.481226 seconds
+│   train = 1243.1248f0
+└   test = 483.38852f0
+  1.638860 seconds
 ┌ Info: Loss:
-│   train = 0.0016358295f0
-└   test = 0.0074498975f0</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../mnist/">MNIST - Convolutions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.22 on <span class="colophon-date" title="Saturday 13 August 2022 13:14">Saturday 13 August 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+│   train = 96.98259f0
+└   test = 210.4579f0
+  1.654781 seconds
+┌ Info: Loss:
+│   train = 44.350838f0
+└   test = 164.85913f0
+
+julia&gt; versioninfo()
+Julia Version 1.9.0-DEV.1189
+Commit 293031b4a5* (2022-08-26 20:24 UTC)
+Platform Info:
+  OS: Linux (x86_64-redhat-linux)
+  CPU: 8 × 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
+  WORD_SIZE: 64
+  LIBM: libopenlibm
+  LLVM: libLLVM-14.0.5 (ORCJIT, tigerlake)
+  Threads: 8 on 8 virtual cores
+Environment:
+  JULIA_NUM_THREADS = 8</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../mnist/">MNIST - Convolutions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Monday 29 August 2022 15:08">Monday 29 August 2022</span>. Using Julia version 1.8.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
