@@ -63,7 +63,11 @@ fill!(G, NaN);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
 @test all(isfinite, p)
 @test all(isfinite, G)
-
+g = Matrix{eltype(g)}(undef, size(G,1), 1);
+@time SimpleChains.train_batched!(g, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 2);
+@test all(isfinite, p)
+@test all(isfinite, g)
+  
 # assess training and test loss
 a2, l2 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 @test l2 ≈ lenetloss(xtrain4, p)
