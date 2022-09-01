@@ -1,7 +1,7 @@
 
 const MAXSTACK = 16384
 _static_max_stack(::StaticInt{N}) where {N} = StaticInt{N}()
-_static_max_stack(_) = Staticint{MAXSTACK}()
+_static_max_stack(_) = StaticInt{MAXSTACK}()
 
 _type_sym(x) = __type_sym(x)
 @generated __type_sym(::T) where {T} = QuoteNode(Symbol(T))
@@ -48,6 +48,7 @@ end
 end
 
 function required_bytes(::Val{T}, layers, sx, additional = static(0)) where {T}
+  # we add 63 extra bytes to make sure we can bring the pointer to 64 byte alignment.
   output_size(Val(T), layers, sx) + additional + static(63)
 end
 function required_bytes(
@@ -59,9 +60,11 @@ function required_bytes(
   nthread,
 ) where {T}
   base_mem_per_thread = output_size(Val(T), layers, sx) + additional_per_thread
+  # we add 63 extra bytes to make sure we can bring the pointer to 64 byte alignment.
   base_mem_per_thread, additional + base_mem_per_thread * nthread + static(63)
 end
 function required_forward_bytes(::Val{T}, layers, sx, additional = static(0)) where {T}
+  # we add 63 extra bytes to make sure we can bring the pointer to 64 byte alignment.
   forward_output_size(Val(T), layers, sx) + additional + static(63)
 end
 
