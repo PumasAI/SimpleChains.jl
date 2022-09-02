@@ -1,10 +1,11 @@
 name = "SimpleChains"
 uuid = "de6bee2f-e2f4-4ec7-b6ed-219cc6f6e9e5"
 authors = ["Chris Elrod <elrodc@gmail.com> and contributors"]
-version = "0.2.12"
+version = "0.3.0"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+ArrayInterfaceCore = "30b0a656-2188-435a-8636-2ec0e6a096e2"
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 CloseOpenIntervals = "fb6a15b2-703c-40df-9091-08a04967cfa9"
@@ -27,6 +28,7 @@ VectorizedRNG = "33b4df10-0173-11e9-2a0c-851a7edac40e"
 
 [compat]
 ArrayInterface = "6"
+ArrayInterfaceCore = "0.1.14"
 CPUSummary = "0.1.8"
 ChainRulesCore = "0.8, 0.9, 0.10, 1"
 CloseOpenIntervals = "0.1.6"
@@ -43,7 +45,7 @@ Static = "0.7"
 StaticArrays = "1"
 StrideArraysCore = "0.3.5"
 UnPack = "1"
-VectorizationBase = "0.21.30"
+VectorizationBase = "0.21.40"
 VectorizedRNG = "0.2.13"
 julia = "1.6"
 

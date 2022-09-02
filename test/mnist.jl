@@ -15,8 +15,8 @@ lenet = SimpleChain(
   TurboDense(identity, 10),
 )
 # 3d and 0-indexed
-xtrain3, ytrain0 = MLDatasets.MNIST(Float32, split=:train)[:];
-xtest3, ytest0 = MLDatasets.MNIST(Float32, split=:test)[:];
+xtrain3, ytrain0 = MLDatasets.MNIST.traindata(Float32);
+xtest3, ytest0 = MLDatasets.MNIST.testdata(Float32);
 xtrain4 = reshape(xtrain3, 28, 28, 1, :);
 xtest4 = reshape(xtest3, 28, 28, 1, :);
 ytrain1 = UInt32.(ytrain0 .+ 1);
@@ -36,10 +36,11 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
   x = xtrain4[:, :, :, subset]
   y = ytrain1[subset]
   let lenetloss = SimpleChains.add_loss(lenet, SimpleChains.LogitCrossEntropyLoss(y))
-    lenetloss.memory .= 0x00
+    lenentmem = SimpleChains.get_heap_memory(lenetloss,0)
+    lenentmem .= 0x00
     valgrad!(g, lenetloss, x, p)
     g2 = similar(g)
-    lenetloss.memory .= 0xff
+    lenentmem .= 0xff
     valgrad!(g2, lenetloss, x, p)
     @test g == g2
   end
@@ -48,24 +49,30 @@ end
 # initialize a gradient buffer matrix; number of columns places an upper bound
 # on the number of threads used.
 # G = similar(p, length(p), min(Threads.nthreads(), (Sys.CPU_THREADS ÷ ((Sys.ARCH === :x86_64) + 1))));
-G = SimpleChains.alloc_threaded_grad(lenetloss);
-@show size(G)
-fill!(G, NaN);
 # train
-@time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
+@time SimpleChains.train_batched!(p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
 @test all(isfinite, p)
-@test all(isfinite, G)
+# @test all(isfinite, G)
 # assess training and test loss
 a0, l0 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
 a1, l1 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
+G = SimpleChains.alloc_threaded_grad(lenetloss);
+@show size(G)
+fill!(G, NaN);
 # train without additional memory allocations
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 10);
 @test all(isfinite, p)
 @test all(isfinite, G)
-
+g = Matrix{eltype(g)}(undef, size(G,1), 1);
+@time SimpleChains.train_batched!(g, p, lenetloss, xtrain4, SimpleChains.ADAM(3e-4), 2);
+@test all(isfinite, p)
+@test all(isfinite, g)
+  
 # assess training and test loss
 a2, l2 = SimpleChains.accuracy_and_loss(lenetloss, xtrain4, p)
+@test l2 ≈ lenetloss(xtrain4, p)
 a3, l3 = SimpleChains.accuracy_and_loss(lenetloss, xtest4, ytest1, p)
+@test l3 ≈ SimpleChains.add_loss(lenetloss, LogitCrossEntropyLoss(ytest1))(xtest4, p)
 if size(G,2) <= 4
   @test a0 > 0.94
   @test a2 > 0.96

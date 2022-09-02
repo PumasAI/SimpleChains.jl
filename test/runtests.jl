@@ -1,5 +1,5 @@
 using SimpleChains
-using Test, Aqua, ForwardDiff, Zygote
+using Test, Aqua, ForwardDiff, Zygote, ChainRules
 
 function countallocations!(g, sc, x, p)
   @allocated valgrad!(g, sc, x, p)
@@ -51,7 +51,7 @@ InteractiveUtils.versioninfo(verbose=true)
       y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10
       sc = SimpleChains.add_loss(scbase, SquaredLoss(y))
 
-      @test first(Dropout(0.5)(x, pointer(x), pointer(sc.memory))) === x
+      @test first(Dropout(0.5)(x, pointer(x), pointer(SimpleChains.get_heap_memory(sc,0)))) === x
       @test sum(iszero, x) == 0
       x .= rand.()
 
@@ -90,21 +90,20 @@ InteractiveUtils.versioninfo(verbose=true)
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
       end
       valgrad!(g, scflp, x, p)
-      if VERSION < v"1.9-DEV" # FIXME: remove check when Zygote stops segfaulting on 1.8-DEV
-        @test g == only(
-          Zygote.gradient(
-            p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
-            p,
-          ),
-        )
-        _gzyg = Zygote.gradient(p) do p
-          sum(abs2, Base.front(sc)(x, p) .- y)/2# / size(x)[end]
-        end
-        gzyg = copy(_gzyg[1])
-        g2 = similar(g)
-        valgrad!(g2, sc, x, p)
-        @test g2 ≈ gzyg
+      @test g == only(
+        Zygote.gradient(
+          p -> FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))(x, p),
+          p,
+        ),
+      )
+      @test (ChainRules.rrule(FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45)), x, p)[2](2.0)[3] .*= 0.5) == g
+      _gzyg = Zygote.gradient(p) do p
+        sum(abs2, Base.front(sc)(x, p) .- y)/2# / size(x)[end]
       end
+      gzyg = copy(_gzyg[1])
+      g2 = similar(g)
+      valgrad!(g2, sc, x, p)
+      @test g2 ≈ gzyg
 
       gfd = ForwardDiff.gradient(p) do p
         off = 8 * 24
@@ -146,16 +145,17 @@ InteractiveUtils.versioninfo(verbose=true)
         (SimpleChains.StaticInt(1),),
         (SimpleChains.StaticInt(1),),
       )
+      scdmem = SimpleChains.get_heap_memory(scd, 0);
       m = SimpleChains.StrideArray(
         SimpleChains.PtrArray(
           SimpleChains.stridedpointer(
-            reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset),
+            reinterpret(Ptr{SimpleChains.Bit}, pointer(scdmem) + offset),
             si,
           ),
           (size(x, 2) * 8,),
           Val((true,)),
         ),
-        scd.memory,
+        scdmem,
       )
 
       valgrad!(g, scd, x, p)
@@ -167,13 +167,13 @@ InteractiveUtils.versioninfo(verbose=true)
       m = SimpleChains.StrideArray(
         SimpleChains.PtrArray(
           SimpleChains.stridedpointer(
-            reinterpret(Ptr{SimpleChains.Bit}, pointer(scd.memory) + offset),
+            reinterpret(Ptr{SimpleChains.Bit}, pointer(scdmem) + offset),
             si,
           ),
           (size(x, 2) * 8,),
           Val((true,)),
         ),
-        scd.memory,
+        scdmem,
       )
 
       let
@@ -482,6 +482,9 @@ InteractiveUtils.versioninfo(verbose=true)
     x = fill(ForwardDiff.Dual(ntuple(x->((x-9)/5), Val(18))...), 10);
     SimpleChains.dualeval!(tanh, x)
     @test reinterpret(reshape, Float64, x) ≈ reinterpret(reshape, Float64, fill((-0.9216685544064713,-0.21073790614559954,-0.18063249098194248,-0.1505270758182854,-0.12042166065462832,-0.09031624549097124,-0.06021083032731416,-0.03010541516365708,0.0,0.03010541516365708,0.06021083032731416,0.09031624549097124,0.12042166065462832,0.1505270758182854,0.18063249098194248,0.21073790614559954,0.24084332130925665,0.27094873647291373), 10))
+  end
+  @testset "SArray" begin
+    include("staticarrays.jl")
   end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped

@@ -56,9 +56,9 @@ end
 _numparam(d::TurboDense{false}, inputdim::Integer) = inputdim * d.outputdim
 _numparam(d::TurboDense{true}, inputdim::Integer) = inputdim * d.outputdim + d.outputdim
 parameter_free(::TurboDense) = false
-function layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
+function forward_layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
   _, outputdim = numparam(td, inputdim)
-  2align(static_sizeof(T) * prod(outputdim)), outputdim
+  align(static_sizeof(T) * prod(outputdim)), outputdim
 end
 
 fast_fuse(td::TurboDense) = fast_fuse(getfield(td, :f))
@@ -77,14 +77,14 @@ end
 # to support `params`
 function _getparams(layer::TurboDense{false}, p, inputdim::Tuple)
   A, p = getparams(layer, p, last(inputdim))
-  _, outputdim = layer_output_size(Val{Float32}(), layer, inputdim)
+  _, outputdim = numparam(layer, inputdim)
   A, p, outputdim
 end
 function _getparams(layer::TurboDense{true}, p, inputdim::Tuple)
   A, p = getparams(layer, p, last(inputdim))
   Kp1 = size(A, static(2))
   K = Kp1 - static(1)
-  _, outputdim = layer_output_size(Val{Float32}(), layer, inputdim)
+  _, outputdim = numparam(layer, inputdim)
   (view(A, :, static(1):K), view(A, :, Kp1)), p, outputdim
 end
 function init_params!(td::TurboDense, p, inputdim::Tuple)
@@ -142,7 +142,7 @@ function alloc_return(
 end
 
 
-function (td::TurboDense{O})(
+@inline function (td::TurboDense{O})(
   B::AbstractVecOrMat{T1},
   p::Ptr{T2},
   pu::Ptr{UInt8},
@@ -169,7 +169,7 @@ function (td::TurboDense{O})(
 end
 
 
-function dense!(
+@inline function dense!(
   f::F,
   C::AbstractVecOrMat{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
@@ -187,7 +187,7 @@ function dense!(
     C[m, n] = f(Cmn + A[m, Kp1])
   end
 end
-function dense!(
+@inline function dense!(
   f::F,
   C::AbstractVecOrMat{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
@@ -208,8 +208,7 @@ function dense!(
     C[i] = f(C[i])
   end
 end
-
-function dense!(
+@inline function dense!(
   f::F,
   C::AbstractVecOrMat{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
@@ -225,7 +224,7 @@ function dense!(
     C[m, n] = f(Cmn)
   end
 end
-function dense!(
+@inline function dense!(
   f::F,
   C::AbstractVecOrMat{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
@@ -294,7 +293,7 @@ function get∂C(
   (nothing, ∂Cp)
 end
 
-function dense!(
+@inline function dense!(
   f::F,
   ∂C::AbstractArray{T1,N},
   C::AbstractArray{T2,N},
@@ -315,7 +314,7 @@ function dense!(
     C[m, n] = Cmn
   end
 end
-function dense!(
+@inline function dense!(
   f::F,
   ∂C::AbstractVector{<:Base.HWReal},
   C::AbstractMatrix{<:Base.HWReal},
@@ -340,7 +339,7 @@ function dense!(
   end
 end
 
-function dense!(
+@inline function dense!(
   f::F,
   ∂C::AbstractArray{T1,N},
   C::AbstractArray{T2,N},
@@ -359,7 +358,7 @@ function dense!(
     ∂C[m, n] = ∂Cmn
   end
 end
-function dense!(
+@inline function dense!(
   f::F,
   ∂C::AbstractVector{<:Base.HWReal},
   C::AbstractMatrix{<:Base.HWReal},
@@ -382,7 +381,7 @@ function dense!(
   end
 end
 
-function dense!(
+@inline function dense!(
   ::Union{typeof(tanh_fast),typeof(tanh)},
   ∂C::AbstractVector{<:Base.HWReal},
   C::AbstractMatrix{<:Base.HWReal},
@@ -405,7 +404,7 @@ function dense!(
     ∂C[i] = one(Cᵢ) - Cᵢ * Cᵢ
   end
 end
-function dense!(
+@inline function dense!(
   ::Union{typeof(tanh_fast),typeof(tanh)},
   ∂C::AbstractVector{<:Base.HWReal},
   C::AbstractMatrix{<:Base.HWReal},
@@ -426,7 +425,7 @@ function dense!(
     ∂C[i] = one(Cᵢ) - Cᵢ * Cᵢ
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(relu),
   ∂C::AbstractMatrix{Bool},
   C::AbstractMatrix{T1},
@@ -447,7 +446,7 @@ function dense!(
     ∂C[m, n] = Cmnr_gt_0
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(relu),
   ∂C::AbstractVector{Bool},
   C::AbstractVector{T1},
@@ -469,7 +468,7 @@ function dense!(
   end
 end
 
-function dense!(
+@inline function dense!(
   ::typeof(relu),
   ∂C::AbstractMatrix{Bool},
   C::AbstractMatrix{T1},
@@ -487,7 +486,7 @@ function dense!(
     ∂C[m, n] = Cmn_gt_0
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(relu),
   ∂C::AbstractVector{Bool},
   C::AbstractVector{T1},
@@ -506,7 +505,7 @@ function dense!(
     ∂C[m] = Cmn_gt_0
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(identity),
   ::Nothing,
   C::AbstractArray{T1,N},
@@ -524,7 +523,7 @@ function dense!(
     C[m, n] = Cmn + A[m, Kp1]
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(identity),
   ::Nothing,
   C::AbstractArray{T1,N},
@@ -541,7 +540,7 @@ function dense!(
   end
 end
 
-function dense!(
+@inline function dense!(
   ::typeof(identity),
   ::Nothing,
   C::AbstractMatrix{T1},
@@ -555,7 +554,7 @@ function dense!(
 end
 
 #=
-function dense!(
+@inline function dense!(
   f::F,
   _∂C::AbstractArray{T1,N},
   _C::AbstractArray{T2,N},
@@ -580,7 +579,7 @@ function dense!(
     C[m, n] = Cmn
   end
 end
-function dense!(
+@inline function dense!(
   f::F,
   _∂C::AbstractVector{<:Base.HWReal},
   _C::AbstractMatrix{<:Base.HWReal},
@@ -609,7 +608,7 @@ function dense!(
   end
 end
 
-function dense!(
+@inline function dense!(
   f::F,
   _∂C::AbstractArray{T1,N},
   _C::AbstractArray{T2,N},
@@ -633,7 +632,7 @@ function dense!(
     ∂C[m, n] = ∂Cmn
   end
 end
-function dense!(
+@inline function dense!(
   f::F,
   _∂C::AbstractVector{<:Base.HWReal},
   _C::AbstractMatrix{<:Base.HWReal},
@@ -661,7 +660,7 @@ function dense!(
   end
 end
 
-function dense!(
+@inline function dense!(
   ::Union{typeof(tanh_fast),typeof(tanh)},
   _∂C::AbstractVector{<:Base.HWReal},
   _C::AbstractMatrix{<:Base.HWReal},
@@ -689,7 +688,7 @@ function dense!(
     ∂C[i] = one(Cᵢ) - Cᵢ * Cᵢ
   end
 end
-function dense!(
+@inline function dense!(
   ::Union{typeof(tanh_fast),typeof(tanh)},
   _∂C::AbstractVector{<:Base.HWReal},
   _C::AbstractMatrix{<:Base.HWReal},
@@ -715,7 +714,7 @@ function dense!(
     ∂C[i] = one(Cᵢ) - Cᵢ * Cᵢ
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(relu),
   _∂C::AbstractArray{Bool,N},
   _C::AbstractArray{T1,N},
@@ -740,7 +739,7 @@ function dense!(
     ∂C[m, n] = Cmnr_gt_0
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(relu),
   _∂C::AbstractArray{Bool,N},
   _C::AbstractArray{T1,N},
@@ -763,7 +762,7 @@ function dense!(
     ∂C[m, n] = Cmn_gt_0
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(identity),
   ::Nothing,
   _C::AbstractArray{T1,N},
@@ -784,7 +783,7 @@ function dense!(
     C[m, n] = Cmn + A[m, K]
   end
 end
-function dense!(
+@inline function dense!(
   ::typeof(identity),
   ::Nothing,
   _C::AbstractArray{T1,N},
@@ -877,8 +876,8 @@ end
 function pullback!(
   pg::Ptr{T},
   td::TurboDense{O},
-  C̄,
-  B,
+  C̄::PtrArray,
+  B::PtrArray,
   p::Ptr{T},
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8},
@@ -892,6 +891,17 @@ function pullback!(
   B̄, pu2 = alloc_return_B_dense(B, pu2, intput_dims)
   dense!(identity, nothing, B̄, matrix_view(td, A)', C̄, False())
   B̄, pu2
+end
+function pullback!(
+  pg,
+  td,
+  C̄,
+  B,
+  p::Ptr,
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8},
+)
+  @gc_preserve pullback!(pg, td, C̄, B, p, pu, pu2)
 end
 matrix_view(::TurboDense{false}, A) = A
 function matrix_view(::TurboDense{true}, A)
@@ -937,7 +947,7 @@ function dense_param_update!(::TurboDense{false}, Ā, C̄, B)
 end
 
 
-function dense!(f, dC, C::AbstractMatrix, A::AbstractVector, B::AbstractMatrix, bias)
+@inline function dense!(f, dC, C::AbstractMatrix, A::AbstractVector, B::AbstractMatrix, bias)
   Abuf = preserve_buffer(A)
   Am = PtrArray(pointer(A), (length(A), static(1)))
   GC.@preserve Abuf begin

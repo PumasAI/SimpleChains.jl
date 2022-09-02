@@ -11,11 +11,12 @@ struct Activation{F}
   f::F
 end
 parameter_free(::Activation) = true
-numparam(::Activation, id) = 0, id
+numparam(::Activation, id) = static(0), id
 init_params!(::Activation, p, id) = p, id
 _check_input_dims(::Activation, _) = nothing
 
-layer_output_size(::Val{T}, a::Activation, s) where {T} = align(prod(s) * (2sizeof(T))), s
+forward_layer_output_size(::Val{T}, a::Activation, s) where {T} =
+  align(prod(s) * static_sizeof(T)), s
 
 Base.show(io::IO, a::Activation) = print(io, "Activation layer applying: ", a.f)
 

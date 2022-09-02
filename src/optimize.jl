@@ -22,10 +22,10 @@ function update!(o::ADAM, (mt, vt, βp), x, Δ, s = One())
   βp₂ = βp[2]
   st = eltype(Δ)(s)
   @turbo for i ∈ eachindex(Δ)
-    Δᵢ = Δ[i]*st
+    Δᵢ = Δ[i] * st
     mt[i] = β₁ * mt[i] + (1 - β₁) * Δᵢ
     vt[i] = β₂ * vt[i] + (1 - β₂) * Δᵢ^2
-    Δxᵢ = mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1f-8))
+    Δxᵢ = mt[i] / ((1 - βp₁) * (sqrt(vt[i] / (1 - βp₂)) + 1.0f-8))
     x[i] -= η * Δxᵢ
   end
   βp[1] = βp₁ * β₁
@@ -58,11 +58,20 @@ end
 
 
 function update!(
-  g::AbstractVector{T}, opt, Xp::AbstractArray{<:Any,N}, layers, pen, sx, p, pm, optbuffer, _
+  g::AbstractVector{T},
+  opt,
+  Xp::AbstractArray{<:Any,N},
+  layers,
+  pen,
+  sx,
+  p,
+  pm,
+  optbuffer,
+  _,
 ) where {T,N}
   GC.@preserve g p chain_valgrad_entry!(pointer(g), Xp, layers, pointer(p), pm)
   apply_penalty!(g, pen, p, sx)
-  gmul = loss_multiplier(last(layers), size(Xp,static(N)), T)
+  gmul = loss_multiplier(last(layers), size(Xp, static(N)), T)
   update!(opt, optbuffer, p, g, gmul)
 end
 function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
@@ -94,7 +103,18 @@ function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
   end
   return nothing
 end
-function update!(g::AbstractMatrix{T}, opt, Xp::AbstractArray{<:Any,N}, layers, pen, sx, p, pm, optbuffer, mpt) where {T,N}
+function update!(
+  g::AbstractMatrix{T},
+  opt,
+  Xp::AbstractArray{<:Any,N},
+  layers,
+  pen,
+  sx,
+  p,
+  pm,
+  optbuffer,
+  mpt,
+) where {T,N}
   nthread = size(g, static(2))
   Xpb = preserve_buffer(Xp)
   Xpp = PtrArray(Xp)
@@ -121,7 +141,7 @@ function update!(g::AbstractMatrix{T}, opt, Xp::AbstractArray{<:Any,N}, layers, 
   GC.@preserve gpb begin
     gv = PtrArray(pointer(g), (length(p),))
     apply_penalty!(gv, pen, p, sx)
-    gmul = loss_multiplier(loss, size(Xp,static(N)), T)
+    gmul = loss_multiplier(loss, size(Xp, static(N)), T)
     update!(opt, optbuffer, p, gv, gmul)
   end
 end
@@ -249,7 +269,7 @@ function shuffle_update!(
     pstart,
     pstop,
   )
-  
+
   @turbo for t = 2:nthread, i in axes(g, 1)
     g[i, 1] += g[i, t]
   end
@@ -257,7 +277,7 @@ function shuffle_update!(
   GC.@preserve gpb begin
     gv = PtrArray(pointer(g), (length(p),))
     apply_penalty!(gv, pen, p, sx)
-    gmul = loss_multiplier(last(layers), size(Xp,static(N)), T)
+    gmul = loss_multiplier(last(layers), size(Xp, static(N)), T)
     update!(opt, optbuffer, p, gv, gmul)
   end
   return nothing
@@ -283,71 +303,142 @@ function shuffle_update!(
     static(1),
   )
   apply_penalty!(g, pen, p, sx)
-  gmul = loss_multiplier(last(layers), size(Xp,static(N)), T)
+  gmul = loss_multiplier(last(layers), size(Xp, static(N)), T)
   update!(opt, optbuffer, p, g, gmul)
 end
 
-function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, t::AbstractArray)
-  if g isa AbstractMatrix && size(g, 2) == 1
-    gpb = preserve_buffer(g)
-    gv = PtrArray(pointer(g), (length(p),))
-    GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, t)
-    return p
-  end
-  chn = getchain(_chn)
-  pX = maybe_static_size_arg(chn.inputdim, X)
-  pen = getpenalty(_chn)
-  @unpack layers, memory = chn
+function train_unbatched_core!(
+  c::Chain,
+  pu::Ptr{UInt8},
+  g,
+  pX,
+  p,
+  opt,
+  t::AbstractArray,
+  mpt,
+)
+  chn = getchain(c)
+  @unpack layers = chn
+  pen = getpenalty(c)
   fl = Base.front(layers)
   ll = last(layers)
-  optoff = optmemsize(opt, p)
-  sx = ArrayInterface.size(pX)
-  mpt = resize_memory!(layers, memory, pX, optoff, 0, size(g, static(2)))
-  optbuffer, pm = optmemory(opt, p, pointer(memory))
-  GC.@preserve p g memory X begin
+  sx = size(pX)
+  optbuffer, pm = optmemory(opt, p, pu)
+  GC.@preserve p g begin
     for y ∈ t
       layers_y = (fl..., ll(y))
       update!(g, opt, pX, layers_y, pen, sx, p, pm, optbuffer, mpt)
     end
   end
-  p
 end
+function train_unbatched_core!(c::Chain, pu::Ptr{UInt8}, g, pX, p, opt, iters::Int, mpt)
+  chn = getchain(c)
+  @unpack layers = chn
+  pen = getpenalty(c)
+  sx = size(pX)
+  optbuffer, pm = optmemory(opt, p, pu)
+  GC.@preserve p g begin
+    for _ ∈ 1:iters
+      update!(g, opt, pX, layers, pen, sx, p, pm, optbuffer, mpt)
+    end
+  end
+end
+function train_unbatched_core!(
+  c::Chain,
+  pu::Ptr{UInt8},
+  pX,
+  it,
+  p::AbstractVector{T},
+  opt,
+  mpt,
+) where {T}
+  numthreads = _numthreads()
+  glen = _try_static(numparam(getchain(c)), static_length(params))
+  aligned_glen = align(glen)
+  g = _alloc_grad(Ptr{T}(pu), glen, numthreads, aligned_glen)
+  offset = static_sizeof(T) * aligned_glen * numthreads
+  train_unbatched_core!(c, pu + offset, g, pX, it, p, opt, mpt)
+end
+
 """
-    train_unbatched!(g::AbstractVecOrMat, p, chn, X, opt, iters)
+    train_unbatched!([g::AbstractVecOrMat, ]p, chn, X, opt, iters)
 
 Train without batching inputs.
 
 Arguments:
-- `g` pre-allocated gradient buffer. Can be allocated with `similar(p)` (if you want to run single threaded), or `alloc_threaded_grad(chn, size(X))` (`size(X)` argument is only necessary if the input dimension was not specified when constructing the chain). If a matrix, the number of columns gives how many threads to use. Do not use more threads than batch size would allow.
+- `g` pre-allocated gradient buffer. Can be allocated with `similar(p)` (if you want to run single threaded), or `alloc_threaded_grad(chn, size(X))` (`size(X)` argument is only necessary if the input dimension was not specified when constructing the chain). If a matrix, the number of columns gives how many threads to use. Do not use more threads than batch size would allow. This argument is optional. If excluded, it will run multithreaded (assuming you started Julia with multiple threads).
 - `p` is the parameter vector. It is updated inplace. It should be pre-initialized, e.g. with `init_params`/`init_params!`. This is to allow calling `train_unbatched!` several times to train in increments.
 - `chn` is the `SimpleChain`. It must include a loss (see `SimpleChains.add_loss`) containing the target information (dependent variables) you're trying to fit.
 - `X` the training data input argument (independent variables).
 - `opt` is the optimizer. Currently, only `SimpleChains.ADAM` is supported.
 - `iters`, how many iterations to train for.
 """
-function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer, iters::Int)
+function train_unbatched!(
+  g,
+  p::AbstractVector{T},
+  _chn::Chain,
+  X,
+  opt::AbstractOptimizer,
+  t,
+) where {T}
   if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
-    GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, iters)
+    GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, t)
     return p
   end
+
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
-  pen = getpenalty(_chn)
-  sx = ArrayInterface.size(pX)
-  @unpack layers, memory = chn
   optoff = optmemsize(opt, p)
-  mpt = resize_memory!(layers, memory, pX, optoff, 0, size(g, static(2)))
-  optbuffer, pm = optmemory(opt, p, pointer(memory))
-  GC.@preserve p g memory X begin
-    for _ ∈ 1:iters
-      update!(g, opt, pX, layers, pen, sx, p, pm, optbuffer, mpt)
-    end
+  @unpack layers = chn
+  bytes_per_thread, total_bytes =
+    required_bytes(Val{T}(), layers, size(pX), optoff, static(0), size(g, static(2)))
+  GC.@preserve X begin
+    with_memory(
+      train_unbatched_core!,
+      _chn,
+      total_bytes,
+      g,
+      pX,
+      p,
+      opt,
+      t,
+      bytes_per_thread,
+    )
   end
   p
 end
-function train_unbatched!(g, p, _chn::Chain, X, opt::AbstractOptimizer)
+
+function train_unbatched!(
+  p::AbstractVector{T},
+  _chn::Chain,
+  X::AbstractArray,
+  opt::AbstractOptimizer,
+  t,
+) where {T}
+
+  chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
+  optoff = optmemsize(opt, p)
+  @unpack layers = chn
+  glen = _try_static(numparam(chn), static_length(params))
+  numthreads = _numthreads()
+
+  bytes_per_thread, total_bytes = required_bytes(
+    Val{T}(),
+    layers,
+    size(pX),
+    optoff + align(glen) * numthreads,
+    static(0),
+    numthreads,
+  )
+  GC.@preserve X begin
+    with_memory(train_unbatched_core!, _chn, total_bytes, pX, p, opt, t, bytes_per_thread)
+  end
+  p
+end
+function train_unbatched!(g, p::AbstractVector, _chn::Chain, X, opt::AbstractOptimizer)
   t = target(_chn)
   if _iterate_over_losses(t)
     train_unbatched!(g, p, _chn, X, opt, t)
@@ -418,61 +509,32 @@ Arguments:
 - `iters`, how many iterations to train for.
 - `batchsize` keyword argument: the size of the batches to use. If `batchsize = nothing`, it'll try to do a half-decent job of picking the batch size for you. However, this is not well optimized at the moment.
 """
-function train_batched!(
-  g::AbstractVecOrMat,
-  p::AbstractVector,
+function train_batched_core!(
   _chn::Chain,
-  X,
+  pu::Ptr{UInt8},
+  g::AbstractVecOrMat{T},
+  p::AbstractVector{T},
+  pX,
   opt::AbstractOptimizer,
-  iters;
-  batchsize = nothing,
-  leaveofflast::Bool = false,
-)
-  if g isa AbstractMatrix && size(g, 2) == 1
-    gpb = preserve_buffer(g)
-    gv = PtrArray(pointer(g), (length(p),))
-    GC.@preserve gpb train_batched!(gv, p, _chn, X, opt, iters; batchsize)
-    return p
-  end
+  iters,
+  leaveofflast::Bool,
+  mpt,
+  N_bs,
+) where {T}
+
   chn = getchain(_chn)
-  pX = maybe_static_size_arg(chn.inputdim, X)
   pen = getpenalty(_chn)
-  @unpack layers, memory = chn
-  optoff = optmemsize(opt, p)
+  @unpack layers = chn
   sx = chain_input_dims(chn, size(pX))
   N = last(sx)
   # need to shuffle `N`
-  tgt = target(chn)
-  nthread = size(g, static(2))
-  N_bs = if batchsize === nothing
-    static(8) * batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
-  else
-    batchsize
-  end
-  if N_bs >= N
-    train_unbatched!(g, p, _chn, X, opt, iters)
-    return p
-  end
-  tgt_batch_len = tsprod(Base.front(size(tgt))) * N_bs
-  X_batch_len = tsprod(Base.front(sx)) * N_bs
-  sxb = (Base.front(sx)..., N_bs)
-  shuffle_per_thread =
-    align(sizeof(eltype(tgt)) * tgt_batch_len) + align(sizeof(eltype(X)) * X_batch_len)
   perm_mem = align(sizeof(Int) * N)
-  mpt = resize_memory!(
-    layers,
-    memory,
-    Val(eltype(pX)),
-    sxb,
-    optoff + perm_mem,
-    shuffle_per_thread,
-    nthread,
-  )
+
   loss = last(layers)
   Y = preserve_buffer(loss)
   newlayers = (Base.front(layers)..., loss(PtrArray(Y)))
-  GC.@preserve p g memory X Y begin
-    optbuffer, pm = optmemory(opt, p, pointer(memory))
+  GC.@preserve p g Y begin
+    optbuffer, pm = optmemory(opt, p, pu)
     perm = StrideArraysCore.ptrarray0(Ptr{Int}(pm), (N,))
     pm += perm_mem
     d, r = divrem(N, N_bs)
@@ -509,9 +571,102 @@ function train_batched!(
       randpermzero!(perm)
     end
   end
+end
+function train_batched_core!(
+  c::Chain,
+  pu::Ptr{UInt8},
+  ::Nothing,
+  p::AbstractVector{T},
+  pX,
+  opt::AbstractOptimizer,
+  iters,
+  leaveofflast::Bool,
+  mpt,
+  N_bs,
+) where {T}
+  numthreads = _numthreads()
+  glen = _try_static(numparam(getchain(c)), static_length(p))
+  aligned_glen = align(glen)
+  g = _alloc_grad(Ptr{T}(pu), glen, numthreads, aligned_glen)
+  offset = static_sizeof(T) * aligned_glen * numthreads
+  train_batched_core!(c, pu + offset, g, p, pX, opt, iters, leaveofflast, mpt, N_bs)
+end
+function train_batched!(
+  g::Union{Nothing,AbstractVector{T},AbstractMatrix{T}},
+  p::AbstractVector{T},
+  _chn::Chain,
+  X,
+  opt::AbstractOptimizer,
+  iters;
+  batchsize = nothing,
+  leaveofflast::Bool = false,
+) where {T}
+  if g isa AbstractMatrix && size(g, 2) == 1
+    gpb = preserve_buffer(g)
+    gv = PtrArray(pointer(g), (length(p),))
+    GC.@preserve gpb train_batched!(gv, p, _chn, X, opt, iters; batchsize)
+    return p
+  end
+  chn = getchain(_chn)
+  pX = maybe_static_size_arg(chn.inputdim, X)
+  @unpack layers = chn
+  optoff = optmemsize(opt, p)
+  sx = chain_input_dims(chn, size(pX))
+  N = last(sx)
+  # need to shuffle `N`
+  tgt = target(chn)
+  nthread = g === nothing ? _numthreads() : size(g, static(2))
+  N_bs = if batchsize === nothing
+    static(8) * batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) * nthread
+  else
+    batchsize
+  end
+  if N_bs >= N
+    train_unbatched!(g, p, _chn, X, opt, iters)
+    return p
+  end
+  tgt_batch_len = tsprod(Base.front(size(tgt))) * N_bs
+  X_batch_len = tsprod(Base.front(sx)) * N_bs
+  sxb = (Base.front(sx)..., N_bs)
+  shuffle_per_thread =
+    align(sizeof(eltype(tgt)) * tgt_batch_len) + align(sizeof(eltype(X)) * X_batch_len)
+  perm_mem = align(sizeof(Int) * N)
+  if g === nothing
+    base_mem =
+      optoff + perm_mem + align(_try_static(numparam(chn), static_length(p))) * nthread
+  else
+    base_mem = optoff + perm_mem
+  end
+  mpt, total_bytes =
+    required_bytes(Val{T}(), layers, sxb, base_mem, shuffle_per_thread, nthread)
+  GC.@preserve X begin
+    with_memory(
+      train_batched_core!,
+      _chn,
+      total_bytes,
+      g,
+      p,
+      pX,
+      opt,
+      iters,
+      leaveofflast,
+      mpt,
+      N_bs,
+    )
+  end
   p
 end
-
+function train_batched!(
+  p::AbstractVector{T},
+  c::Chain,
+  X,
+  opt::AbstractOptimizer,
+  iters;
+  batchsize = nothing,
+  leaveofflast::Bool = false,
+) where {T}
+  train_batched!(nothing, p, c, X, opt, iters; batchsize, leaveofflast)
+end
 _isstochastic(::Tuple{}) = false
 function _isstochastic(x::Tuple{T,Vararg}) where {T}
   isstochastic(getfield(x, 1)) ? true : _isstochastic(Base.tail(x))
@@ -519,6 +674,13 @@ end
 
 isstochastic(chn::Chain) = _isstochastic(getfield(getchain(chn), :layers))
 
+function train!(p, chn::Chain, X, opt::AbstractOptimizer, iters)
+  if isstochastic(chn)
+    train_unbatched!(p, chn, X, opt, iters)
+  else
+    train_batched!(p, chn, X, opt, iters)
+  end
+end
 function train!(g, p, chn::Chain, X, opt::AbstractOptimizer, iters)
   if isstochastic(chn)
     train_unbatched!(g, p, chn, X, opt, iters)
@@ -530,8 +692,6 @@ end
 for t ∈ [:train, :train_batched, :train_unbatched]
   t! = Symbol(t, :!)
   @eval function $t(chn::Chain, X, opt, iters)
-    p = init_params(chn)
-    g = similar(p)
-    $t!(g, p, chn, X, opt, iters)
+    $t!(init_params(chn), chn, X, opt, iters)
   end
 end
