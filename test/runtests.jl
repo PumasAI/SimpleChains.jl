@@ -268,6 +268,7 @@ InteractiveUtils.versioninfo(verbose=true)
       ldd = tanh.(Add * x .+ bdd)
       ldd_dd = tanh.(Add * xdd .+ bdd)
       GC.@preserve pd pu begin
+        @test reinterpret(T, td(x, pointer(pd), pointer(pu))[1]) == reinterpret(T, SimpleChain(td)(x, pd))
         @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
         @test reinterpret(T, ld) ≈
           reinterpret(T, td(permutedims(x)', pointer(pd), pointer(pu))[1])

@@ -123,7 +123,7 @@ function valgrad_noloss(sc, arg::AbstractArray{S}, params::AbstractVector{T}) wh
   goff = align(glen * static_sizeof(T))
   aoff = align(arglen * static_sizeof(S))
 
-  num_bytes = required_bytes(Val{T}(), layers, size(parg), aoff + goff)
+  num_bytes = required_bytes(Val{promote_type(T,S)}(), layers, size(parg), aoff + goff)
   memory = get_heap_memory(sc, num_bytes)
 
   GC.@preserve barg params memory begin

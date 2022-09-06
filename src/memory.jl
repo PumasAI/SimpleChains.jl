@@ -1,5 +1,4 @@
 
-const MAXSTACK = 16384
 _static_max_stack(::StaticInt{N}) where {N} = StaticInt{N}()
 _static_max_stack(_) = StaticInt{MAXSTACK}()
 
@@ -13,16 +12,18 @@ function task_local_memory(sc)::Vector{UInt8}
     end
   )::Vector{UInt8}
 end
-
 @inline function with_stack_memory(f::F, ::StaticInt{N}, sc, args::Vararg{Any,K}) where {F,N,K}
   stack_memory = Ref{NTuple{N,UInt8}}()
-  p = Base.unsafe_convert(Ptr{UInt8}, stack_memory)
-  ret = GC.@preserve stack_memory f(
-    sc,
-    align(p),
-    args...,
-  )
-  VectorizationBase.lifetime_end!(p, Val{N}())
+  # stack_memory = pointer(NOTSTACKMEM) + (Threads.threadid()-1)*MAXSTACK
+  GC.@preserve stack_memory begin
+    p = Base.unsafe_convert(Ptr{UInt8}, stack_memory)
+    ret = f(
+      sc,
+      align(p),
+      args...,
+    )
+    VectorizationBase.lifetime_end!(p, Val{N}())
+  end
   return ret
 end
 function get_heap_memory(sc, num_bytes)

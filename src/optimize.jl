@@ -375,12 +375,12 @@ Arguments:
 """
 function train_unbatched!(
   g,
-  p::AbstractVector{T},
+  p::AbstractVector,
   _chn::Chain,
   X,
   opt::AbstractOptimizer,
   t,
-) where {T}
+)
   if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
@@ -392,6 +392,7 @@ function train_unbatched!(
   pX = maybe_static_size_arg(chn.inputdim, X)
   optoff = optmemsize(opt, p)
   @unpack layers = chn
+  T = Base.promote_eltype(p, X)
   bytes_per_thread, total_bytes =
     required_bytes(Val{T}(), layers, size(pX), optoff, static(0), size(g, static(2)))
   GC.@preserve X begin
@@ -411,13 +412,12 @@ function train_unbatched!(
 end
 
 function train_unbatched!(
-  p::AbstractVector{T},
+  p::AbstractVector,
   _chn::Chain,
   X::AbstractArray,
   opt::AbstractOptimizer,
   t,
-) where {T}
-
+)
   chn = getchain(_chn)
   pX = maybe_static_size_arg(chn.inputdim, X)
   optoff = optmemsize(opt, p)
@@ -425,6 +425,7 @@ function train_unbatched!(
   glen = _try_static(numparam(chn), static_length(params))
   numthreads = _numthreads()
 
+  T = Base.promote_eltype(p, X)
   bytes_per_thread, total_bytes = required_bytes(
     Val{T}(),
     layers,
@@ -576,31 +577,32 @@ function train_batched_core!(
   c::Chain,
   pu::Ptr{UInt8},
   ::Nothing,
-  p::AbstractVector{T},
+  p::AbstractVector,
   pX,
   opt::AbstractOptimizer,
   iters,
   leaveofflast::Bool,
   mpt,
   N_bs,
-) where {T}
+)
   numthreads = _numthreads()
   glen = _try_static(numparam(getchain(c)), static_length(p))
   aligned_glen = align(glen)
+  T = Base.promote_eltype(p, pX)
   g = _alloc_grad(Ptr{T}(pu), glen, numthreads, aligned_glen)
   offset = static_sizeof(T) * aligned_glen * numthreads
   train_batched_core!(c, pu + offset, g, p, pX, opt, iters, leaveofflast, mpt, N_bs)
 end
 function train_batched!(
-  g::Union{Nothing,AbstractVector{T},AbstractMatrix{T}},
-  p::AbstractVector{T},
+  g::Union{Nothing,AbstractVector,AbstractMatrix},
+  p::AbstractVector,
   _chn::Chain,
   X,
   opt::AbstractOptimizer,
   iters;
   batchsize = nothing,
   leaveofflast::Bool = false,
-) where {T}
+)
   if g isa AbstractMatrix && size(g, 2) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
@@ -637,6 +639,7 @@ function train_batched!(
   else
     base_mem = optoff + perm_mem
   end
+  T = Base.promote_eltype(p, X)
   mpt, total_bytes =
     required_bytes(Val{T}(), layers, sxb, base_mem, shuffle_per_thread, nthread)
   GC.@preserve X begin
