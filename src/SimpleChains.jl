@@ -68,6 +68,7 @@ export SimpleChain,
   FrontLastPenalty
 
 const Integer = Union{StaticInt,Base.Integer}
+const MAXSTACK = 16384
 
 include("memory.jl")
 include("simple_chain.jl")

@@ -134,34 +134,59 @@ function verify_arg(c, arg)
     throw(ArgumentError("Input argument: !matches(chain_input_dims(c), size(arg))"))
   end
 end
+struct SArrayOutput{T}
+  f::T
+end
+@inline function (f::SArrayOutput)(x::Vararg{Any,K}) where {K}
+  fx = f.f(x...)
+  _maybe_sarray(fx, size(fx))
+end
 
-function (c::SimpleChain)(arg::AbstractArray{T}, params) where {T}
+
+function (c::SimpleChain)(
+  arg::AbstractArray{T0},
+  params::AbstractVector{T1}
+) where {T0,T1}
   verify_arg(c, arg)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  num_bytes = required_forward_bytes(Val(T), layers, size(parg), static(0))
+  num_bytes = required_forward_bytes(Val(promote_type(T0,T1)), layers, size(parg), static(0))
   if has_loss(c)
-    GC.@preserve arg params with_memory(_chain, c, num_bytes, parg, pointer(params))
-  else
     GC.@preserve arg params begin
-      res, heap_memory = with_heap_memory(_chain, c, num_bytes, parg, pointer(params))
-      StrideArray(res, heap_memory)
+      lret = with_memory(_chain, c, num_bytes, parg, pointer(params))
+    end
+    return lret
+  else
+    ol = tsprod(outputdim(c, size(arg)))
+    if ol isa StaticInt && num_bytes isa StaticInt && ol < 64 && num_bytes <= MAXSTACK
+      GC.@preserve arg params begin
+        saret = with_stack_memory(
+          SArrayOutput(_chain), num_bytes, c, parg, pointer(params)
+        )
+      end
+      return saret
+    else
+      GC.@preserve arg params begin
+        res, heap_memory = with_heap_memory(_chain, c, num_bytes, parg, pointer(params))
+        sret = StrideArray(res, heap_memory)
+      end
+      return sret
     end
   end
 end
 @inline _maybe_sarray(x) = x
 @inline _maybe_sarray(x::AbstractArray) = _maybe_sarray(x, size(x))
 @inline _maybe_sarray(x::AbstractArray, _) = x
+@inline _maybe_sarray(A::AbstractArray, s::Tuple{Vararg{StaticInt}}) = _to_sarray(A, s)
 @generated function _marray_type(s::Tuple{Vararg{StaticInt}})
   k = known(s)
-  t = Expr(:tuple)
   ct = Expr(:curly, :Tuple)
   for x in k
     push!(ct.args, x)
   end
   :($StaticArrays.MArray{$ct})
 end
-@inline function _maybe_sarray(A::AbstractArray{T}, s::Tuple{Vararg{StaticInt}}) where {T}
+@inline function _to_sarray(A::AbstractArray{T}, s::Tuple{Vararg{StaticInt}}) where {T}
   B = _marray_type(s){T}(undef)
   if T <: Base.HWReal
     @turbo for i = eachindex(B)
@@ -203,13 +228,13 @@ end
   mparams = StaticArrays.MArray(params)
   @gc_preserve c(arg, mparams)
 end
-@inline function (c::SimpleChain)(arg::StaticArrays.SArray, params)
+@inline function (c::SimpleChain)(arg::StaticArrays.SArray, params::AbstractVector)
   verify_arg(c, arg)
   @unpack layers = c
   marg = StaticArrays.MArray(arg)
   GC.@preserve marg params begin
     parg = maybe_static_size_arg(c.inputdim, marg)
-    num_bytes = required_forward_bytes(Val(eltype(arg)), layers, size(parg), static(0))
+    num_bytes = required_forward_bytes(Val(Base.promote_eltype(arg, params)), layers, size(parg), static(0))
     if has_loss(c)
       with_memory(_chain, c, num_bytes, parg, pointer(params))
     else
@@ -422,12 +447,14 @@ function valgrad!(memory::Ptr{UInt8}, g, c::SimpleChain, arg, params)
   parg = maybe_static_size_arg(c.inputdim, arg)
   GC.@preserve arg unsafe_valgrad!(c, memory, g, params, parg)
 end
-function valgrad!(g, c::SimpleChain, arg::AbstractArray{T}, params) where {T}
+function valgrad!(
+  g, c::SimpleChain, arg::AbstractArray{T0}, params::AbstractVector{T1}
+) where {T0, T1}
   verify_arg(c, arg)
   @assert has_loss(c)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  num_bytes = required_bytes(Val{T}(), layers, size(parg), static(0))
+  num_bytes = required_bytes(Val{promote_type(T0,T1)}(), layers, size(parg), static(0))
   GC.@preserve arg with_memory(unsafe_valgrad!, c, num_bytes, g, params, parg)
 end
 
@@ -587,15 +614,16 @@ function valgrad_core_sarray(
   )
   return l, _maybe_sarray(g, (static(L),))
 end
-function valgrad(sc::Chain, arg, params::AbstractVector{T}) where {T}
+function valgrad(sc::Chain, arg, params::AbstractVector{TP}) where {TP}
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   glen = _try_static(numparam(sc), static_length(params))
+  T = Base.promote_eltype(arg, params)
   num_bytes = required_bytes(Val{T}(), layers, size(parg), glen * static_sizeof(T))
   l, heap_memory = with_heap_memory(valgrad_core, sc, num_bytes, parg, params, glen)
   gv = StrideArraysCore.StrideArray(
-    PtrArray(align(Ptr{T}(pointer(heap_memory))), (glen,)),
+    PtrArray(align(Ptr{TP}(pointer(heap_memory))), (glen,)),
     heap_memory,
   )
   return l, gv
@@ -603,19 +631,20 @@ end
 @inline function valgrad(
   sc::Chain,
   arg::StaticArrays.SArray,
-  params::AbstractVector{T},
-) where {T}
+  params::AbstractVector{TP},
+) where {TP}
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   glen = _try_static(numparam(sc), static_length(params))
+  T = Base.promote_eltype(arg, params)
   num_bytes = required_bytes(Val{T}(), layers, size(parg), glen * static_sizeof(T))
   if glen isa StaticInt
     return with_memory(valgrad_core_sarray, sc, num_bytes, parg, params, glen)
   else
     l, heap_memory = with_heap_memory(valgrad_core, sc, num_bytes, parg, params, glen)
     gv = StrideArraysCore.StrideArray(
-      PtrArray(Ptr{T}(pointer(heap_memory)), (glen,)),
+      PtrArray(Ptr{TP}(pointer(heap_memory)), (glen,)),
       heap_memory,
     )
     return l, gv
