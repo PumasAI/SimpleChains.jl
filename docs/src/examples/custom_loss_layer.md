@@ -102,6 +102,7 @@ end
 That's all! The way we can now use this loss function, just like any other:
 
 ```julia
+using SimpleChains
 
 model = SimpleChain(
     static(2),
