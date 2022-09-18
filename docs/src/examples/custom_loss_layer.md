@@ -2,7 +2,7 @@
 
 Loss functions like the `LogitCrossEntropyLoss` are defined for users to be able to quickly prototype models on new problems. However, sometimes there is a need to write one's own customised loss function. This example will walk through this process.
 
-We will first begin with an example loss function to implement, a `BinaryLogitCrossEntropyLoss`, which specifically acts on a model which outputs a "probability" for a binary variable. 
+To show which functions need to be implemented for your own custom loss, this example will walk through implementing a `BinaryLogitCrossEntropyLoss`, which acts on a model with only a single output, and binary targets.
 
 ## Mathematical background for a Binary Cross Entropy Loss
 Consider the following model:
@@ -21,13 +21,13 @@ where ``Y_i`` is the true binary label of the ``i^\text{th}`` sample. In order t
     \frac{{\partial }}{{\partial } \theta} L(\theta | X, Y) = -\sum_i  Y_i\frac{{\partial }}{{\partial } \theta}\ln{p_\theta (X_i)} + (1-Y_i)\frac{{\partial }}{{\partial } \theta}\ln (1-p_\theta (X_i)).
 ```
 
-To calculate simplify this, we can use the fact that ``1-p_\theta (x)=p_\theta (-x)``, and ``\frac{{\partial }}{{\partial } \theta}\ln(p_\theta(X_i))=(1+e^{f_\theta(X_i)})^{-1} \frac{{\partial }}{{\partial } \theta} f_\theta(X_i)``. We are left with:
+To simplify this calculation, we can use the fact that ``1-p_\theta (x)=p_\theta (-x)``, and ``\frac{{\partial }}{{\partial } \theta}\ln(p_\theta(X_i))=(1+e^{f_\theta(X_i)})^{-1} \frac{{\partial }}{{\partial } \theta} f_\theta(X_i)``. We are left with:
 
 ```math
-\frac{{\partial }}{{\partial } \theta} L(\theta| X, Y) = -\sum_i \left [ (2Y_i - 1)(1+e^{(2Y_i-1)f_\theta(X_i)})^{-1} \right ] \frac{{\partial }}{{\partial } \theta} f_\theta(X_i).
+\frac{{\partial }}{{\partial } \theta} L(\theta| X, Y) = -\sum_i \left [ (2Y_i - 1){\left (1+e^{(2Y_i-1)f_\theta(X_i)} \right )}^{-1} \right ] \frac{{\partial }}{{\partial } \theta} f_\theta(X_i).
 ```
 
-We have managed to write the derivative of the loss function, in terms of the derivative of the model, independently for each sample and we can start writing the code.
+We have managed to write the derivative of the loss function, in terms of the derivative of the model, independently for each sample. The important part of this equation is the multiplicand of the partial derivative term; this term is the partial gradient used for backpropagation. From this point, we can begin writing the code.
 
 ## Implementing a custom loss type
 
@@ -39,28 +39,27 @@ using SimpleChains
 We can now define our own type, which is a subtype of `SimpleChains.AbstractLoss`:
 
 ```julia
-struct BinaryLogitCrossEntropyLoss{T, Y<:AbstractVector{T}} <: SimpleChains.AbstractLoss{T}
+struct BinaryLogitCrossEntropyLoss{T,Y<:AbstractVector{T}} <: SimpleChains.AbstractLoss{T}
     targets::Y
 end
-target(loss::BinaryLogitCrossEntropyLoss) = loss.targets
 ```
 
 Next, we define how to calculate the loss, given some logits:
 
 ```julia
-function calculate_loss(loss::BinaryCrossEntropyLoss, logits::AbstractArrray{T})
-    y = target(loss)
+function calculate_loss(loss::BinaryLogitCrossEntropyLoss, logits)
+    y = loss.targets
     total_loss = zero(T)
     for i in eachindex(y)
-        p_i = inv(1+exp(-logits[i]))
+        p_i = inv(1 + exp(-logits[i]))
         y_i = y[i]
-        total_loss -= y_i * log(p_i) + (1-y_i) * (1-log(p_i))
+        total_loss -= y_i * log(p_i) + (1 - y_i) * (1 - log(p_i))
     end
-    total_loss, p, pu
+    total_loss
 end
-function (loss::BinaryLogitCrossEntropyLoss)(previous_layer_output::AbstractArray{T}, p::Ptr, pu) where {T}
-  total_loss = calculate_loss(loss, previous_layer_output)
-  total_loss, p, pu
+function (loss::BinaryLogitCrossEntropyLoss)(previous_layer_output::AbstractArray{T}, p::Ptr, pu)
+    total_loss = calculate_loss(loss, previous_layer_output)
+    total_loss, p, pu
 end
 ```
 
@@ -80,36 +79,35 @@ Finally, we define how to backpropagate the gradient from this loss function:
 function SimpleChains.chain_valgrad!(
     __,
     previous_layer_output::AbstractArray{T},
-    layers::Tuple{PolicyGradientLoss},
+    layers::Tuple{BinaryLogitCrossEntropyLoss},
     _::Ptr,
     pu::Ptr{UInt8},
 ) where {T}
     loss = getfield(layers, 1)
     total_loss = calculate_loss(loss, previous_layer_output)
-    y = target(loss)
+    y = loss.targets
 
     # Store the backpropagated gradient in the previous_layer_output array.
-    @turbo for i in eachindex(arg)
+    for i in eachindex(y)
         sign_arg = 2 * y[i] - 1
         # Get the value of the last logit
         logit_i = previous_layer_output[i]
-        previous_layer_output[i] = -(sign_arg * inv(1+exp(sign_arg * logit_i)))
+        previous_layer_output[i] = -(sign_arg * inv(1 + exp(sign_arg * logit_i)))
     end
 
-    return total_loss, arg, pu
+    return total_loss, previous_layer_output, pu
 end
 ```
 
 That's all! The way we can now use this loss function, just like any other:
 
 ```julia
-using SimpleChains
 
 model = SimpleChain(
-  static(2),
-  TurboDense(tanh, 32),
-  TurboDense(tanh, 16),
-  TurboDense(identity, 1)
+    static(2),
+    TurboDense(tanh, 32),
+    TurboDense(tanh, 16),
+    TurboDense(identity, 1)
 )
 
 batch_size = 64
@@ -119,16 +117,9 @@ Y = rand(Bool, batch_size)
 parameters = SimpleChains.init_params(model);
 gradients = G = SimpleChains.alloc_threaded_grad(model);
 
-# Add the loss like any other
+# Add the loss like any other loss type
 model_loss = SimpleChains.add_loss(model, BinaryLogitCrossEntropyLoss(Y));
 
-# train the model
-SimpleChains.train_unbatched!(
-    gradients,
-    parameters,
-    model_loss,
-    X,
-    SimpleChains.ADAM(),
-    10_000
-);
+
+SimpleChains.valgrad!(gradients, model_loss, X, parameters)
 ```
