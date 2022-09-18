@@ -15,7 +15,7 @@ makedocs(;
   ),
   pages = [
     "Home" => "index.md",
-    "Examples" => ["examples/smallmlp.md", "examples/mnist.md"],
+    "Examples" => ["examples/smallmlp.md", "examples/mnist.md", "examples/custom_loss_layer.md"],
   ],
 )
 
