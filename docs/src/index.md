@@ -14,5 +14,5 @@ Modules = [SimpleChains]
 ```
 
 ```@contents
-Pages = ["examples/smallmlp.md", "examples/mnist.md"]
+Pages = ["examples/smallmlp.md", "examples/mnist.md", "examples/custom_loss_layer.md"]
 ```
