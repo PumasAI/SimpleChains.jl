@@ -61,6 +61,8 @@ apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
 getpenalty(sc::SimpleChain) = NoPenalty(sc)
 getpenalty(Λ::AbstractPenalty) = Λ
 getλ(::NoPenalty) = nothing
+Base.:(/)(Λ::NoPenalty, x) = Λ
+
 
 @inline apply_penalty(Λ, p, _) = apply_penalty(Λ, p)
 @inline apply_penalty!(g, Λ, p, _) = apply_penalty!(g, Λ, p)
@@ -79,6 +81,8 @@ L1Penalty(λ::Number) = L1Penalty(nothing, λ)
 L1Penalty(p::AbstractPenalty, λ) = L1Penalty(getchain(p), λ)
 getλ(p::L1Penalty) = getfield(p, :λ)
 (p::L1Penalty)(chn::SimpleChain) = L1Penalty(chn, p.λ)
+Base.:(/)(Λ::L1Penalty, x) = L1Penalty(Λ.chn, Λ.λ / x)
+
 
 @inline function apply_penalty(Λ::L1Penalty, p::AbstractVector{T}) where {T}
   l = zero(T)
@@ -119,6 +123,7 @@ L2Penalty(λ) = L2Penalty(nothing, λ)
 L2Penalty(p::AbstractPenalty, λ) = L2Penalty(getchain(p), λ)
 getλ(p::L2Penalty) = getfield(p, :λ)
 (p::L2Penalty)(chn::SimpleChain) = L2Penalty(chn, p.λ)
+Base.:(/)(Λ::L2Penalty, x) = L2Penalty(Λ.chn, Λ.λ / x)
 
 @inline function apply_penalty(Λ::L2Penalty, p::AbstractVector{T}) where {T}
   l = zero(T)
@@ -165,6 +170,7 @@ getchain(p::FrontLastPenalty) = getfield(p, :chn)
 FrontLastPenalty(λ₁, λ₂) = FrontLastPenalty(nothing, λ₁, λ₂)
 FrontLastPenalty(p::AbstractPenalty, λ₁, λ₂) = FrontLastPenalty(getchain(p), λ₁, λ₂)
 (p::FrontLastPenalty)(chn::SimpleChain) = FrontLastPenalty(chn, p.front, p.last)
+Base.:(/)(Λ::FrontLastPenalty, x) = FrontLastPenalty(Λ.chn, Λ.front / x, Λ.last / x)
 
 function Base.show(io::IO, p::FrontLastPenalty)
   print(io, "Penalty on all but last layer: ")
