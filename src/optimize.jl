@@ -524,7 +524,7 @@ function train_batched_core!(
 ) where {T}
 
   chn = getchain(_chn)
-  pen = getpenalty(_chn)
+  pen = getpenalty(_chn) / N_bs
   @unpack layers = chn
   sx = chain_input_dims(chn, size(pX))
   N = last(sx)
