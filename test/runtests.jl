@@ -1,5 +1,5 @@
 using SimpleChains
-using Test, Aqua, ForwardDiff, Zygote, ChainRules
+using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
 
 function countallocations!(g, sc, x, p)
   @allocated valgrad!(g, sc, x, p)
@@ -486,6 +486,9 @@ InteractiveUtils.versioninfo(verbose=true)
   end
   @testset "SArray" begin
     include("staticarrays.jl")
+  end
+  @testset "Glorot" begin
+    include("random.jl")
   end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped

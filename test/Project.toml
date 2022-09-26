@@ -4,8 +4,10 @@ ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 MLDatasets = "eb30cadb-4394-5ae3-aed4-317e484a6458"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+VectorizedRNG = "33b4df10-0173-11e9-2a0c-851a7edac40e"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]

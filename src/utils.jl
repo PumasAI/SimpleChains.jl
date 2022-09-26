@@ -79,6 +79,7 @@ function glorot_uniform!(A::AbstractArray{T}, rng::VectorizedRNG.AbstractVRNG = 
 end
 function glorot_uniform!(A::AbstractArray{T}, rng) where {T}
   scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
+  @show scale
   # (rand()-0.5)*scale === rand()*scale - 0.5scale
   rand!(rng, A)
   @inbounds @fastmath for i = eachindex(A)

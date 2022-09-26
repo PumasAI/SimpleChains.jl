@@ -2,6 +2,8 @@
 
 import MLDatasets
 function get_data()
+  # xtrain, ytrain = MLDatasets.MNIST.traindata(Float32);
+  # xtest, ytest = MLDatasets.MNIST.testdata(Float32);
   xtrain, ytrain = MLDatasets.MNIST(:train)[:]
   xtest, ytest = MLDatasets.MNIST(:test)[:]
 
@@ -53,7 +55,7 @@ SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
 
 
-lenet.memory .= 0;
+# lenet.memory .= 0;
 SimpleChains.init_params!(lenet, p);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
