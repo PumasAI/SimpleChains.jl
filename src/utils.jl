@@ -72,15 +72,33 @@ nfan(n_out, n_in) = n_in, n_out
   p * dft, p * dt
 end
 # https://github.com/FluxML/Flux.jl/blob/master/LICENSE.md
-function glorot_uniform!(A::AbstractArray{T}, rng = local_rng()) where {T}
+function glorot_uniform!(A::AbstractArray{T}, rng::VectorizedRNG.AbstractVRNG = local_rng()) where {T}
   scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
   # (rand()-0.5)*scale === rand()*scale - 0.5scale
   rand!(rng, A, static(0), T(-0.5) * scale, scale)
 end
+function glorot_uniform!(A::AbstractArray{T}, rng) where {T}
+  scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
+  @show scale
+  # (rand()-0.5)*scale === rand()*scale - 0.5scale
+  rand!(rng, A)
+  @inbounds @fastmath for i = eachindex(A)
+    A[i] = A[i]*scale - 0.5*scale
+  end
+  return A
+end
 # https://github.com/FluxML/Flux.jl/blob/master/LICENSE.md
-function glorot_normal!(A::AbstractArray{T}, rng = local_rng()) where {T}
+function glorot_normal!(A::AbstractArray{T}, rng::VectorizedRNG.AbstractVRNG = local_rng()) where {T}
   σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
   randn!(rng, A, static(0), static(0), σ)
+end
+function glorot_normal!(A::AbstractArray{T}, rng) where {T}
+  σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
+  randn!(rng, A)
+  @inbounds @fastmath for i = eachindex(A)
+    A[i] *= σ
+  end
+  return A
 end
 
 function randpermzero!(r::Random.AbstractRNG, a::AbstractArray{<:Integer})
