@@ -9,7 +9,7 @@ x = Vector{Float64}(undef, 2047);
 y = Vector{Float64}(undef, 2047);
 
 vrng = VectorizedRNG.MutableXoshift(3);
-rng = VERSION >= v"1.7" ? Random.Xoshiro(3) : Random.MersenneTwister(3);
+rng = VERSION >= v"1.7" ? Random.Xoshiro(3) : Random.MersenneTwister(4);
 
 SimpleChains.glorot_uniform!(x, vrng);
 SimpleChains.glorot_uniform!(y, rng);
