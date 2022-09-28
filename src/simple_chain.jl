@@ -405,7 +405,7 @@ function init_params(
   rng::AbstractRNG=local_rng()
 ) where {T}
   _id = chain_input_dims(Λ, id)
-  init_params!(Λ, StrideArray{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id), rng)
+  init_params!(Λ, StrideArray{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id); rng)
 end
 
 """
@@ -415,7 +415,7 @@ Creates a parameter vector of element type `T` with size matching that by `id` (
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
 function init_params(Λ::SimpleChain, ::Type{T}; rng::AbstractRNG=local_rng()) where {T}
-  init_params(Λ, nothing, T, rng)
+  init_params(Λ, nothing, T; rng)
 end
 
 @inline function maybe_static_size_arg(s::Tuple, arg)
