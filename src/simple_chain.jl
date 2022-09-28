@@ -387,22 +387,25 @@ end
 Randomly initializes parameter vector `p` with input dim `id`. Input dim does not need to be specified if these were provided to the chain object itself.
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
-function init_params!(chn::SimpleChain, x::AbstractVector, id = nothing)
-  GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id))
+function init_params!(
+  chn::SimpleChain, x::AbstractVector, id = nothing, rng::AbstractRNG=local_rng()
+)
+  GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id), rng)
   return x
 end
-function init_params!(layers::Tuple, p::Ptr, id)
-  p, od = init_params!(first(layers), p, id)
-  init_params!(Base.tail(layers), p, od)
+function init_params!(layers::Tuple, p::Ptr, id, rng::AbstractRNG=local_rng())
+  p, od = init_params!(first(layers), p, id, rng)
+  init_params!(Base.tail(layers), p, od, rng)
 end
-init_params!(::Tuple{}, p::Ptr, _) = nothing
+init_params!(::Tuple{}, p::Ptr, _, ::AbstractRNG) = nothing
 function init_params(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32,
+  rng::AbstractRNG=local_rng()
 ) where {T}
   _id = chain_input_dims(Λ, id)
-  init_params!(Λ, StrideArray{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id))
+  init_params!(Λ, StrideArray{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id), rng)
 end
 """
     SimpleChains.init_params(chn[, id = nothing][, ::Type{T} = Float32])
@@ -410,8 +413,8 @@ end
 Creates a parameter vector of element type `T` with size matching that by `id` (argument not required if provided to the `chain` object itself).
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
-function init_params(Λ::SimpleChain, ::Type{T}) where {T}
-  init_params(Λ, nothing, T)
+function init_params(Λ::SimpleChain, ::Type{T}, rng::AbstractRNG=local_rng()) where {T}
+  init_params(Λ, nothing, T, rng)
 end
 
 @inline function maybe_static_size_arg(s::Tuple, arg)

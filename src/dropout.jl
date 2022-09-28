@@ -27,7 +27,7 @@ gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
 numparam(::Dropout, id) = static(0), id
 parameter_free(::Dropout) = true
 
-init_params!(::Dropout, p, id) = p, id
+init_params!(::Dropout, p, id, _) = p, id
 
 function (d::Dropout)(B::AbstractVecOrMat{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   x = muladd(T(d.p), -inv(T(typemax(UInt32))), one(T))

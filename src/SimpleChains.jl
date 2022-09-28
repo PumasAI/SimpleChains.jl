@@ -41,6 +41,7 @@ import ChainRulesCore
 import ForwardDiff
 import LoopVectorization
 import StaticArrays
+using Random: AbstractRNG
 
 using LoopVectorization: matmul_params, @turbo
 # using LoopVectorization: matmul_params

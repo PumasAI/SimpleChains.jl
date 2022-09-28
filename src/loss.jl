@@ -66,7 +66,7 @@ end
 (::SquaredLoss)(y) = SquaredLoss(y)
 SquaredLoss() = SquaredLoss(nothing)
 target(sl::SquaredLoss) = getfield(sl, :y)
-init_params!(::AbstractLoss, p, _) = p, 1
+init_params!(::AbstractLoss, p, _, ::AbstractRNG) = p, 1
 
 function Base.getindex(sl::SquaredLoss, r)
   SquaredLoss(view_slice_last(target(sl), r))

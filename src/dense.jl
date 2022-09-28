@@ -87,22 +87,22 @@ function _getparams(layer::TurboDense{true}, p, inputdim::Tuple)
   _, outputdim = numparam(layer, inputdim)
   (view(A, :, static(1):K), view(A, :, Kp1)), p, outputdim
 end
-function init_params!(td::TurboDense, p, inputdim::Tuple)
-  p, outputdim = _init_params!(td, p, first(inputdim))
+function init_params!(td::TurboDense, p, inputdim::Tuple, rng::AbstractRNG)
+  p, outputdim = _init_params!(td, p, first(inputdim), rng)
   p, (outputdim, Base.tail(inputdim)...)
 end
-function _init_params!(td::TurboDense{true}, p, inputdim::Integer)
+function _init_params!(td::TurboDense{true}, p, inputdim::Integer, rng::AbstractRNG)
   W, p = getparams(td, p, inputdim)
   outputdim = td.outputdim
-  glorot_normal!(view(W, :, 1:inputdim))
+  glorot_normal!(view(W, :, 1:inputdim), rng)
   @turbo for i = 1:outputdim
     W[i, inputdim+1] = 0
   end
   return p, outputdim
 end
-function _init_params!(td::TurboDense{false}, p, inputdim::Integer)
+function _init_params!(td::TurboDense{false}, p, inputdim::Integer, rng::AbstractRNG)
   W, p = getparams(td, p, inputdim)
-  glorot_normal!(W)
+  glorot_normal!(W, rng)
   return p, td.outputdim
 end
 

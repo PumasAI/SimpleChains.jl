@@ -694,7 +694,7 @@ end
 
 for t ∈ [:train, :train_batched, :train_unbatched]
   t! = Symbol(t, :!)
-  @eval function $t(chn::Chain, X, opt, iters)
-    $t!(init_params(chn), chn, X, opt, iters)
+  @eval function $t(chn::Chain, X, opt, iters; rng::AbstractRNG = local_rng())
+    $t!(init_params(chn, nothing, eltype(X), rng), chn, X, opt, iters)
   end
 end

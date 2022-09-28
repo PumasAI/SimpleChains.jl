@@ -797,9 +797,9 @@ function forward_layer_output_size(::Val{T}, c::Conv, inputdim::Tuple) where {T}
   align(static_sizeof(T) * prod(outputdim)), outputdim
 end
 
-function init_params!(c::Conv, p, inputdim)
+function init_params!(c::Conv, p, inputdim, rng::AbstractRNG)
   (K, b), p2 = getparams(c, p, inputdim)
-  glorot_uniform!(K)
+  glorot_uniform!(K, rng)
   @turbo for i in eachindex(b)
     b[i] = 0
   end
