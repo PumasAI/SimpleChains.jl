@@ -388,12 +388,12 @@ Randomly initializes parameter vector `p` with input dim `id`. Input dim does no
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
 function init_params!(
-  chn::SimpleChain, x::AbstractVector, id = nothing, rng::AbstractRNG=local_rng()
+  chn::SimpleChain, x::AbstractVector, id = nothing; rng::AbstractRNG
 )
   GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id), rng)
   return x
 end
-function init_params!(layers::Tuple, p::Ptr, id, rng::AbstractRNG=local_rng())
+function init_params!(layers::Tuple, p::Ptr, id, rng::AbstractRNG)
   p, od = init_params!(first(layers), p, id, rng)
   init_params!(Base.tail(layers), p, od, rng)
 end
@@ -401,19 +401,20 @@ init_params!(::Tuple{}, p::Ptr, _, ::AbstractRNG) = nothing
 function init_params(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
-  ::Type{T} = Float32,
+  ::Type{T} = Float32;
   rng::AbstractRNG=local_rng()
 ) where {T}
   _id = chain_input_dims(Λ, id)
   init_params!(Λ, StrideArray{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id), rng)
 end
+
 """
     SimpleChains.init_params(chn[, id = nothing][, ::Type{T} = Float32])
 
 Creates a parameter vector of element type `T` with size matching that by `id` (argument not required if provided to the `chain` object itself).
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
-function init_params(Λ::SimpleChain, ::Type{T}, rng::AbstractRNG=local_rng()) where {T}
+function init_params(Λ::SimpleChain, ::Type{T}; rng::AbstractRNG=local_rng()) where {T}
   init_params(Λ, nothing, T, rng)
 end
 
