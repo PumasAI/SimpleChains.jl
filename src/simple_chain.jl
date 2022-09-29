@@ -394,7 +394,7 @@ function init_params!(
   return x
 end
 function _init_params!(layers::Tuple, p::Ptr, id, rng::AbstractRNG)
-  p, od = _init_params!(first(layers), p, id, rng)
+  p, od = init_params!(first(layers), p, id, rng)
   _init_params!(Base.tail(layers), p, od, rng)
 end
 _init_params!(::Tuple{}, p::Ptr, _, ::AbstractRNG) = nothing
