@@ -39,14 +39,17 @@ _type_sym(c::Chain) = __type_sym(remove_loss(c))
 function init_params(
   Λ::AbstractPenalty,
   id::Union{Nothing,InputDim} = nothing,
-  ::Type{T} = Float32,
+  ::Type{T} = Float32;
+  rng::AbstractRNG=local_rng(),
 ) where {T}
-  init_params(getchain(Λ), id, T)
+  init_params(getchain(Λ), id, T; rng)
 end
-function init_params(Λ::AbstractPenalty, ::Type{T}) where {T}
-  init_params(getchain(Λ), nothing, T)
+function init_params(Λ::AbstractPenalty, ::Type{T}; rng::AbstractRNG=local_rng()) where {T}
+  init_params(getchain(Λ), nothing, T; rng)
 end
-init_params!(Λ::AbstractPenalty, x, id = nothing) = init_params!(getchain(Λ), x, id)
+function init_params!(Λ::AbstractPenalty, x, id = nothing; rng::AbstractRNG=local_rng())
+  init_params!(getchain(Λ), x, id; rng)
+end
 
 target(c::AbstractPenalty) = target(getchain(c))
 

@@ -27,7 +27,7 @@ end
 function getoutputdim(::MaxPool{D}, inputdim) where {D}
   _maxpooloutputdim(map(StaticInt, D), inputdim)
 end
-init_params!(::MaxPool{D}, p, id) where {D} = p, getoutputdim(MaxPool{D}(), id)
+init_params!(::MaxPool{D}, p, id, ::AbstractRNG) where {D} = p, getoutputdim(MaxPool{D}(), id)
 
 numparam(mp::MaxPool, inputdim) = 0, getoutputdim(mp, inputdim)
 

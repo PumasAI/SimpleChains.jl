@@ -34,7 +34,7 @@ function forward_layer_output_size(::Val{T}, ::Flatten{N}, inputdim::Tuple) wher
   static(0), getoutputdim(Flatten{N}(), inputdim)
 end
 
-init_params!(::Flatten{N}, p, id) where {N} = p, getoutputdim(Flatten{N}(), id)
+init_params!(::Flatten{N}, p, id, ::AbstractRNG) where {N} = p, getoutputdim(Flatten{N}(), id)
 
 
 numparam(::Flatten{N}, inputdim) where {N} = 0, getoutputdim(Flatten{N}(), inputdim)

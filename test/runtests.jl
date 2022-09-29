@@ -80,7 +80,7 @@ InteractiveUtils.versioninfo(verbose=true)
         # typename doesn't work on 1.5
         @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
       end
-      p = SimpleChains.init_params(scflp, T)
+      p = SimpleChains.init_params(scflp, T, rng = Random.default_rng())
       g = similar(p)
       let sc = SimpleChains.remove_loss(sc)
         @test_throws ArgumentError sc(rand(T, 23, 2), p)

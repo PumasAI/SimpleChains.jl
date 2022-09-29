@@ -12,7 +12,7 @@ struct Activation{F}
 end
 parameter_free(::Activation) = true
 numparam(::Activation, id) = static(0), id
-init_params!(::Activation, p, id) = p, id
+init_params!(::Activation, p, id, ::AbstractRNG) = p, id
 _check_input_dims(::Activation, _) = nothing
 
 forward_layer_output_size(::Val{T}, a::Activation, s) where {T} =

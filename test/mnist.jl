@@ -27,7 +27,7 @@ lenetloss = SimpleChains.add_loss(lenet, LogitCrossEntropyLoss(ytrain1));
 @test SimpleChains.outputdim(lenet, size(xtest4)) == (10, length(ytest1));
 
 # initialize parameters
-@time p = SimpleChains.init_params(lenet);
+@time p = SimpleChains.init_params(lenet, rng = SimpleChains.local_rng());
 @test all(isfinite, p)
 
 @testset "Cache Corrupting Results" begin
