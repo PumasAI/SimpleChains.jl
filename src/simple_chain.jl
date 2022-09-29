@@ -388,16 +388,16 @@ Randomly initializes parameter vector `p` with input dim `id`. Input dim does no
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
 function init_params!(
-  chn::SimpleChain, x::AbstractVector, id = nothing; rng::AbstractRNG
+  chn::SimpleChain, x::AbstractVector, id = nothing; rng::AbstractRNG = local_rng()
 )
-  GC.@preserve x init_params!(chn.layers, pointer(x), chain_input_dims(chn, id), rng)
+  GC.@preserve x _init_params!(chn.layers, pointer(x), chain_input_dims(chn, id), rng)
   return x
 end
-function init_params!(layers::Tuple, p::Ptr, id, rng::AbstractRNG)
-  p, od = init_params!(first(layers), p, id, rng)
-  init_params!(Base.tail(layers), p, od, rng)
+function _init_params!(layers::Tuple, p::Ptr, id, rng::AbstractRNG)
+  p, od = _init_params!(first(layers), p, id, rng)
+  _init_params!(Base.tail(layers), p, od, rng)
 end
-init_params!(::Tuple{}, p::Ptr, _, ::AbstractRNG) = nothing
+_init_params!(::Tuple{}, p::Ptr, _, ::AbstractRNG) = nothing
 function init_params(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
