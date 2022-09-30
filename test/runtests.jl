@@ -235,12 +235,8 @@ InteractiveUtils.versioninfo(verbose=true)
         @show isapprox(g, gfdd, rtol = 1e-8)
       end
       # let g=g, sc=sc, x=x, p=p
-      @test iszero(
-        countallocations!(g, FrontLastPenalty(sc, L2Penalty(2.3), NoPenalty()), x, p),
-      )
-      @test iszero(
-        countallocations!(g, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, p),
-      )
+      @test countallocations!(g, FrontLastPenalty(sc, L2Penalty(2.3), NoPenalty()), x, p) == 0
+      @test countallocations!(g, FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)), x, p) == 0
       # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 
       td = TurboDense{true}(tanh, static(8))
