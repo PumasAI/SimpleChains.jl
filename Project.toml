@@ -1,7 +1,7 @@
 name = "SimpleChains"
 uuid = "de6bee2f-e2f4-4ec7-b6ed-219cc6f6e9e5"
 authors = ["Chris Elrod <elrodc@gmail.com> and contributors"]
-version = "0.3.3"
+version = "0.3.4"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
