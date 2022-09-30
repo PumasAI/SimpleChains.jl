@@ -48,7 +48,7 @@ G = SimpleChains.alloc_threaded_grad(lenetloss);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
-# SimpleChains.init_params!(lenet, p);
+# SimpleChains.init_params!(p, lenet);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
@@ -56,11 +56,11 @@ SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
 
 
 # lenet.memory .= 0;
-SimpleChains.init_params!(lenet, p);
+SimpleChains.init_params!(p, lenet);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
-SimpleChains.init_params!(lenet, p);
+SimpleChains.init_params!(p, lenet);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
@@ -75,11 +75,11 @@ lenetloss.memory .= 0x00;
 @time valgrad!(g1, lenetloss, xtrain, p)
 g0 == g1
 lenet.memory .= 0;
-SimpleChains.init_params!(lenet, p);
+SimpleChains.init_params!(p, lenet);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
-SimpleChains.init_params!(lenet, p);
+SimpleChains.init_params!(p, lenet);
 @time SimpleChains.train_batched!(G, p, lenetloss, xtrain, SimpleChains.ADAM(3e-4), 10);
 SimpleChains.accuracy_and_loss(lenetloss, xtrain, p),
 SimpleChains.accuracy_and_loss(lenetloss, xtest, ytest, p)
