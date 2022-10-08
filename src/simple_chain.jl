@@ -1,4 +1,5 @@
 
+
 struct InputDimUnknown end
 const InputDim = Union{InputDimUnknown,Tuple{Vararg{Integer}}}
 
@@ -387,8 +388,8 @@ end
 Randomly initializes parameter vector `p` with input dim `id`. Input dim does not need to be specified if these were provided to the chain object itself.
 See the documentation of the individual layers to see how they are initialized, but it is generally via (Xavier) Glorot uniform or normal distributions.
 """
-function init_params!(
-  chn::SimpleChain, x::AbstractVector, id = nothing; rng::AbstractRNG = local_rng()
+@inline function init_params!(
+  x::AbstractVector, chn::SimpleChain, id = nothing; rng::AbstractRNG = local_rng()
 )
   GC.@preserve x _init_params!(chn.layers, pointer(x), chain_input_dims(chn, id), rng)
   return x
@@ -398,14 +399,14 @@ function _init_params!(layers::Tuple, p::Ptr, id, rng::AbstractRNG)
   _init_params!(Base.tail(layers), p, od, rng)
 end
 _init_params!(::Tuple{}, p::Ptr, _, ::AbstractRNG) = nothing
-function init_params(
+@inline function init_params(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32;
   rng::AbstractRNG=local_rng()
 ) where {T}
   _id = chain_input_dims(Λ, id)
-  init_params!(Λ, StrideArray{T}(undef, numparam(Λ, id)), chain_input_dims(Λ, _id); rng)
+  init_params!(StrideArray{T}(undef, numparam(Λ, id)), Λ, chain_input_dims(Λ, _id); rng)
 end
 
 """
