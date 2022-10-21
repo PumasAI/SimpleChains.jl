@@ -68,7 +68,7 @@ dualeval!(
 function dualeval!(f::F, Cdual::AbstractArray) where {F}
   dualeval!(f, @gc_preserve(vec(Cdual)))
 end
-const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? Int(length(LoopVectorization.EXTRACTFUNS)) : 14
+const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? 32 : 14
 @generated function dualeval!(
   f::F,
   Cdual::AbstractVector{D},
