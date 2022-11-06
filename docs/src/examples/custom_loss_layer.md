@@ -1,6 +1,6 @@
 # Adding a custom loss layer
 
-Loss functions like the `LogitCrossEntropyLoss` are defined for users to be able to quickly prototype models on new problems. However, sometimes there is a need to write one's own customised loss function. This example will walk through this process.
+Loss functions like the `LogitCrossEntropyLoss` are defined for users to be able to quickly prototype models on new problems. However, sometimes there is a need to write one's own customized loss function. This example will walk through this process.
 
 To show which functions need to be implemented for your own custom loss, this example will walk through implementing a `BinaryLogitCrossEntropyLoss`, which acts on a model with only a single output, and binary targets.
 
@@ -10,7 +10,7 @@ Consider the following model:
 ```math
 p_\theta(X_i) = \sigma (f(X_i)),
 ```
-where ``X_i`` is the input features, ``\sigma`` is the sigmoid function, given by ``\sigma(x)=(1+e^{-x})^{-1}`` and ``f_\theta`` is some function mapping defined by your model, which is parameterised by parameters ``\theta``. The output of ``f_\theta (X_i)`` is called the "logit". The loss function we want to calculate is the following:
+where ``X_i`` is the input features, ``\sigma`` is the sigmoid function, given by ``\sigma(x)=(1+e^{-x})^{-1}`` and ``f_\theta`` is some function mapping defined by your model, which is parameterized by parameters ``\theta``. The output of ``f_\theta (X_i)`` is called the "logit". The loss function we want to calculate is the following:
 
 ```math
 L(\theta| X, Y) = -\sum_i \left [ Y_i\ln{p_\theta (X_i)} + (1-Y_i)\ln{(1-p_\theta (X_i))} \right ],
