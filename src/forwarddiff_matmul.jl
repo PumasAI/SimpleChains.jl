@@ -1,12 +1,16 @@
 
-@generated function _flatten(x::ForwardDiff.Dual{<:Any,<:NativeTypesV,N}) where {N}
+@generated function _flatten(
+  x::ForwardDiff.Dual{<:Any,<:NativeTypesV,N}
+) where {N}
   t = Expr(:tuple, :(ForwardDiff.value(x)))
   for n = 1:N
     push!(t.args, :(@inbounds p[$n]))
   end
   Expr(:block, Expr(:meta, :inline), :(p = ForwardDiff.partials(x)), t)
 end
-@generated function _flatten(x::ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual,N}) where {N}
+@generated function _flatten(
+  x::ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual,N}
+) where {N}
   t = Expr(:tuple, :(_flatten(ForwardDiff.value(x))...))
   for n = 1:N
     push!(t.args, :(_flatten(@inbounds(p[$n]))...))
@@ -35,7 +39,7 @@ DualDualCall{I}(f::F) where {I,F} = DualDualCall{I,F}(f)
   # O is the outer
   # P = (I + 1) * (O + 1)
   II = I + 1
-  OO = (P ÷ II)  
+  OO = (P ÷ II)
   D = ForwardDiff.Dual
   c = VERSION >= v"1.8-beta0" ? :(@inline dc.f(d)) : :(dc.f(d))
   quote
@@ -46,24 +50,24 @@ DualDualCall{I}(f::F) where {I,F} = DualDualCall{I,F}(f)
   end
 end
 
-
 dualeval!(
   ::typeof(identity),
-  ::AbstractArray{D},
-) where {T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}} = nothing
+  ::AbstractArray{D}
+) where {T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}} =
+  nothing
 dualeval!(
   ::typeof(identity),
-  ::AbstractArray{D},
+  ::AbstractArray{D}
 ) where {T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
 dualeval!(
   ::typeof(identity),
-  ::AbstractVector{D},
-) where {T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}} = nothing
+  ::AbstractVector{D}
+) where {T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}} =
+  nothing
 dualeval!(
   ::typeof(identity),
-  ::AbstractVector{D},
+  ::AbstractVector{D}
 ) where {T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}} = nothing
-
 
 function dualeval!(f::F, Cdual::AbstractArray) where {F}
   dualeval!(f, @gc_preserve(vec(Cdual)))
@@ -71,9 +75,9 @@ end
 const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? 32 : 14
 @generated function dualeval!(
   f::F,
-  Cdual::AbstractVector{D},
+  Cdual::AbstractVector{D}
 ) where {F,T<:Base.HWReal,P,D<:ForwardDiff.Dual{<:Any,T,P}}
-  if (P+1) <= min(MAX_NUM_LV_EXTRACT,16)
+  if (P + 1) <= min(MAX_NUM_LV_EXTRACT, 16)
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualCall(f)
@@ -92,15 +96,19 @@ const MAX_NUM_LV_EXTRACT = isdefined(LoopVectorization, :EXTRACTFUNS) ? 32 : 14
 end
 @generated function dualeval!(
   f::F,
-  Cdual::AbstractVector{D},
+  Cdual::AbstractVector{D}
 ) where {F,T,P,R,D<:ForwardDiff.Dual{<:Any,<:ForwardDiff.Dual{<:Any,T,R},P}}
   TD = (P + 1) * (R + 1)
-  if (T <: Base.HWReal) && TD <= MAX_NUM_LV_EXTRACT && ((P+1) <= 16) && ((R+1) <= 16)
+  if (T <: Base.HWReal) &&
+     TD <= MAX_NUM_LV_EXTRACT &&
+     ((P + 1) <= 16) &&
+     ((R + 1) <= 16)
     quote
       C = reinterpret(reshape, T, Cdual)
       g = DualDualCall{$R}(f)
       @turbo for m ∈ eachindex(Cdual)
-        (Base.Cartesian.@ntuple $TD p -> C[p, m]) = Base.Cartesian.@ncall $TD g p -> C[p, m]
+        (Base.Cartesian.@ntuple $TD p -> C[p, m]) =
+          Base.Cartesian.@ncall $TD g p -> C[p, m]
       end
     end
   else
@@ -112,10 +120,11 @@ end
   end
 end
 
-@inline reinterpret_dual(A::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N} =
-  zero_offsets(reinterpret(V, A))
+@inline reinterpret_dual(
+  A::AbstractArray{ForwardDiff.Dual{T,V,N}}
+) where {T,V,N} = zero_offsets(reinterpret(V, A))
 @inline function reinterpret_reshape_dual(
-  A::AbstractArray{ForwardDiff.Dual{T,V,N}},
+  A::AbstractArray{ForwardDiff.Dual{T,V,N}}
 ) where {T,V,N}
   zero_offsets(reinterpret(reshape, V, A))
 end
@@ -217,16 +226,20 @@ function contract_loops(
   q = :(@turbo $q)
   if lao
     cd::Int = findfirst(==(first(contract_dims)), DA)
-    Expr(:block, :(K = $(ArrayInterface.static_last)($axes(A, StaticInt{$cd}()))), q)
+    Expr(
+      :block,
+      :(K = $(ArrayInterface.static_last)($axes(A, StaticInt{$cd}()))),
+      q
+    )
   else
     q
   end
 end
 
 @generated function contract!(
-  C::PtrArray{<:Any,<:Any,TC},
-  A::PtrArray{<:Any,<:Any,TA},
-  B::PtrArray{<:Any,<:Any,TB},
+  C::PtrArray{TC},
+  A::PtrArray{TA},
+  B::PtrArray{TB},
   ::Val{DC},
   ::Val{DA},
   ::Val{DB},
@@ -253,9 +266,9 @@ end
   contract_loops(dc, da, db, LAO, U, sb)
 end
 @generated function contract!(
-  C::PtrArray{<:Any,DDC,TC},
-  A::PtrArray{<:Any,DDA,TA},
-  B::PtrArray{<:Any,<:Any,TB},
+  C::PtrArray{TC},
+  A::PtrArray{TA},
+  B::PtrArray{TB},
   ::Val{DC},
   ::Val{DA},
   ::Val{DB},
@@ -268,8 +281,6 @@ end
   TC<:ForwardDiff.Dual{T,<:Any,P},
   TA<:ForwardDiff.Dual{T,<:Any,P},
   TB,
-  DDC,
-  DDA,
   DC,
   DA,
   DB,
@@ -277,25 +288,41 @@ end
   U,
   SB
 }
-  if (DDC[1] & DDA[1]) & (DC[1] == DA[1]) & Bool(is_column_major(A)) & Bool(is_column_major(C))
+  DDC = map(Bool, ArrayInterface.dense_dims(C))
+  DDA = map(Bool, ArrayInterface.dense_dims(A))
+  if (DDC[1] & DDA[1]) &
+     (DC[1] == DA[1]) &
+     Bool(is_column_major(A)) &
+     Bool(is_column_major(C))
     r = reinterpret_dual
     DCN = DC
     DAN = DA
   else
     r = reinterpret_reshape_dual
     dimC::Int = Int(length(DC))
-    new_dim = ((Int(length(DA))::Int + Int(length(DB))::Int - dimC) >>> 1) + dimC
+    new_dim =
+      ((Int(length(DA))::Int + Int(length(DB))::Int - dimC) >>> 1) + dimC
     DCN = (new_dim, DC...)
     DAN = (new_dim, DA...)
   end
   quote
-    contract!($r(C), $r(A), B, Val{$DCN}(), Val{$DAN}(), Val{$DB}(), Val{$LAO}(), Val{$U}(), Val{$SB}())
+    contract!(
+      $r(C),
+      $r(A),
+      B,
+      Val{$DCN}(),
+      Val{$DAN}(),
+      Val{$DB}(),
+      Val{$LAO}(),
+      Val{$U}(),
+      Val{$SB}()
+    )
   end
 end
 @generated function contract!(
-  C::PtrArray{<:Any,DDC,TC},
-  A::PtrArray{<:Any,<:Any,TA},
-  B::PtrArray{<:Any,DDB,TB},
+  C::PtrArray{TC},
+  A::PtrArray{TA},
+  B::PtrArray{TB},
   ::Val{DC},
   ::Val{DA},
   ::Val{DB},
@@ -308,8 +335,6 @@ end
   TC<:ForwardDiff.Dual{T,<:Any,P},
   TA,
   TB<:ForwardDiff.Dual{T,<:Any,P},
-  DDC,
-  DDB,
   DC,
   DA,
   DB,
@@ -328,22 +353,35 @@ end
     SBN = ()
   end
   quote
-    contract!($r(C), A, $r(B), Val{$DCN}(), Val{$DA}(), Val{$DBN}(), Val{$LAO}(), Val{$U}(), Val{$SBN}())
+    contract!(
+      $r(C),
+      A,
+      $r(B),
+      Val{$DCN}(),
+      Val{$DA}(),
+      Val{$DBN}(),
+      Val{$LAO}(),
+      Val{$U}(),
+      Val{$SBN}()
+    )
   end
 end
 
-
 @inline function view_d1_first(A::AbstractArray{<:Any,N}) where {N}
-  zero_offsets(view(A, firstindex(A, static(1)), ntuple(_ -> (:), Val(N - 1))...))
+  zero_offsets(
+    view(A, firstindex(A, static(1)), ntuple(_ -> (:), Val(N - 1))...)
+  )
 end
-_increment_first(r::CloseOpen) = CloseOpen(getfield(r,:start) + static(1), getfield(r,:upper))
+_increment_first(r::CloseOpen) =
+  CloseOpen(getfield(r, :start) + static(1), getfield(r, :upper))
 _increment_first(r::AbstractUnitRange) = first(r)+static(1):last(r)
 
 @inline function view_d1_notfirst(A::AbstractArray{<:Any,N}) where {N}
   r = _increment_first(axes(A, static(1)))
   zero_offsets(view(A, r, ntuple(_ -> (:), Val(N - 1))...))
 end
-_decrement_last(r::CloseOpen) = CloseOpen(getfield(r,:start), getfield(r,:upper) - static(1))
+_decrement_last(r::CloseOpen) =
+  CloseOpen(getfield(r, :start), getfield(r, :upper) - static(1))
 _decrement_last(r::AbstractUnitRange) = CloseOpen(first(r), last(r))
 @inline function view_dlast_front(A::AbstractArray{<:Any,N}) where {N}
   r = _decrement_last(axes(A, static(N)))
@@ -351,9 +389,9 @@ _decrement_last(r::AbstractUnitRange) = CloseOpen(first(r), last(r))
 end
 
 @generated function contract!(
-  C::PtrArray{<:Any,DDC,TC},
-  A::PtrArray{<:Any,DDA,TA},
-  B::PtrArray{<:Any,DDB,TB},
+  C::PtrArray{TC},
+  A::PtrArray{TA},
+  B::PtrArray{TB},
   ::Val{DC},
   ::Val{DA},
   ::Val{DB},
@@ -366,9 +404,6 @@ end
   TC<:ForwardDiff.Dual{T,<:Any,P},
   TA<:ForwardDiff.Dual{T,<:Any,P},
   TB<:ForwardDiff.Dual{T,<:Any,P},
-  DDC,
-  DDA,
-  DDB,
   DC,
   DA,
   DB,
@@ -376,7 +411,6 @@ end
   U,
   SB
 }
-
   rr = reinterpret_reshape_dual
   q = quote
     rB = $rr(B)
@@ -384,6 +418,8 @@ end
   dimC::Int = Int(length(DC))
   new_dim = ((Int(length(DA))::Int + Int(length(DB))::Int - dimC) >>> 1) + dimC
   let
+    DDC = map(Bool, ArrayInterface.dense_dims(C))
+    DDA = map(Bool, ArrayInterface.dense_dims(A))
     if (DDC[1] & DDA[1]) & (DC[1] == DA[1])
       r1 = reinterpret_dual
       DCN = DC
@@ -405,7 +441,7 @@ end
         Val{$LAO}(),
         Val{$U}(),
         Val{$SB}()
-      )),
+      ))
     )
   end
   let
@@ -430,7 +466,7 @@ end
           Val{true}(),
           Val{()}()
         ),
-      ),
+      )
     )
   end
   q
@@ -438,34 +474,64 @@ end
 
 using StrideArraysCore: PtrVector, PtrMatrix
 function matmul!(
-  C::PtrVector{<:Any,<:Any,D},
+  C::PtrVector{D},
   A::PtrMatrix,
   B::PtrVector,
-  ::True,
+  ::True
 ) where {D<:ForwardDiff.Dual}
-  contract!(zero_offsets(C), zero_offsets(A), zero_offsets(B), Val{(0,)}(), Val{(0, 1)}(), Val{(1,)}(), Val{true}(), Val{false}(), Val{()}())
+  contract!(
+    zero_offsets(C),
+    zero_offsets(A),
+    zero_offsets(B),
+    Val{(0,)}(),
+    Val{(0, 1)}(),
+    Val{(1,)}(),
+    Val{true}(),
+    Val{false}(),
+    Val{()}()
+  )
 end
 function matmul!(
-  C::PtrMatrix{<:Any,<:Any,D},
+  C::PtrMatrix{D},
   A::PtrMatrix,
   B::PtrMatrix,
-  ::True,
+  ::True
 ) where {D<:ForwardDiff.Dual}
-  contract!(zero_offsets(C), zero_offsets(A), zero_offsets(B), Val{(0, 1)}(), Val{(0, 2)}(), Val{(2, 1)}(), Val{true}(), Val{false}(), Val{()}())
+  contract!(
+    zero_offsets(C),
+    zero_offsets(A),
+    zero_offsets(B),
+    Val{(0, 1)}(),
+    Val{(0, 2)}(),
+    Val{(2, 1)}(),
+    Val{true}(),
+    Val{false}(),
+    Val{()}()
+  )
 end
 function matmul!(
-  C::PtrVector{<:Any,<:Any,D},
+  C::PtrVector{D},
   A::PtrMatrix{},
   B::PtrVector,
-  ::False,
+  ::False
 ) where {D<:ForwardDiff.Dual}
-  contract!(zero_offsets(C), zero_offsets(A), zero_offsets(B), Val{(0,)}(), Val{(0, 1)}(), Val{(1,)}(), Val{false}(), Val{false}(), Val{()}())
+  contract!(
+    zero_offsets(C),
+    zero_offsets(A),
+    zero_offsets(B),
+    Val{(0,)}(),
+    Val{(0, 1)}(),
+    Val{(1,)}(),
+    Val{false}(),
+    Val{false}(),
+    Val{()}()
+  )
 end
 function matmul!(
-  C::PtrMatrix{<:Any,<:Any,D},
+  C::PtrMatrix{D},
   A::PtrMatrix,
   B::PtrMatrix,
-  ::False,
+  ::False
 ) where {D<:ForwardDiff.Dual}
   contract!(
     zero_offsets(C),
@@ -476,40 +542,54 @@ function matmul!(
     Val{(2, 1)}(),
     Val{false}(),
     Val{false}(),
-    Val{()}(),
+    Val{()}()
   )
 end
 
 function matmul!(
-  C::PtrMatrix{<:Any,<:Any,D},
+  C::PtrMatrix{D},
   A::PtrMatrix,
   B::PtrVector,
-  bias::StaticBool,
+  bias::StaticBool
 ) where {D<:ForwardDiff.Dual}
-  matmul!(zero_offsets(@gc_preserve(vec(C))), zero_offsets(A), zero_offsets(B), bias)
+  matmul!(
+    zero_offsets(@gc_preserve(vec(C))),
+    zero_offsets(A),
+    zero_offsets(B),
+    bias
+  )
 end
 function matmul!(
-  C::PtrVector{<:Any,<:Any,D},
+  C::PtrVector{D},
   A::PtrMatrix,
   B::PtrMatrix,
-  bias::StaticBool,
+  bias::StaticBool
 ) where {D<:ForwardDiff.Dual}
-  matmul!(zero_offsets(C), zero_offsets(A), zero_offsets(@gc_preserve(vec(B))), bias)
+  matmul!(
+    zero_offsets(C),
+    zero_offsets(A),
+    zero_offsets(@gc_preserve(vec(B))),
+    bias
+  )
 end
 
 function matmul!(C, A, B, bias::StaticBool)
-  GC.@preserve C A B matmul!(zero_offsets(PtrArray(C)), zero_offsets(PtrArray(A)), zero_offsets(PtrArray(B)), bias)
+  GC.@preserve C A B matmul!(
+    zero_offsets(PtrArray(C)),
+    zero_offsets(PtrArray(A)),
+    zero_offsets(PtrArray(B)),
+    bias
+  )
 end
 
 function dense!(
   f::F,
-  Cdual::PtrArray{<:Any,<:Any,D},
+  Cdual::PtrArray{D},
   A::AbstractMatrix,
   B::PtrArray,
   ::BT,
-  ::FF,
+  ::FF
 ) where {F,BT<:StaticBool,FF,T,P,D<:ForwardDiff.Dual{<:Any,T,P}}
-
   matmul!(zero_offsets(Cdual), zero_offsets(A), zero_offsets(B), BT())
   dualeval!(f, Cdual)
 end
