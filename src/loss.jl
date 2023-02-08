@@ -15,9 +15,7 @@ function add_loss(sc::SimpleChain, l::AbstractLoss)
     SimpleChain(id, (sc.layers..., l))
   end
 end
-function remove_loss(sc::SimpleChain)
-  has_loss(sc) ? Base.front(sc) : sc
-end
+remove_loss(sc::SimpleChain) = has_loss(sc) ? Base.front(sc) : sc
 pop_loss(sc::SimpleChain) = last(sc.layers)
 function split_loss(sc::SimpleChain)
   layers = sc.layers
@@ -37,14 +35,14 @@ numparam(::AbstractLoss, _) = static(0), 1
 function _layer_output_size_needs_temp(
   ::Val{T},
   sl::AbstractLoss{<:AbstractArray{<:AbstractArray}},
-  s,
+  s
 ) where {T}
   align(length(first(target(sl))) * static_sizeof(T)), static_sizeof(T)
 end
 function _layer_output_size_needs_temp_of_equal_len_as_target(
   ::Val{T},
   sl::AbstractLoss,
-  s,
+  s
 ) where {T}
   align(length(target(sl)) * static_sizeof(T)), static_sizeof(T)
 end
@@ -68,9 +66,7 @@ SquaredLoss() = SquaredLoss(nothing)
 target(sl::SquaredLoss) = getfield(sl, :y)
 init_params!(::AbstractLoss, p, _, ::AbstractRNG) = p, 1
 
-function Base.getindex(sl::SquaredLoss, r)
-  SquaredLoss(view_slice_last(target(sl), r))
-end
+Base.getindex(sl::SquaredLoss, r) = SquaredLoss(view_slice_last(target(sl), r))
 
 squared_loss(chn::SimpleChain, y) = add_loss(chn, SquaredLoss(y))
 
@@ -84,7 +80,7 @@ function chain_valgrad!(
   arg::AbstractArray{T,D},
   layers::Tuple{SquaredLoss},
   p::Ptr,
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T,D}
   y = getfield(getfield(layers, 1), :y)
   # invN = T(inv(size(arg, D)))
@@ -99,7 +95,7 @@ end
 function (sl::SquaredLoss{<:AbstractArray{<:Number}})(
   arg::AbstractArray{T,N},
   p,
-  pu,
+  pu
 ) where {T,N}
   y = getfield(sl, :y)
   s = zero(T)
@@ -135,7 +131,7 @@ function chain_valgrad!(
   arg::AbstractArray{T},
   layers::Tuple{AbsoluteLoss},
   _::Ptr,
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T}
   y = getfield(getfield(layers, 1), :y)
   s = zero(eltype(arg))
@@ -171,7 +167,8 @@ end
 
 Calculates mean logit cross-entropy loss.
 """
-struct LogitCrossEntropyLoss{Y<:Union{AbstractVector{UInt32},Nothing}} <: AbstractLoss{Y}
+struct LogitCrossEntropyLoss{Y<:Union{AbstractVector{UInt32},Nothing}} <:
+       AbstractLoss{Y}
   y::Y
 end
 # function LogitCrossEntropyLoss!(y::AbstractVector{UInt32})
@@ -200,14 +197,26 @@ LogitCrossEntropyLoss() = LogitCrossEntropyLoss(nothing)
 target(sl::LogitCrossEntropyLoss) = getfield(sl, :y)
 (::LogitCrossEntropyLoss)(Y::AbstractVector{UInt32}) = LogitCrossEntropyLoss(Y)
 
-function layer_output_size(::Val{T}, sl::LogitCrossEntropyLoss, s::Tuple) where {T}
+function layer_output_size(
+  ::Val{T},
+  sl::LogitCrossEntropyLoss,
+  s::Tuple
+) where {T}
   _layer_output_size_needs_temp_of_equal_len_as_target(Val{T}(), sl, s)
 end
-function forward_layer_output_size(::Val{T}, sl::LogitCrossEntropyLoss, s) where {T}
+function forward_layer_output_size(
+  ::Val{T},
+  sl::LogitCrossEntropyLoss,
+  s
+) where {T}
   _layer_output_size_needs_temp_of_equal_len_as_target(Val{T}(), sl, s)
 end
 
-function (lcel::LogitCrossEntropyLoss)(arg::AbstractArray{T}, p::Ptr, pu) where {T}
+function (lcel::LogitCrossEntropyLoss)(
+  arg::AbstractArray{T},
+  p::Ptr,
+  pu
+) where {T}
   y = lcel.y
   N = length(y)
   m = PtrArray(Ptr{T}(pu), (N,))
@@ -223,7 +232,7 @@ function chain_valgrad!(
   arg::AbstractArray{T},
   layers::Tuple{LogitCrossEntropyLoss},
   _::Ptr,
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T}
   y = getfield(getfield(layers, 1), :y)
   N = length(y)
@@ -263,17 +272,24 @@ function correct_count(c::SimpleChain, X, p)
   Ŷ = cnl(X, p)
   correct_count(Ŷ, target(loss))
 end
-@inline function __loss(_, pu, loss::F, arg, p) where {F}
-  loss(arg, p, pu)
-end
-function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, p) where {T}
+@inline __loss(_, pu, loss::F, arg, p) where {F} = loss(arg, p, pu)
+function correct_count_and_loss(
+  c::SimpleChain,
+  X::AbstractArray{T},
+  p
+) where {T}
   cnl, loss = split_loss(c)
   Ŷ = cnl(X, p)
   ec = correct_count(Ŷ, target(loss))
   os = first(layer_output_size(Val(T), loss, size(X)))
   GC.@preserve p (ec, with_memory(__loss, c, os, loss, Ŷ, pointer(p))...)
 end
-function correct_count_and_loss(c::SimpleChain, X::AbstractArray{T}, Y, p) where {T}
+function correct_count_and_loss(
+  c::SimpleChain,
+  X::AbstractArray{T},
+  Y,
+  p
+) where {T}
   correct_count_and_loss(add_loss(c, pop_loss(c)(Y)), X, p)
 end
 function accuracy_and_loss(c::SimpleChain, X, args...)

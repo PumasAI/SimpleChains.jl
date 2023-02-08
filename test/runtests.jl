@@ -149,7 +149,7 @@ InteractiveUtils.versioninfo(verbose=true)
       m = SimpleChains.StrideArray(
         SimpleChains.PtrArray(
           SimpleChains.stridedpointer(
-            reinterpret(Ptr{SimpleChains.Bit}, pointer(scdmem) + offset),
+            Ptr{SimpleChains.Bit}(pointer(scdmem) + offset),
             si,
           ),
           (size(x, 2) * 8,),
@@ -167,7 +167,7 @@ InteractiveUtils.versioninfo(verbose=true)
       m = SimpleChains.StrideArray(
         SimpleChains.PtrArray(
           SimpleChains.stridedpointer(
-            reinterpret(Ptr{SimpleChains.Bit}, pointer(scdmem) + offset),
+            Ptr{SimpleChains.Bit}(pointer(scdmem) + offset),
             si,
           ),
           (size(x, 2) * 8,),
@@ -263,6 +263,7 @@ InteractiveUtils.versioninfo(verbose=true)
       bdd = view(pdd, 1+8dim:8*25)
       ldd = tanh.(Add * x .+ bdd)
       ldd_dd = tanh.(Add * xdd .+ bdd)
+      # call crashes julia td(xdd, pointer(pdd), pointer(pu))
       GC.@preserve pd pu begin
         @test reinterpret(T, td(x, pointer(pd), pointer(pu))[1]) == reinterpret(T, SimpleChain(td)(x, pd))
         @test reinterpret(T, ld) ≈ reinterpret(T, td(x, pointer(pd), pointer(pu))[1])
@@ -389,8 +390,6 @@ InteractiveUtils.versioninfo(verbose=true)
       convlayertest(x, y, K, b)
     end
     @test gpfd ≈ g
-
-
 
     scconv2 = SimpleChain(
       Conv(relu, (3, 3), 4), # fast_fuse == true

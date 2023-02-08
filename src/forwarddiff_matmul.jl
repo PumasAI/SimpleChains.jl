@@ -511,7 +511,7 @@ function matmul!(
 end
 function matmul!(
   C::PtrVector{D},
-  A::PtrMatrix{},
+  A::PtrMatrix,
   B::PtrVector,
   ::False
 ) where {D<:ForwardDiff.Dual}
