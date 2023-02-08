@@ -297,7 +297,7 @@ function layer_output_size(::Val{T}, l, inputdim::Tuple) where {T}
   os + os, od
 end
 
-if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+@static if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
   @inline output_size(::Val{T}, x::Tuple{}, _) where {T} = static(0)
   @inline function output_size(::Val{T}, x::Tuple{X}, s1) where {T,X}
     first(layer_output_size(Val{T}(), getfield(x, 1), s1))
@@ -586,16 +586,16 @@ function chain_valgrad_entry!(
   pg,
   arg,
   layers::Tuple{X1,X2,Vararg},
-  p::Ptr,
+  p1::Ptr,
   pu::Ptr{UInt8}
 ) where {X1,X2}
   l = getfield(layers, 1)
-  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
+  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p1, pu)
   if parameter_free(l)
     val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
   else
     val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-    pullback_param!(pg, l, grad, arg, p, pu)
+    pullback_param!(pg, l, grad, arg, p1, pu)
   end
   return val
 end
@@ -611,7 +611,7 @@ function chain_valgrad_entry!(
   chain_valgrad_entry!(pg, arg_subset, layers, p, pu)
 end
 
-if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+@static if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
   function chain_valgrad!(
     pg,
     arg,
@@ -729,10 +729,8 @@ function valgrad_core(
 ) where {T}
   @unpack layers = c
   g = PtrArray(Ptr{T}(pu), (glen,))
-  Base.FastMath.add_fast(
-    unsafe_valgrad!(c, pu + align(glen * static_sizeof(T)), g, params, arg),
-    apply_penalty!(g, getpenalty(c), params, size(arg))
-  )
+  l = unsafe_valgrad!(c, pu + align(glen * static_sizeof(T)), g, params, arg)
+  Base.FastMath.add_fast(l, apply_penalty!(g, getpenalty(c), params, size(arg)))
 end
 function valgrad_core_sarray(
   c::Chain,
@@ -759,7 +757,7 @@ function valgrad(sc::Chain, arg, params::AbstractVector{TP}) where {TP}
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  glen = _try_static(numparam(sc), static_length(params))
+  glen = _try_static(numparam(sc, size(parg)), static_length(params))
   T = Base.promote_eltype(arg, params)
   num_bytes =
     required_bytes(Val{T}(), layers, size(parg), glen * static_sizeof(T))

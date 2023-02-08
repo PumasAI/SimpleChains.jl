@@ -88,7 +88,6 @@ end
 ) where {X1,X2}
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-
   val, pbl = chain_valgrad_pullback!(pg2, larg, Base.tail(layers), p2, pu2)
   pbl_ret = PullBackLayer(pg, l, arg, p, pu, pbl)
   return val, pbl_ret
@@ -102,7 +101,6 @@ end
 ) where {X1}
   l = getfield(layers, 1)
   _, val, __, pu2 = valgrad_layer!(pg, l, arg, p, pu)
-
   # pu2 gets fed into eventual `pullback!` call
   pbl_ret = PullBackLayer(pg, l, arg, p, pu, pu2)
   return val, pbl_ret

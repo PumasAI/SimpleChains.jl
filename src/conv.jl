@@ -865,7 +865,7 @@ function get∂C(::F, outputdim, ∂Cp::Ptr{T}, ::False) where {F,T}
 end
 function get∂C(::typeof(relu), outputdim, ∂Cp::Ptr)
   ∂C = PtrArray(Ptr{Bit}(∂Cp), outputdim)
-  ∂Cp += align((last(StrideArraysCore.strides(∂C)) * last(outputdim)) >>> 3)
+  ∂Cp += align((last(strides(∂C)) * last(outputdim)) >>> 3)
   ∂C, ∂Cp
 end
 get∂C(::typeof(identity), _, ∂Cp::Ptr) = nothing, ∂Cp
@@ -967,7 +967,6 @@ function valgrad_layer!(
   C, pu3 = alloc_return(outputdim, Ptr{T}(pu2))
   (K, b), p2 = getparams(c, p, sz)
   convlayer!(∂(fused_fun(c)), ∂C, C, A, K, b)
-  @assert all(isfinite, C)
   _valgrad_layer!(
     ∂C,
     C,
