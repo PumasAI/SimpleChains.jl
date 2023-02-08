@@ -507,8 +507,8 @@ end
   M = Mk === nothing ? 1024 : Mk
   K = Kk === nothing ? 1024 : Kk
   N = Nk === nothing ? 1024 : Nk
-  mₖ, nₖ = matmul_params(RS, RC, CLS; M, K, N, W)
-
+  _, nₖ = matmul_params(RS, RC, CLS; M, K, N, W)
+  nₖ = ifelse(nₖ == -1, 16, nₖ)
   StaticInt(nₖ)
 end
 @inline function batch_size(
