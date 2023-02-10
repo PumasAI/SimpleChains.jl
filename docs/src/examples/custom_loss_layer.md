@@ -46,8 +46,8 @@ end
 
 The function used to get the inner targets is called `target` and can be defined easily:
 ```julia
-target(loss::BinaryLogitCrossEntropyLoss) = loss.targets
-(loss::BinaryLogitCrossEntropyLoss)(::Int) = loss
+SimpleChains.target(loss::BinaryLogitCrossEntropyLoss) = loss.targets
+(loss::BinaryLogitCrossEntropyLoss)(x::AbstractArray) = BinaryLogitCrossEntropyLoss(x)
 ```
 
 Next, we define how to calculate the loss, given some logits:
