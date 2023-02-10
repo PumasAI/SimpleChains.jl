@@ -127,12 +127,11 @@ gradients = SimpleChains.alloc_threaded_grad(model);
 # Add the loss like any other loss type
 model_loss = SimpleChains.add_loss(model, BinaryLogitCrossEntropyLoss(Y));
 
-
 SimpleChains.valgrad!(gradients, model_loss, X, parameters)
 ```
 
 Or alternatively, if you want to just train the parameters in full:
 ```julia
 epochs = 100
-SimpleChains.train_unbatched!(gradients, parameters, model_loss, X, SimpleChains.ADAM(), 1:epochs); 
+SimpleChains.train_unbatched!(gradients, parameters, model_loss, X, SimpleChains.ADAM(), epochs); 
 ```
