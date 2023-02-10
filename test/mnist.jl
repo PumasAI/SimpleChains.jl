@@ -76,7 +76,7 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
   )
   @test all(isfinite, p)
   @test all(isfinite, G)
-  g = Matrix{eltype(g)}(undef, size(G, 1), 1)
+  g = Matrix{eltype(G)}(undef, size(G, 1), 1)
   @time SimpleChains.train_batched!(
     g,
     p,
