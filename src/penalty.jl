@@ -1,11 +1,14 @@
 
 function (Λ::AbstractPenalty{<:SimpleChain})(arg, params)
-  Base.FastMath.add_fast(getchain(Λ)(arg, params), apply_penalty(Λ, params, size(arg)))
+  Base.FastMath.add_fast(
+    getchain(Λ)(arg, params),
+    apply_penalty(Λ, params, size(arg))
+  )
 end
 function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
   Base.FastMath.add_fast(
     valgrad!(g, getchain(Λ), arg, params),
-    apply_penalty!(g, Λ, params, size(arg)),
+    apply_penalty!(g, Λ, params, size(arg))
   )
 end
 
@@ -20,9 +23,11 @@ function Base.show(io::IO, p::AbstractPenalty)
   λ === nothing || print(io, " (λ=$λ)")
   _penalty_applied_to_sc(io, getchain(p))
 end
-alloc_threaded_grad(c::AbstractPenalty, id::Union{Nothing,InputDim} = nothing,
+alloc_threaded_grad(
+  c::AbstractPenalty,
+  id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32;
-  numthreads = _min(num_threads(), num_cores()),
+  numthreads = _min(num_threads(), num_cores())
 ) where {T} = alloc_threaded_grad(getchain(c), id, T; numthreads)
 
 UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:layers}) =
@@ -40,14 +45,23 @@ function init_params(
   Λ::AbstractPenalty,
   id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32;
-  rng::AbstractRNG=local_rng(),
+  rng::AbstractRNG = local_rng()
 ) where {T}
   init_params(getchain(Λ), id, T; rng)
 end
-function init_params(Λ::AbstractPenalty, ::Type{T}; rng::AbstractRNG=local_rng()) where {T}
+function init_params(
+  Λ::AbstractPenalty,
+  ::Type{T};
+  rng::AbstractRNG = local_rng()
+) where {T}
   init_params(getchain(Λ), nothing, T; rng)
 end
-function init_params!(x, Λ::AbstractPenalty, id = nothing; rng::AbstractRNG=local_rng())
+function init_params!(
+  x,
+  Λ::AbstractPenalty,
+  id = nothing;
+  rng::AbstractRNG = local_rng()
+)
   init_params!(x, getchain(Λ), id; rng)
 end
 
@@ -64,8 +78,7 @@ apply_penalty!(_, ::NoPenalty, __) = Static.Zero()
 getpenalty(sc::SimpleChain) = NoPenalty(sc)
 getpenalty(Λ::AbstractPenalty) = Λ
 getλ(::NoPenalty) = nothing
-Base.:(/)(Λ::NoPenalty, x::Number) = Λ
-
+Base.:(/)(Λ::NoPenalty, ::Number) = Λ
 
 @inline apply_penalty(Λ, p, _) = apply_penalty(Λ, p)
 @inline apply_penalty!(g, Λ, p, _) = apply_penalty!(g, Λ, p)
@@ -86,7 +99,6 @@ getλ(p::L1Penalty) = getfield(p, :λ)
 (p::L1Penalty)(chn::SimpleChain) = L1Penalty(chn, p.λ)
 Base.:(/)(Λ::L1Penalty, x::Number) = L1Penalty(Λ.chn, Λ.λ / x)
 
-
 @inline function apply_penalty(Λ::L1Penalty, p::AbstractVector{T}) where {T}
   l = zero(T)
   @turbo for i ∈ eachindex(p) # add penalty
@@ -97,7 +109,7 @@ end
 function apply_penalty!(
   g::AbstractVector{T1},
   Λ::L1Penalty,
-  p::AbstractVector{T2},
+  p::AbstractVector{T2}
 ) where {T1,T2}
   T = promote_type(T1, T2)
   l = zero(T)
@@ -139,7 +151,7 @@ end
 function apply_penalty!(
   g::AbstractVector{T1},
   Λ::L2Penalty,
-  p::AbstractVector{T2},
+  p::AbstractVector{T2}
 ) where {T1,T2}
   T = promote_type(T1, T2)
   l = zero(T)
@@ -163,7 +175,7 @@ the then `lastpen` applies to the layer preceding this.
 struct FrontLastPenalty{
   NN<:Union{SimpleChain,Nothing},
   P1<:AbstractPenalty{Nothing},
-  P2<:AbstractPenalty{Nothing},
+  P2<:AbstractPenalty{Nothing}
 } <: AbstractPenalty{NN}
   chn::NN
   front::P1
@@ -171,9 +183,11 @@ struct FrontLastPenalty{
 end
 getchain(p::FrontLastPenalty) = getfield(p, :chn)
 FrontLastPenalty(λ₁, λ₂) = FrontLastPenalty(nothing, λ₁, λ₂)
-FrontLastPenalty(p::AbstractPenalty, λ₁, λ₂) = FrontLastPenalty(getchain(p), λ₁, λ₂)
+FrontLastPenalty(p::AbstractPenalty, λ₁, λ₂) =
+  FrontLastPenalty(getchain(p), λ₁, λ₂)
 (p::FrontLastPenalty)(chn::SimpleChain) = FrontLastPenalty(chn, p.front, p.last)
-Base.:(/)(Λ::FrontLastPenalty, x::Number) = FrontLastPenalty(Λ.chn, Λ.front / x, Λ.last / x)
+Base.:(/)(Λ::FrontLastPenalty, x::Number) =
+  FrontLastPenalty(Λ.chn, Λ.front / x, Λ.last / x)
 
 function Base.show(io::IO, p::FrontLastPenalty)
   print(io, "Penalty on all but last layer: ")
@@ -182,7 +196,6 @@ function Base.show(io::IO, p::FrontLastPenalty)
   show(io, p.last)
   _penalty_applied_to_sc(io, getchain(p))
 end
-
 
 function split_front_last(c::SimpleChain)
   l = c.layers
@@ -200,19 +213,23 @@ end
 
   Base.FastMath.add_fast(
     apply_penalty(Λ.front, view(param, 1:f)),
-    apply_penalty(Λ.last, view(param, f+1:length(param))),
+    apply_penalty(Λ.last, view(param, f+1:length(param)))
   )
 end
-@inline function apply_penalty!(grad, Λ::FrontLastPenalty{<:SimpleChain}, param, id)
+@inline function apply_penalty!(
+  grad,
+  Λ::FrontLastPenalty{<:SimpleChain},
+  param,
+  id
+)
   f = front_param_lens(getchain(Λ), id)
   fr = 1:f
   lr = 1+f:length(param)
   Base.FastMath.add_fast(
     apply_penalty!(view(grad, fr), Λ.front, view(param, fr)),
-    apply_penalty!(view(grad, lr), Λ.last, view(param, lr)),
+    apply_penalty!(view(grad, lr), Λ.last, view(param, lr))
   )
 end
-
 
 params(sc::AbstractPenalty, p::AbstractVector, inputdim = nothing) =
   params(getchain(sc), p, inputdim)
