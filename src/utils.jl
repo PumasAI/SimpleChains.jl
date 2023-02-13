@@ -18,16 +18,13 @@ tsprod(::Tuple{}) = static(1)
 tssum(x) = ArrayInterface.reduce_tup(+, x)
 tssum(::Tuple{}) = static(0)
 
-function maximum_turbo!(m, y)
-  @turbo for i in indices((m, y), (1, 2))
+maximum_turbo!(m, y) = @turbo for i in indices((m, y), (1, 2))
     mi = typemin(eltype(y))
     for j in axes(y, 1)
       mi = max(mi, y[j, i])
     end
     m[i] = mi
   end
-end
-
 
 function unnormalized_logsoftmax!(z, m, y::AbstractMatrix)
   maximum_turbo!(m, y)
@@ -72,7 +69,10 @@ nfan(n_out, n_in) = n_in, n_out
   p * dft, p * dt
 end
 # https://github.com/FluxML/Flux.jl/blob/master/LICENSE.md
-function glorot_uniform!(A::AbstractArray{T}, rng::VectorizedRNG.AbstractVRNG = local_rng()) where {T}
+function glorot_uniform!(
+  A::AbstractArray{T},
+  rng::VectorizedRNG.AbstractVRNG = local_rng()
+) where {T}
   scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
   # (rand()-0.5)*scale === rand()*scale - 0.5scale
   rand!(rng, A, static(0), T(-0.5) * scale, scale)
@@ -81,20 +81,23 @@ function glorot_uniform!(A::AbstractArray{T}, rng) where {T}
   scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
   # (rand()-0.5)*scale === rand()*scale - 0.5scale
   rand!(rng, A)
-  @inbounds @fastmath for i = eachindex(A)
-    A[i] = A[i]*scale - 0.5*scale
+  @inbounds @fastmath for i in eachindex(A)
+    A[i] = A[i] * scale - 0.5 * scale
   end
   return A
 end
 # https://github.com/FluxML/Flux.jl/blob/master/LICENSE.md
-function glorot_normal!(A::AbstractArray{T}, rng::VectorizedRNG.AbstractVRNG = local_rng()) where {T}
+function glorot_normal!(
+  A::AbstractArray{T},
+  rng::VectorizedRNG.AbstractVRNG = local_rng()
+) where {T}
   σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
   randn!(rng, A, static(0), static(0), σ)
 end
 function glorot_normal!(A::AbstractArray{T}, rng) where {T}
   σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
   randn!(rng, A)
-  @inbounds @fastmath for i = eachindex(A)
+  @inbounds @fastmath for i in eachindex(A)
     A[i] *= σ
   end
   return A
@@ -149,9 +152,19 @@ end
 # end
 function randpermzero!(r::VectorizedRNG.Xoshift, a::AbstractArray{<:Integer})
   if length(a) > typemax(UInt32)
-    randpermzero!(r, a, Val(UInt64), VectorizationBase.pick_vector_width(UInt64))
+    randpermzero!(
+      r,
+      a,
+      Val(UInt64),
+      VectorizationBase.pick_vector_width(UInt64)
+    )
   else
-    randpermzero!(r, a, Val(UInt32), VectorizationBase.pick_vector_width(UInt64))
+    randpermzero!(
+      r,
+      a,
+      Val(UInt32),
+      VectorizationBase.pick_vector_width(UInt64)
+    )
   end
   return a
 end
@@ -166,7 +179,7 @@ function randpermzero!(
   r::VectorizedRNG.Xoshift,
   a::AbstractArray{I},
   ::Val{U},
-  ::StaticInt{W},
+  ::StaticInt{W}
 ) where {W,U,I<:Integer}
   n = length(a)
   @assert n % UInt64 <= min(typemax(U) % UInt64, one(UInt64) << 52)
@@ -197,10 +210,10 @@ end
 randpermzero!(a::AbstractArray{<:Integer}) = randpermzero!(local_rng(), a)
 
 function _alloc_grad(pg::Ptr{T}, np, numthreads, x) where {T}
-  PtrArray(pg, (np, numthreads), (static_sizeof(T), x), Val((true, false)))
+  PtrArray(pg, (np, numthreads), (static(1), x), Val((true, false)))
 end
 function _alloc_grad(pg::Ptr{T}, np, ::One, x) where {T}
-  PtrArray(pg, (np,), (static_sizeof(T),), Val((true,)))
+  PtrArray(pg, (np,), (static(1),), Val((true,)))
 end
 
 function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
@@ -222,15 +235,14 @@ function alloc_threaded_grad(
   Λ::SimpleChain,
   id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32;
-  numthreads = _numthreads(),
+  numthreads = _numthreads()
 ) where {T}
   np = numparam(Λ, id)
   x = align(np, T)
   mem = Vector{T}(undef, x * numthreads + register_size() ÷ sizeof(T) - 1)
-  _alloc_grad(mem, np, numthreads, x * sizeof(T))
+  _alloc_grad(mem, np, numthreads, x)
 end
 alloc_threaded_grad(x, ::Type{T}) where {T} = alloc_threaded_grad(x, nothing, T)
-
 
 getparams(_, p, inputdim) = nothing, p
 _getparams(::Nothing, p, inputdim::Tuple) = nothing, p, outputdim
@@ -247,7 +259,12 @@ Returns a tuple of the parameters of the SimpleChain `sc`, as a view of the para
 """
 function params(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
   @unpack layers = sc
-  A = _walk_chain(Val{:param}(), layers, pointer(p), chain_input_dims(sc, inputdim))
+  A = _walk_chain(
+    Val{:param}(),
+    layers,
+    pointer(p),
+    chain_input_dims(sc, inputdim)
+  )
   _add_memory(A, p)
 end
 """
@@ -257,7 +274,12 @@ Returns a tuple of the weights (parameters other than biases) of the SimpleChain
 """
 function weights(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
   @unpack layers = sc
-  A = _walk_chain(Val{:weight}(), layers, pointer(p), chain_input_dims(sc, inputdim))
+  A = _walk_chain(
+    Val{:weight}(),
+    layers,
+    pointer(p),
+    chain_input_dims(sc, inputdim)
+  )
   _add_memory(A, p)
 end
 """
@@ -267,7 +289,12 @@ Returns a tuple of the biases of the SimpleChain `sc`, as a view of the paramete
 """
 function biases(sc::SimpleChain, p::AbstractVector, inputdim = nothing)
   @unpack layers = sc
-  A = _walk_chain(Val{:bias}(), layers, pointer(p), chain_input_dims(sc, inputdim))
+  A = _walk_chain(
+    Val{:bias}(),
+    layers,
+    pointer(p),
+    chain_input_dims(sc, inputdim)
+  )
   _add_memory(A, p)
 end
 

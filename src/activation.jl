@@ -1,9 +1,7 @@
 
-
 # Elementwise transforms
 """
     Activation(activation)
-
 
 Applies `activation` function elementwise.
 """
@@ -22,7 +20,7 @@ Base.show(io::IO, a::Activation) = print(io, "Activation layer applying: ", a.f)
 
 function (a::Activation)(x::AbstractArray{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   f = a.f
-  C = PtrArray(reinterpret(Ptr{T}, pu), size(x))
+  C = PtrArray(Ptr{T}(pu), size(x))
   pu += length(C) * sizeof(T)
   @turbo for i ∈ eachindex(x)
     C[i] = f(x[i])
@@ -37,10 +35,16 @@ function call!(x::AbstractArray, a::Activation, p::Ptr, pu::Ptr{UInt8})
   x, p, pu
 end
 
-function valgrad_layer!(pg::Ptr{T}, a::Activation, x, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
-  ∂C = PtrArray(reinterpret(Ptr{T}, pu), size(x))
+function valgrad_layer!(
+  pg::Ptr{T},
+  a::Activation,
+  x,
+  p::Ptr{T},
+  pu::Ptr{UInt8}
+) where {T}
+  ∂C = PtrArray(Ptr{T}(pu), size(x))
   pu += length(∂C) * sizeof(T)
-  C = PtrArray(reinterpret(Ptr{T}, pu), size(x))
+  C = PtrArray(Ptr{T}(pu), size(x))
   pu += length(C) * sizeof(T)
   _valgrad_layer!(∂C, C, pg, a, x, p, pu)
 end
@@ -51,7 +55,7 @@ function _valgrad_layer!(
   a::Activation,
   x,
   p::Ptr{T},
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T}
   ∂f = ∂(a.f)
   @turbo for i ∈ eachindex(x)
@@ -59,7 +63,8 @@ function _valgrad_layer!(
   end
   pg, C, p, pu
 end
-@inline pullback_param!(__::Ptr, ::Activation, C̄, B, p::Ptr, pu::Ptr{UInt8}) = nothing
+@inline pullback_param!(__::Ptr, ::Activation, C̄, B, p::Ptr, pu::Ptr{UInt8}) =
+  nothing
 function pullback!(
   __::Ptr{T},
   a::Activation,
@@ -67,9 +72,9 @@ function pullback!(
   B,
   p::Ptr{T},
   pu::Ptr{UInt8},
-  pu2::Ptr{UInt8},
+  pu2::Ptr{UInt8}
 ) where {T}
-  ∂C = PtrArray(reinterpret(Ptr{T}, pu), size(C̄))
+  ∂C = PtrArray(Ptr{T}(pu), size(C̄))
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
   end
@@ -77,16 +82,25 @@ function pullback!(
 end
 
 # specialization for identity
-function (::Activation{typeof(identity)})(x::AbstractArray, p::Ptr, pu::Ptr{UInt8})
+function (::Activation{typeof(identity)})(
+  x::AbstractArray,
+  p::Ptr,
+  pu::Ptr{UInt8}
+)
   return x, p, pu
 end
-call!(x::AbstractArray, ::Activation{typeof(identity)}, p::Ptr, pu::Ptr{UInt8}) = x, p, pu
+call!(
+  x::AbstractArray,
+  ::Activation{typeof(identity)},
+  p::Ptr,
+  pu::Ptr{UInt8}
+) = x, p, pu
 function valgrad_layer!(
   pg::Ptr{T},
   ::Activation{typeof(identity)},
   x,
   p::Ptr{T},
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T}
   pg, x, p, pu
 end
@@ -97,7 +111,7 @@ function _valgrad_layer!(
   ::Activation{typeof(identity)},
   x,
   p::Ptr{T},
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T}
   pg, x, p, pu
 end
@@ -108,7 +122,7 @@ function pullback!(
   B,
   p::Ptr{T},
   pu::Ptr{UInt8},
-  pu2::Ptr{UInt8},
+  pu2::Ptr{UInt8}
 ) where {T}
   C̄, pu2
 end

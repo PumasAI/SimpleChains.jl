@@ -3,9 +3,10 @@
     TurboDense{B=true}(activation, outputdim::Integer)
 
 Linear (dense) layer.
-- `B` specifies whether the layer includes a bias term.
-- The `activation` function is applied elementwise to the result.
-- `outputdim` indicates how many dimensions the input is mapped to.
+
+  - `B` specifies whether the layer includes a bias term.
+  - The `activation` function is applied elementwise to the result.
+  - `outputdim` indicates how many dimensions the input is mapped to.
 
 Randomly initializing weights using the (Xavier) Glorot normal distribution.
 The bias is zero-initialized.
@@ -20,12 +21,13 @@ function TurboDense{B}(f::F, t::I) where {F,I<:Integer,B}
   TurboDense{B,typeof(st),F}(f, st)
 end
 TurboDense{B}(t::I, f::F) where {F,I<:Integer,B} = TurboDense{B}(f, static(t))
-TurboDense{B,I}(f::F, t::Integer) where {F,I<:Integer,B} = TurboDense{B,I,F}(f, I(t))
+TurboDense{B,I}(f::F, t::Integer) where {F,I<:Integer,B} =
+  TurboDense{B,I,F}(f, I(t))
 function TurboDense{B}(::Integer, ::Integer) where {B}
   throw(
     ArgumentError(
-      "TurboDense{$B} requires one integer (output dim) and one function argument.",
-    ),
+      "TurboDense{$B} requires one integer (output dim) and one function argument."
+    )
   )
 end
 TurboDense(f, d) = TurboDense{true}(f, static(d))
@@ -54,16 +56,25 @@ function numparam(d::TurboDense, inputdim::Tuple)
   np, (d.outputdim, Base.tail(inputdim)...)
 end
 _numparam(d::TurboDense{false}, inputdim::Integer) = inputdim * d.outputdim
-_numparam(d::TurboDense{true}, inputdim::Integer) = inputdim * d.outputdim + d.outputdim
+_numparam(d::TurboDense{true}, inputdim::Integer) =
+  inputdim * d.outputdim + d.outputdim
 parameter_free(::TurboDense) = false
-function forward_layer_output_size(::Val{T}, td::TurboDense, inputdim::Tuple) where {T}
+function forward_layer_output_size(
+  ::Val{T},
+  td::TurboDense,
+  inputdim::Tuple
+) where {T}
   _, outputdim = numparam(td, inputdim)
   align(static_sizeof(T) * prod(outputdim)), outputdim
 end
 
 fast_fuse(td::TurboDense) = fast_fuse(getfield(td, :f))
 
-function getparams(td::TurboDense{false}, p::Ptr{T}, inputdim::Integer) where {T}
+function getparams(
+  td::TurboDense{false},
+  p::Ptr{T},
+  inputdim::Integer
+) where {T}
   outputdim = td.outputdim
   PtrArray(reinterpret(Ptr{T}, p), (outputdim, inputdim)),
   p + inputdim * outputdim * sizeof(T)
@@ -91,7 +102,12 @@ function init_params!(td::TurboDense, p, inputdim::Tuple, rng::AbstractRNG)
   p, outputdim = _init_params!(td, p, first(inputdim), rng)
   p, (outputdim, Base.tail(inputdim)...)
 end
-function _init_params!(td::TurboDense{true}, p, inputdim::Integer, rng::AbstractRNG)
+function _init_params!(
+  td::TurboDense{true},
+  p,
+  inputdim::Integer,
+  rng::AbstractRNG
+)
   W, p = getparams(td, p, inputdim)
   outputdim = td.outputdim
   glorot_normal!(view(W, :, 1:inputdim), rng)
@@ -100,12 +116,16 @@ function _init_params!(td::TurboDense{true}, p, inputdim::Integer, rng::Abstract
   end
   return p, outputdim
 end
-function _init_params!(td::TurboDense{false}, p, inputdim::Integer, rng::AbstractRNG)
+function _init_params!(
+  td::TurboDense{false},
+  p,
+  inputdim::Integer,
+  rng::AbstractRNG
+)
   W, p = getparams(td, p, inputdim)
   glorot_normal!(W, rng)
   return p, td.outputdim
 end
-
 
 function alloc_return(
   td::TurboDense,
@@ -113,7 +133,7 @@ function alloc_return(
   p::Ptr{T},
   ::StaticInt{1},
   ::Tuple,
-  ::Val{1},
+  ::Val{1}
 ) where {T}
   O = td.outputdim
   PtrArray(p, (O,)), p + align(O * sizeof(T))
@@ -124,7 +144,7 @@ function alloc_return(
   p::Ptr{T},
   ::StaticInt{1},
   ::Tuple{StaticInt{1},StaticInt{2}},
-  ::Val{2},
+  ::Val{2}
 ) where {T}
   O = td.outputdim
   PtrArray(p, (O, batch_size)), p + align(O * batch_size * sizeof(T))
@@ -135,32 +155,30 @@ function alloc_return(
   p::Ptr{T},
   ::StaticInt{2},
   ::Tuple{StaticInt{2},StaticInt{1}},
-  ::Val{2},
+  ::Val{2}
 ) where {T}
   O = td.outputdim
   PtrArray(p, (batch_size, O))', p + align(O * batch_size * sizeof(T))
 end
 
-
 @inline function (td::TurboDense{O})(
   B::AbstractVecOrMat{T1},
   p::Ptr{T2},
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T1,T2,O}
   pB = PtrArray(B)
   T = promote_type(T1, T2)
   GC.@preserve B begin
     put = Base.unsafe_convert(Ptr{T}, pu)
     A, p = getparams(td, p, size(B, StaticInt(1)))
-    C, _pu =
-      alloc_return(
-        td,
-        size(pB, StaticInt(2)),
-        put,
-        contiguous_axis(A),
-        stride_rank(A),
-        Val(ndims(B)),
-      )
+    C, _pu = alloc_return(
+      td,
+      size(pB, StaticInt(2)),
+      put,
+      contiguous_axis(A),
+      stride_rank(A),
+      Val(ndims(B))
+    )
     pu = Base.unsafe_convert(Ptr{UInt8}, _pu)
     f = td.f
     dense!(f, C, A, pB, static(O), fast_fuse(f))
@@ -168,14 +186,13 @@ end
   C, p, pu
 end
 
-
 @inline function dense!(
   f::F,
   C::AbstractVecOrMat{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractVecOrMat{<:Base.HWReal},
   ::True,
-  ::True,
+  ::True
 ) where {F}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -193,7 +210,7 @@ end
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractVecOrMat{<:Base.HWReal},
   ::True,
-  ::False,
+  ::False
 ) where {F}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -214,7 +231,7 @@ end
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractVecOrMat{<:Base.HWReal},
   ::False,
-  ::True,
+  ::True
 ) where {F}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -230,7 +247,7 @@ end
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractVecOrMat{<:Base.HWReal},
   ::False,
-  ::False,
+  ::False
 ) where {F}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -261,15 +278,29 @@ end
 # overloadable
 @inline ∂(f::F) where {F} = ForwardDiffElementwise{F}(f)
 
-function get∂C(td::TurboDense{B,D}, C::AbstractArray, ∂Cp::Ptr{UInt8}) where {B,D}
+function get∂C(
+  td::TurboDense{B,D},
+  C::AbstractArray,
+  ∂Cp::Ptr{UInt8}
+) where {B,D}
   get∂C(td, C, ∂Cp, fast_fuse(td))
 end
-function get∂C(::TurboDense, C::AbstractArray{T}, ∂Cp::Ptr{UInt8}, ::True) where {T}
+function get∂C(
+  ::TurboDense,
+  C::AbstractArray{T},
+  ∂Cp::Ptr{UInt8},
+  ::True
+) where {T}
   ∂C = PtrArray(reinterpret(Ptr{T}, ∂Cp), size(C))
   ∂Cp += align(length(∂C) * sizeof(T))
   ∂C, ∂Cp
 end
-function get∂C(::TurboDense, C::AbstractArray{T}, ∂Cp::Ptr{UInt8}, ::False) where {T}
+function get∂C(
+  ::TurboDense,
+  C::AbstractArray{T},
+  ∂Cp::Ptr{UInt8},
+  ::False
+) where {T}
   lenC = length(C)
   ∂C = PtrArray(reinterpret(Ptr{T}, ∂Cp), (lenC,))
   ∂Cp += align(lenC * sizeof(T))
@@ -278,7 +309,7 @@ end
 function get∂C(
   ::TurboDense{B,D,typeof(relu)},
   C::AbstractArray,
-  ∂Cp::Ptr{UInt8},
+  ∂Cp::Ptr{UInt8}
 ) where {B,D}
   outputdim = size(C)
   ∂C = PtrArray(reinterpret(Ptr{Bit}, ∂Cp), outputdim)
@@ -288,7 +319,7 @@ end
 function get∂C(
   ::TurboDense{B,D,typeof(identity)},
   ::AbstractArray,
-  ∂Cp::Ptr{UInt8},
+  ∂Cp::Ptr{UInt8}
 ) where {B,D}
   (nothing, ∂Cp)
 end
@@ -299,7 +330,7 @@ end
   C::AbstractArray{T2,N},
   A::AbstractMatrix,
   B::AbstractArray{T3,N},
-  ::True,
+  ::True
 ) where {F,T1<:Base.HWReal,T2<:Base.HWReal,T3<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -320,7 +351,7 @@ end
   C::AbstractMatrix{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractMatrix{<:Base.HWReal},
-  ::True,
+  ::True
 ) where {F}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -345,7 +376,7 @@ end
   C::AbstractArray{T2,N},
   A::AbstractMatrix,
   B::AbstractArray{T3,N},
-  ::False,
+  ::False
 ) where {F,T1<:Base.HWReal,T2<:Base.HWReal,T3<:Base.HWReal,N}
   ∂f = ∂(f)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
@@ -364,7 +395,7 @@ end
   C::AbstractMatrix{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractMatrix{<:Base.HWReal},
-  ::False,
+  ::False
 ) where {F}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -387,7 +418,7 @@ end
   C::AbstractMatrix{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractMatrix{<:Base.HWReal},
-  ::True,
+  ::True
 )
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -410,7 +441,7 @@ end
   C::AbstractMatrix{<:Base.HWReal},
   A::AbstractMatrix{<:Base.HWReal},
   B::AbstractMatrix{<:Base.HWReal},
-  ::False,
+  ::False
 )
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -431,7 +462,7 @@ end
   C::AbstractMatrix{T1},
   A::AbstractMatrix,
   B::AbstractMatrix{T2},
-  ::True,
+  ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
   Kp1 = size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -452,7 +483,7 @@ end
   C::AbstractVector{T1},
   A::AbstractMatrix,
   B::AbstractVector{T2},
-  ::True,
+  ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
   Kp1 = size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -474,7 +505,7 @@ end
   C::AbstractMatrix{T1},
   A::AbstractMatrix,
   B::AbstractMatrix{T2},
-  ::False,
+  ::False
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -492,7 +523,7 @@ end
   C::AbstractVector{T1},
   A::AbstractMatrix,
   B::AbstractVector{T2},
-  ::False,
+  ::False
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
   K = ArrayInterface.size(A, StaticInt(2))
   @turbo for m ∈ indices((A, C), 1)
@@ -511,7 +542,7 @@ end
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
   B::AbstractArray{T2,N},
-  ::True,
+  ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   Kp1 = ArrayInterface.size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -529,7 +560,7 @@ end
   C::AbstractArray{T1,N},
   A::AbstractMatrix,
   B::AbstractArray{T2,N},
-  ::False,
+  ::False
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -546,7 +577,7 @@ end
   C::AbstractMatrix{T1},
   A::AbstractVector,
   B::AbstractMatrix{T2},
-  ::False,
+  ::False
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     C[m, n] = A[m] * B[1, n]
@@ -839,24 +870,26 @@ function chain_valgrad_entry!(
 end
 =#
 
-
 function valgrad_layer!(
   pg::Ptr{T},
   td::TurboDense{O},
   B,
   p::Ptr{T},
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T,O}
   input_dim = size(B, StaticInt(1))
   batch_size = size(B, StaticInt(2))
-  pu2 = Base.unsafe_convert(Ptr{T}, pu + align(batch_size * td.outputdim * sizeof(T)))
+  pu2 = Base.unsafe_convert(
+    Ptr{T},
+    pu + align(batch_size * td.outputdim * sizeof(T))
+  )
   C, _pu3 = alloc_return(
     td,
     batch_size,
     pu2,
     contiguous_axis(B),
     (static(1), static(2)),
-    Val(ndims(B)),
+    Val(ndims(B))
   )
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
   ∂C, _ = get∂C(td, C, pu)
@@ -867,7 +900,11 @@ function valgrad_layer!(
   pg + length(A) * sizeof(T), C, p2, pu3
 end
 alloc_return_B_dense(B::PtrArray, pu::Ptr{UInt8}, _) = (B, pu) # assume `PtrArray` means we can destroy it
-function alloc_return_B_dense(B::AbstractArray{T}, pu::Ptr{UInt8}, input_dim) where {T}
+function alloc_return_B_dense(
+  B::AbstractArray{T},
+  pu::Ptr{UInt8},
+  input_dim
+) where {T}
   si = bytestrideindex(B)
   sp = stridedpointer(reinterpret(Ptr{T}, pu), si)
   B̄ = PtrArray(sp, (input_dim, size(B, static(2))), val_dense_dims(B))
@@ -880,7 +917,7 @@ function pullback!(
   B::PtrArray,
   p::Ptr{T},
   pu::Ptr{UInt8},
-  pu2::Ptr{UInt8},
+  pu2::Ptr{UInt8}
 ) where {T,O}
   # Start with 4-arg `pulback!` to update `∂C`
   pullback_param!(pg, td, C̄, B, p, pu) # Ā = C̄ * B'
@@ -892,15 +929,7 @@ function pullback!(
   dense!(identity, nothing, B̄, matrix_view(td, A)', C̄, False())
   B̄, pu2
 end
-function pullback!(
-  pg,
-  td,
-  C̄,
-  B,
-  p::Ptr,
-  pu::Ptr{UInt8},
-  pu2::Ptr{UInt8},
-)
+function pullback!(pg, td, C̄, B, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
   @gc_preserve pullback!(pg, td, C̄, B, p, pu, pu2)
 end
 matrix_view(::TurboDense{false}, A) = A
@@ -910,10 +939,8 @@ function matrix_view(::TurboDense{true}, A)
   view(A, :, static(1):K)
 end
 update_C̄!(::typeof(identity), _, __) = nothing #=∂C=#
-function update_C̄!(::F, C̄, ∂C) where {F}
-  @turbo for i ∈ eachindex(∂C)
-    C̄[i] *= ∂C[i]
-  end
+update_C̄!(::F, C̄, ∂C) where {F} = @turbo for i ∈ eachindex(∂C)
+  C̄[i] *= ∂C[i]
 end
 function pullback_param!(
   pg::Ptr{T},
@@ -921,7 +948,7 @@ function pullback_param!(
   C̄,
   B,
   ::Ptr{T},
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T,O}
   # Ā = C̄ * B'
   ∂C = first(get∂C(td, C̄, pu))
@@ -946,8 +973,14 @@ function dense_param_update!(::TurboDense{false}, Ā, C̄, B)
   dense!(identity, nothing, Ā, C̄, B', False())
 end
 
-
-@inline function dense!(f, dC, C::AbstractMatrix, A::AbstractVector, B::AbstractMatrix, bias)
+@inline function dense!(
+  f,
+  dC,
+  C::AbstractMatrix,
+  A::AbstractVector,
+  B::AbstractMatrix,
+  bias
+)
   Abuf = preserve_buffer(A)
   Am = PtrArray(pointer(A), (length(A), static(1)))
   GC.@preserve Abuf begin

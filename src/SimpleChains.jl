@@ -28,9 +28,11 @@ using ArrayInterface:
   is_column_major
 using SIMDTypes: Bit, NativeTypes
 using VectorizationBase: align, relu, stridedpointer, AbstractSIMD, NativeTypesV
-using HostCPUFeatures: static_sizeof, register_size, register_count, static_sizeof
+using HostCPUFeatures:
+  static_sizeof, register_size, register_count, static_sizeof
 using CPUSummary: cache_linesize, num_threads, num_cores
-using LayoutPointers: bytestrideindex, stridedpointer, zstridedpointer, zero_offsets, val_dense_dims
+using LayoutPointers:
+  bytestrideindex, stridedpointer, zstridedpointer, zero_offsets, val_dense_dims
 using Static: One, lt
 using CloseOpenIntervals: CloseOpen
 using StrideArraysCore: zview, @gc_preserve
@@ -45,8 +47,12 @@ using Random: AbstractRNG
 
 using LoopVectorization: matmul_params, @turbo
 # using LoopVectorization: matmul_params
-# macro turbo(ex); esc(ex); end; macro turbo(ex0, ex1); esc(ex1); end
-
+# macro turbo(ex)
+#   esc(ex)
+# end
+# macro turbo(ex0, ex1)
+#   esc(ex1)
+# end
 
 export SimpleChain,
   TurboDense,
@@ -95,7 +101,7 @@ if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
     output_size,
     forward_output_size,
     _numparam,
-    pullback_layer!,
+    pullback_layer!
   )
     for m in methods(f)
       m.recursion_relation = dont_limit
