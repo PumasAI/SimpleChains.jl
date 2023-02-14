@@ -13,17 +13,21 @@ defaults:
 jobs:
   finalize:
     timeout-minutes: 10
-    needs: [coverage, nocoverage]
+    needs: [coverage, nocoverage, docs, doctests]
     if: always()
-    runs-on: [linux, self-hosted, x64]
+    runs-on: ${{ matrix.os }}
     steps:
       - run: |
-          echo test: ${{ needs.test.result }}
-          echo doctest: ${{ needs.doctest.result }}
+          echo coverage: ${{ needs.coverage.result }}
+          echo nocoverage: ${{ needs.nocoverage.result }}
+          echo docs: ${{ needs.docs.result }}
+          echo doctests: ${{ needs.doctests.result }}
       - run: exit 1
         if: |
-          (needs.test.result != 'success') ||
-          (needs.doctest.result != 'success')
+          (needs.coverage.result != 'success') ||
+          (needs.nocoverage.result != 'success') ||
+          (needs.docs.result != 'success') ||
+          (needs.doctests.result != 'success')
   coverage:
     name: coverage=true/Julia ${{ matrix.version }}/${{ matrix.threads }} threads/${{ matrix.os }}/${{ matrix.arch }}/${{ github.event_name }}
     runs-on: ${{ matrix.os }}
