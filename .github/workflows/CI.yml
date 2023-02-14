@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 10
     needs: [coverage, nocoverage, docs, doctests]
     if: always()
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - run: |
           echo coverage: ${{ needs.coverage.result }}
