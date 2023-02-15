@@ -19,12 +19,12 @@ tssum(x) = ArrayInterface.reduce_tup(+, x)
 tssum(::Tuple{}) = static(0)
 
 maximum_turbo!(m, y) = @turbo for i in indices((m, y), (1, 2))
-    mi = typemin(eltype(y))
-    for j in axes(y, 1)
-      mi = max(mi, y[j, i])
-    end
-    m[i] = mi
+  mi = typemin(eltype(y))
+  for j in axes(y, 1)
+    mi = max(mi, y[j, i])
   end
+  m[i] = mi
+end
 
 function unnormalized_logsoftmax!(z, m, y::AbstractMatrix)
   maximum_turbo!(m, y)
@@ -220,8 +220,8 @@ function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
   StrideArray(_alloc_grad(align(pointer(mem)), np, numthreads, x), mem)
 end
 
-_min(a, b) = ifelse(lt(a, b), a, b)
-_numthreads() = _min(num_threads(), num_cores())
+_numthreads() = min(Threads.nthreads(), convert(Int, num_cores())::Int)::Int
+
 """
     alloc_threaded_grad(chn, id = nothing, ::Type{T} = Float32; numthreads = min(Threads.nthreads(), SimpleChains.num_cores())
 
