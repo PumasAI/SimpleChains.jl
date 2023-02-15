@@ -27,7 +27,7 @@ alloc_threaded_grad(
   c::AbstractPenalty,
   id::Union{Nothing,InputDim} = nothing,
   ::Type{T} = Float32;
-  numthreads = _min(num_threads(), num_cores())
+  numthreads = _numthreads()
 ) where {T} = alloc_threaded_grad(getchain(c), id, T; numthreads)
 
 UnPack.unpack(c::AbstractPenalty{<:SimpleChain}, ::Val{:layers}) =
