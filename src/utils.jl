@@ -229,7 +229,7 @@ Returns a preallocated array for writing gradients, for use with `train_batched`
 If Julia was started with multiple threads, returns a matrix with one column per thread, so they may
 accumulate gradients in parallel.
 
-Note that the memory is alligned to avoid false sharing.
+Note that the memory is aligned to avoid false sharing.
 """
 function alloc_threaded_grad(
   Λ::SimpleChain,
