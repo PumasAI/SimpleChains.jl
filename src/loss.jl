@@ -83,7 +83,7 @@ function chain_valgrad!(
   pu::Ptr{UInt8}
 ) where {T,D}
   y = getfield(getfield(layers, 1), :y)
-  # invN = T(inv(size(arg, D)))
+  # invN = T(inv(static_size(arg, D)))
   s = zero(T)
   @turbo for i ∈ eachindex(arg)
     δ = arg[i] - y[i]
@@ -103,7 +103,7 @@ function (sl::SquaredLoss{<:AbstractArray{<:Number}})(
     δ = arg[i] - y[i]
     s += δ * δ
   end
-  # NOTE: we're not dividing by size(arg,N)
+  # NOTE: we're not dividing by static_size(arg,N)
   T(0.5) * s, p, pu
 end
 
@@ -281,7 +281,7 @@ function correct_count_and_loss(
   cnl, loss = split_loss(c)
   Ŷ = cnl(X, p)
   ec = correct_count(Ŷ, target(loss))
-  os = first(layer_output_size(Val(T), loss, size(X)))
+  os = first(layer_output_size(Val(T), loss, static_size(X)))
   GC.@preserve p (ec, with_memory(__loss, c, os, loss, Ŷ, pointer(p))...)
 end
 function correct_count_and_loss(
@@ -294,7 +294,7 @@ function correct_count_and_loss(
 end
 function accuracy_and_loss(c::SimpleChain, X, args...)
   cnt, l = correct_count_and_loss(c, X, args...)
-  cnt / size(X)[end], l
+  cnt / static_size(X)[end], l
 end
 
 _params(::Tuple{AbstractLoss}, _, __) = ()

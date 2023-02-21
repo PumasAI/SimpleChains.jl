@@ -2,13 +2,13 @@
 function (Λ::AbstractPenalty{<:SimpleChain})(arg, params)
   Base.FastMath.add_fast(
     getchain(Λ)(arg, params),
-    apply_penalty(Λ, params, size(arg))
+    apply_penalty(Λ, params, static_size(arg))
   )
 end
 function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
   Base.FastMath.add_fast(
     valgrad!(g, getchain(Λ), arg, params),
-    apply_penalty!(g, Λ, params, size(arg))
+    apply_penalty!(g, Λ, params, static_size(arg))
   )
 end
 
