@@ -549,8 +549,8 @@ function convlayeradjA!(
   Cadj = zero_offsets(_Cadj)
   Aadj = zero_offsets(_Aadj)
   K = zero_offsets(_K)
-  I0 = size(Aadj, static(1))
-  K0, K2, K3 = size(K)
+  I0 = static_size(Aadj, static(1))
+  K0, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
   @turbo for j0 = 0:I0-1, i = 0:K2-1
     s = zero(T)
@@ -570,8 +570,8 @@ function convlayeradjA!(
   Cadj = zero_offsets(_Cadj)
   Aadj = zero_offsets(_Aadj)
   K = zero_offsets(_K)
-  I0, _, I3 = size(Aadj)
-  K0, K2, K3 = size(K)
+  I0, _, I3 = static_size(Aadj)
+  K0, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
   for d = 0:I3-1
     @turbo for j0 = 0:I0-1, i = 0:K2-1
@@ -593,8 +593,8 @@ function convlayeradjA!(
   Cadj = zero_offsets(_Cadj)
   Aadj = zero_offsets(_Aadj)
   K = zero_offsets(_K)
-  I0, I1, _ = size(Aadj)
-  K0, K1, K2, K3 = size(K)
+  I0, I1, _ = static_size(Aadj)
+  K0, K1, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
   @turbo for j0 = 0:I0-1, j1 = 0:I1-1, i = 0:K2-1
@@ -616,8 +616,8 @@ function convlayeradjA!(
   Cadj = zero_offsets(_Cadj)
   Aadj = zero_offsets(_Aadj)
   K = zero_offsets(_K)
-  I0, I1, _, I3 = size(Aadj)
-  K0, K1, K2, K3 = size(K)
+  I0, I1, _, I3 = static_size(Aadj)
+  K0, K1, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
   for d = 0:I3-1
@@ -644,8 +644,8 @@ function convlayeradjA2!(
   Aadj = OffsetArray(_Aadj, OffsetArrays.Origin(0))
   K = OffsetArray(_K, OffsetArrays.Origin(0))
   Cadj = OffsetArray(_Cadj, OffsetArrays.Origin(0))
-  I0, I1, _, I3 = size(Aadj)
-  K0, K1, K2, K3 = size(K)
+  I0, I1, _, I3 = static_size(Aadj)
+  K0, K1, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
   # I0-1 = J0 + K0 - 2
@@ -674,8 +674,8 @@ function convlayeradjA!(
   Cadj = zero_offsets(_Cadj)
   Aadj = zero_offsets(_Aadj)
   K = zero_offsets(_K)
-  I0, I1, I2, _ = size(Aadj)
-  K0, K1, K2, K3, K4 = size(K)
+  I0, I1, I2, _ = static_size(Aadj)
+  K0, K1, K2, K3, K4 = static_size(K)
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
   J2 = I2 - K2 + static(1)
@@ -699,8 +699,8 @@ function convlayeradjA!(
   Cadj = zero_offsets(_Cadj)
   Aadj = zero_offsets(_Aadj)
   K = zero_offsets(_K)
-  I0, I1, I2, _, I4 = size(Aadj)
-  K0, K1, K2, K3, K4 = size(K)
+  I0, I1, I2, _, I4 = static_size(Aadj)
+  K0, K1, K2, K3, K4 = static_size(K)
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
   J2 = I2 - K2 + static(1)
@@ -865,7 +865,7 @@ function get∂C(::F, outputdim, ∂Cp::Ptr{T}, ::False) where {F,T}
 end
 function get∂C(::typeof(relu), outputdim, ∂Cp::Ptr)
   ∂C = PtrArray(Ptr{Bit}(∂Cp), outputdim)
-  ∂Cp += align((last(strides(∂C)) * last(outputdim)) >>> 3)
+  ∂Cp += align((last(static_strides(∂C)) * last(outputdim)) >>> 3)
   ∂C, ∂Cp
 end
 get∂C(::typeof(identity), _, ∂Cp::Ptr) = nothing, ∂Cp
@@ -876,7 +876,7 @@ function (c::Conv)(
   pu::Ptr{UInt8}
 ) where {T0,T1}
   T = promote_type(T0, T1)
-  sz = size(A)
+  sz = static_size(A)
   outputdim = getoutputdim(c, sz)
   C, pu2 = alloc_return(outputdim, Ptr{T}(pu))
   (K, b), p = getparams(c, p, sz)
@@ -892,7 +892,7 @@ function valgrad_layer!(
   p::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T}
-  sz = (Base.front(size(A))..., length(inds))
+  sz = (Base.front(static_size(A))..., length(inds))
   outputdim = getoutputdim(c, sz)
   R, pu3 = alloc_return(outputdim, Ptr{T}(pu))
   (K, b), p2 = getparams(c, p, sz)
@@ -907,7 +907,7 @@ function valgrad_layer!(
   p::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T}
-  sz = (Base.front(size(A))..., length(inds))
+  sz = (Base.front(static_size(A))..., length(inds))
   outputdim = getoutputdim(c, sz)
   # we want to allocate ∂C in front of C
   ∂C, pu2 = get∂C(c.f, outputdim, Ptr{T}(pu))
@@ -946,7 +946,7 @@ function valgrad_layer!(
   p::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T}
-  sz = size(A)
+  sz = static_size(A)
   outputdim = getoutputdim(c, sz)
   R, pu3 = alloc_return(outputdim, Ptr{T}(pu))
   (K, b), p2 = getparams(c, p, sz)
@@ -960,7 +960,7 @@ function valgrad_layer!(
   p::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T}
-  sz = size(A)
+  sz = static_size(A)
   outputdim = getoutputdim(c, sz)
   # we want to allocate ∂C in front of C
   ∂C, pu2 = get∂C(c.f, outputdim, Ptr{T}(pu))
@@ -1002,7 +1002,7 @@ function _pullback!(
   return
 end
 function _pullback_A!(c::Conv, C̄, A, p::Ptr{T}) where {T}
-  convlayeradjA!(A, first(first(getparams(c, p, size(A)))), C̄) # overwrite A
+  convlayeradjA!(A, first(first(getparams(c, p, static_size(A)))), C̄) # overwrite A
   return
 end
 function pullback_param!(
@@ -1016,9 +1016,9 @@ function pullback_param!(
   _pullback_param!(pg, c, C̄, A, pu)
 end
 function _pullback_param!(pg::Ptr{T}, c::Conv, C̄, A, pu::Ptr{UInt8}) where {T}
-  ∂C = first(get∂C(c.f, size(C̄), Ptr{T}(pu)))
+  ∂C = first(get∂C(c.f, static_size(C̄), Ptr{T}(pu)))
   update_C̄!(c.f, C̄, ∂C)
-  (gK, gb), _ = getparams(c, pg, size(A))
+  (gK, gb), _ = getparams(c, pg, static_size(A))
   convlayeradjK!(gK, gb, A, C̄)
   return
 end
