@@ -93,7 +93,7 @@ function _getparams(layer::TurboDense{false}, p, inputdim::Tuple)
 end
 function _getparams(layer::TurboDense{true}, p, inputdim::Tuple)
   A, p = getparams(layer, p, last(inputdim))
-  Kp1 = size(A, static(2))
+  Kp1 = static_size(A, static(2))
   K = Kp1 - static(1)
   _, outputdim = numparam(layer, inputdim)
   (view(A, :, static(1):K), view(A, :, Kp1)), p, outputdim
@@ -170,10 +170,10 @@ end
   T = promote_type(T1, T2)
   GC.@preserve B begin
     put = Base.unsafe_convert(Ptr{T}, pu)
-    A, p = getparams(td, p, size(B, StaticInt(1)))
+    A, p = getparams(td, p, static_size(B, StaticInt(1)))
     C, _pu = alloc_return(
       td,
-      size(pB, StaticInt(2)),
+      static_size(pB, StaticInt(2)),
       put,
       contiguous_axis(A),
       stride_rank(A),
@@ -194,7 +194,7 @@ end
   ::True,
   ::True
 ) where {F}
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -212,7 +212,7 @@ end
   ::True,
   ::False
 ) where {F}
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -291,7 +291,7 @@ function get∂C(
   ∂Cp::Ptr{UInt8},
   ::True
 ) where {T}
-  ∂C = PtrArray(reinterpret(Ptr{T}, ∂Cp), size(C))
+  ∂C = PtrArray(reinterpret(Ptr{T}, ∂Cp), static_size(C))
   ∂Cp += align(length(∂C) * sizeof(T))
   ∂C, ∂Cp
 end
@@ -311,9 +311,9 @@ function get∂C(
   C::AbstractArray,
   ∂Cp::Ptr{UInt8}
 ) where {B,D}
-  outputdim = size(C)
+  outputdim = static_size(C)
   ∂C = PtrArray(reinterpret(Ptr{Bit}, ∂Cp), outputdim)
-  ∂Cp += align((last(StrideArraysCore.strides(∂C)) >>> 3) * last(outputdim))
+  ∂Cp += align((last(static_strides(∂C)) >>> 3) * last(outputdim))
   ∂C, ∂Cp
 end
 function get∂C(
@@ -332,7 +332,7 @@ end
   B::AbstractArray{T3,N},
   ::True
 ) where {F,T1<:Base.HWReal,T2<:Base.HWReal,T3<:Base.HWReal,N}
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   ∂f = ∂(f)
   @turbo for n ∈ indices((B, C, ∂C), 2), m ∈ indices((A, C, ∂C), 1)
@@ -353,7 +353,7 @@ end
   B::AbstractMatrix{<:Base.HWReal},
   ::True
 ) where {F}
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -420,7 +420,7 @@ end
   B::AbstractMatrix{<:Base.HWReal},
   ::True
 )
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -464,7 +464,7 @@ end
   B::AbstractMatrix{T2},
   ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
-  Kp1 = size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -485,7 +485,7 @@ end
   B::AbstractVector{T2},
   ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
-  Kp1 = size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -525,7 +525,7 @@ end
   B::AbstractVector{T2},
   ::False
 ) where {T1<:Base.HWReal,T2<:Base.HWReal}
-  K = ArrayInterface.size(A, StaticInt(2))
+  K = static_size(A, StaticInt(2))
   @turbo for m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ 1:K
@@ -544,7 +544,7 @@ end
   B::AbstractArray{T2,N},
   ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
@@ -598,7 +598,7 @@ end
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  K = size(A, StaticInt(2)) - StaticInt(1)
+  K = static_size(A, StaticInt(2)) - StaticInt(1)
   ∂f = ∂(f)
   @turbo for n ∈ indices((inds, C, ∂C), (1,2,2)), m ∈ indices((A, C, ∂C), 1)
     Cmn = zero(eltype(C))
@@ -623,7 +623,7 @@ end
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  K = size(A, StaticInt(2)) - StaticInt(1)
+  K = static_size(A, StaticInt(2)) - StaticInt(1)
   @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
@@ -704,7 +704,7 @@ end
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  K = size(A, StaticInt(2)) - StaticInt(1)
+  K = static_size(A, StaticInt(2)) - StaticInt(1)
   @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
@@ -758,7 +758,7 @@ end
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  K = size(A, StaticInt(2)) - StaticInt(1)
+  K = static_size(A, StaticInt(2)) - StaticInt(1)
   @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
@@ -805,7 +805,7 @@ end
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  K = ArrayInterface.size(A, StaticInt(2)) - One()
+  K = static_size(A, StaticInt(2)) - One()
   @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
@@ -842,8 +842,8 @@ function valgrad_layer!(
   p::Ptr{T},
   pu::Ptr{UInt8},
 ) where {T,O}
-  input_dim = size(B, StaticInt(1))
-  batch_size = size(B, StaticInt(2))
+  input_dim = static_size(B, StaticInt(1))
+  batch_size = static_size(B, StaticInt(2))
   pu2 = Base.unsafe_convert(Ptr{T}, pu + align(batch_size * td.outputdim * sizeof(T)))
   C, _pu3 = alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(B))
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
@@ -877,8 +877,8 @@ function valgrad_layer!(
   p::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T,O}
-  input_dim = size(B, StaticInt(1))
-  batch_size = size(B, StaticInt(2))
+  input_dim = static_size(B, StaticInt(1))
+  batch_size = static_size(B, StaticInt(2))
   pu2 = Base.unsafe_convert(
     Ptr{T},
     pu + align(batch_size * td.outputdim * sizeof(T))
@@ -907,7 +907,7 @@ function alloc_return_B_dense(
 ) where {T}
   si = bytestrideindex(B)
   sp = stridedpointer(reinterpret(Ptr{T}, pu), si)
-  B̄ = PtrArray(sp, (input_dim, size(B, static(2))), val_dense_dims(B))
+  B̄ = PtrArray(sp, (input_dim, static_size(B, static(2))), val_dense_dims(B))
   B̄, pu + align(length(B̄) * sizeof(T))
 end
 function pullback!(
@@ -923,7 +923,7 @@ function pullback!(
   pullback_param!(pg, td, C̄, B, p, pu) # Ā = C̄ * B'
   # Now 5-arg
   # B̄ = A' * C̄
-  intput_dims = size(B, StaticInt(1))
+  intput_dims = static_size(B, StaticInt(1))
   A, _ = getparams(td, p, intput_dims)
   B̄, pu2 = alloc_return_B_dense(B, pu2, intput_dims)
   dense!(identity, nothing, B̄, matrix_view(td, A)', C̄, False())
@@ -934,7 +934,7 @@ function pullback!(pg, td, C̄, B, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
 end
 matrix_view(::TurboDense{false}, A) = A
 function matrix_view(::TurboDense{true}, A)
-  Kp1 = ArrayInterface.size(A, StaticInt(2))
+  Kp1 = static_size(A, StaticInt(2))
   K = Kp1 - StaticInt(1)
   view(A, :, static(1):K)
 end
@@ -953,12 +953,12 @@ function pullback_param!(
   # Ā = C̄ * B'
   ∂C = first(get∂C(td, C̄, pu))
   update_C̄!(td.f, C̄, ∂C)
-  Ā, __ = getparams(td, pg, size(B, StaticInt(1)))
+  Ā, __ = getparams(td, pg, static_size(B, StaticInt(1)))
   dense_param_update!(td, Ā, C̄, B)
   return nothing
 end
 function dense_param_update!(::TurboDense{true}, Ā, C̄, B)
-  Kp1 = ArrayInterface.size(Ā, StaticInt(2))
+  Kp1 = static_size(Ā, StaticInt(2))
   K = Kp1 - StaticInt(1)
   dense!(identity, nothing, view(Ā, :, static(1):K), C̄, B', False())
   @turbo for m ∈ axes(Ā, 1)

@@ -3,22 +3,21 @@ module SimpleChains
 # using ChainRules, ChainRulesCore, NNlibCPU
 using UnPack,
   VectorizationBase,
-  ArrayInterface,
+  StaticArrayInterface,
   Polyester,
   SLEEFPirates,
   StrideArraysCore,
   Static,
   VectorizedRNG
-using ArrayInterfaceCore: CPUPointer
-using ArrayInterface:
-  size,
-  strides,
-  stride,
-  axes,
+const ArrayInterface = StaticArrayInterface
+using StaticArrayInterface:
+  CPUPointer,
+  static_size,
+  static_strides,
+  static_axes,
   StrideIndex,
   contiguous_axis,
   stride_rank,
-  length,
   static_length,
   static_first,
   static_last,

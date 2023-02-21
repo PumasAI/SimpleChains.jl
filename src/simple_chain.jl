@@ -137,9 +137,9 @@ function matches(x::Tuple{X,Vararg}, y::Tuple{Y,Vararg}) where {X,Y}
   matches(first(x), first(y)) && matches(Base.tail(x), Base.tail(y))
 end
 function verify_arg(c, arg)
-  if !matches(chain_input_dims(c), size(arg))
+  if !matches(chain_input_dims(c), static_size(arg))
     throw(
-      ArgumentError("Input argument: !matches(chain_input_dims(c), size(arg))")
+      ArgumentError("Input argument: !matches(chain_input_dims(c), static_size(arg))")
     )
   end
 end
@@ -148,7 +148,7 @@ struct SArrayOutput{T}
 end
 @inline function (f::SArrayOutput)(x::Vararg{Any,K}) where {K}
   fx = f.f(x...)
-  _maybe_sarray(fx, size(fx))
+  _maybe_sarray(fx, static_size(fx))
 end
 
 function (c::SimpleChain)(
@@ -161,7 +161,7 @@ function (c::SimpleChain)(
   num_bytes = required_forward_bytes(
     Val(promote_type(T0, T1)),
     layers,
-    size(parg),
+    static_size(parg),
     static(0)
   )
   if has_loss(c)
@@ -170,7 +170,7 @@ function (c::SimpleChain)(
     end
     return lret
   else
-    ol = tsprod(outputdim(c, size(arg)))
+    ol = tsprod(outputdim(c, static_size(arg)))
     if ol isa StaticInt &&
        num_bytes isa StaticInt &&
        ol < 64 &&
@@ -196,7 +196,7 @@ function (c::SimpleChain)(
   end
 end
 @inline _maybe_sarray(x) = x
-@inline _maybe_sarray(x::AbstractArray) = _maybe_sarray(x, size(x))
+@inline _maybe_sarray(x::AbstractArray) = _maybe_sarray(x, static_size(x))
 @inline _maybe_sarray(x::AbstractArray, _) = x
 @inline _maybe_sarray(A::AbstractArray, s::Tuple{Vararg{StaticInt}}) =
   _to_sarray(A, s)
@@ -275,7 +275,7 @@ end
     num_bytes = required_forward_bytes(
       Val(Base.promote_eltype(arg, params)),
       layers,
-      size(parg),
+      static_size(parg),
       static(0)
     )
     if has_loss(c)
@@ -505,14 +505,14 @@ end
 
 @inline function maybe_static_size_arg(s::Tuple, arg)
   if SimpleChains.ArrayInterface.device(arg) === CPUPointer()
-    PtrArray(pointer(arg), _try_static(s, size(arg)))
+    PtrArray(pointer(arg), _try_static(s, static_size(arg)))
   else
     arg
   end
 end
 @inline function maybe_static_size_arg(s::InputDimUnknown, arg)
   if SimpleChains.ArrayInterface.device(arg) === CPUPointer()
-    PtrArray(pointer(arg), size(arg))
+    PtrArray(pointer(arg), static_size(arg))
   else
     arg
   end
@@ -549,7 +549,7 @@ function valgrad!(
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
   num_bytes =
-    required_bytes(Val{promote_type(T0, T1)}(), layers, size(parg), static(0))
+    required_bytes(Val{promote_type(T0, T1)}(), layers, static_size(parg), static(0))
   GC.@preserve arg with_memory(unsafe_valgrad!, c, num_bytes, g, params, parg)
 end
 
@@ -562,7 +562,7 @@ end
 # fallback valgrad_layer for functions not implementing fusion w/ indexing
 
 function subset_batch(Xp::AbstractArray{T,N}, perm, pu) where {T,N}
-  Xsz = Base.front(size(Xp))
+  Xsz = Base.front(static_size(Xp))
   lastdim = length(perm)
   Xtsz = (Xsz..., lastdim)
   Xtmp = PtrArray(Ptr{T}(pu), Xtsz)
@@ -730,7 +730,7 @@ function valgrad_core(
   @unpack layers = c
   g = PtrArray(Ptr{T}(pu), (glen,))
   l = unsafe_valgrad!(c, pu + align(glen * static_sizeof(T)), g, params, arg)
-  Base.FastMath.add_fast(l, apply_penalty!(g, getpenalty(c), params, size(arg)))
+  Base.FastMath.add_fast(l, apply_penalty!(g, getpenalty(c), params, static_size(arg)))
 end
 function valgrad_core_sarray(
   c::Chain,
@@ -749,7 +749,7 @@ function valgrad_core_sarray(
       params,
       arg
     ),
-    apply_penalty!(g, getpenalty(c), params, size(arg))
+    apply_penalty!(g, getpenalty(c), params, static_size(arg))
   )
   return l, _maybe_sarray(g, (static(L),))
 end
@@ -757,10 +757,10 @@ function valgrad(sc::Chain, arg, params::AbstractVector{TP}) where {TP}
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  glen = _try_static(numparam(sc, size(parg)), static_length(params))
+  glen = _try_static(numparam(sc, static_size(parg)), static_length(params))
   T = Base.promote_eltype(arg, params)
   num_bytes =
-    required_bytes(Val{T}(), layers, size(parg), glen * static_sizeof(T))
+    required_bytes(Val{T}(), layers, static_size(parg), glen * static_sizeof(T))
   l, heap_memory =
     with_heap_memory(valgrad_core, sc, num_bytes, parg, params, glen)
   gv = StrideArraysCore.StrideArray(
@@ -780,7 +780,7 @@ end
   glen = _try_static(numparam(sc), static_length(params))
   T = Base.promote_eltype(arg, params)
   num_bytes =
-    required_bytes(Val{T}(), layers, size(parg), glen * static_sizeof(T))
+    required_bytes(Val{T}(), layers, static_size(parg), glen * static_sizeof(T))
   if glen isa StaticInt
     return with_memory(valgrad_core_sarray, sc, num_bytes, parg, params, glen)
   else
