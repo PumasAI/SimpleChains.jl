@@ -46,8 +46,8 @@ end
 
 The function used to get the inner targets is called `target` and can be defined easily:
 ```julia
-target(loss::BinaryLogitCrossEntropyLoss) = loss.targets
-(loss::BinaryLogitCrossEntropyLoss)(::Int) = loss
+SimpleChains.target(loss::BinaryLogitCrossEntropyLoss) = loss.targets
+(loss::BinaryLogitCrossEntropyLoss)(x::AbstractArray) = BinaryLogitCrossEntropyLoss(x)
 ```
 
 Next, we define how to calculate the loss, given some logits:
@@ -127,12 +127,11 @@ gradients = SimpleChains.alloc_threaded_grad(model);
 # Add the loss like any other loss type
 model_loss = SimpleChains.add_loss(model, BinaryLogitCrossEntropyLoss(Y));
 
-
 SimpleChains.valgrad!(gradients, model_loss, X, parameters)
 ```
 
 Or alternatively, if you want to just train the parameters in full:
 ```julia
 epochs = 100
-SimpleChains.train_unbatched!(gradients, parameters, model_loss, X, SimpleChains.ADAM(), 1:epochs); 
+SimpleChains.train_unbatched!(gradients, parameters, model_loss, X, SimpleChains.ADAM(), epochs); 
 ```
