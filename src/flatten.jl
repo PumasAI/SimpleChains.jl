@@ -40,7 +40,7 @@ init_params!(::Flatten{N}, p, id, ::AbstractRNG) where {N} = p, getoutputdim(Fla
 numparam(::Flatten{N}, inputdim) where {N} = 0, getoutputdim(Flatten{N}(), inputdim)
 
 @inline function (::Flatten{N})(A::AbstractArray) where {N}
-  reshape(A, getoutputdim(Flatten{N}(), size(A)))
+  reshape(A, getoutputdim(Flatten{N}(), static_size(A)))
 end
 @inline function (::Flatten{N})(A::AbstractArray, p::Ptr, pu::Ptr{UInt8}) where {N}
   Flatten{N}()(A), p, pu
@@ -50,5 +50,5 @@ function valgrad_layer!(pg::Ptr, ::Flatten{N}, A, p, pu) where {N}
   return pg, B, p, pu
 end
 function pullback!(::Ptr, ::Flatten, B̄, A, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
-  return reshape(B̄, size(A)), pu2
+  return reshape(B̄, static_size(A)), pu2
 end

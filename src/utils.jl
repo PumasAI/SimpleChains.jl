@@ -50,7 +50,7 @@ function logsoftmax!(z, m, y::AbstractMatrix)
   end
 end
 function logsoftmax(y::AbstractMatrix)
-  m = similar(y, size(y, 2))
+  m = similar(y, static_size(y, 2))
   z = similar(y)
   logsoftmax!(z, m, y)
   return z
@@ -73,12 +73,12 @@ function glorot_uniform!(
   A::AbstractArray{T},
   rng::VectorizedRNG.AbstractVRNG = local_rng()
 ) where {T}
-  scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
+  scale = @fastmath sqrt(T(24) / tssum(nfan(static_size(A)...)))
   # (rand()-0.5)*scale === rand()*scale - 0.5scale
   rand!(rng, A, static(0), T(-0.5) * scale, scale)
 end
 function glorot_uniform!(A::AbstractArray{T}, rng) where {T}
-  scale = @fastmath sqrt(T(24) / tssum(nfan(size(A)...)))
+  scale = @fastmath sqrt(T(24) / tssum(nfan(static_size(A)...)))
   # (rand()-0.5)*scale === rand()*scale - 0.5scale
   rand!(rng, A)
   @inbounds @fastmath for i in eachindex(A)
@@ -91,11 +91,11 @@ function glorot_normal!(
   A::AbstractArray{T},
   rng::VectorizedRNG.AbstractVRNG = local_rng()
 ) where {T}
-  σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
+  σ = @fastmath sqrt(T(2) / tssum(nfan(static_size(A)...)))
   randn!(rng, A, static(0), static(0), σ)
 end
 function glorot_normal!(A::AbstractArray{T}, rng) where {T}
-  σ = @fastmath sqrt(T(2) / tssum(nfan(size(A)...)))
+  σ = @fastmath sqrt(T(2) / tssum(nfan(static_size(A)...)))
   randn!(rng, A)
   @inbounds @fastmath for i in eachindex(A)
     A[i] *= σ
