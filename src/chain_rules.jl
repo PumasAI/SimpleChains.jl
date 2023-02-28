@@ -131,12 +131,12 @@ function valgrad_noloss(
   aoff = align(arglen * static_sizeof(S))
 
   num_bytes =
-    required_bytes(Val{promote_type(T, S)}(), layers, size(parg), aoff + goff)
+    required_bytes(Val{promote_type(T, S)}(), layers, static_size(parg), aoff + goff)
   memory = get_heap_memory(sc, num_bytes)
 
   GC.@preserve barg params memory begin
     pm = align(pointer(memory))
-    parg2 = PtrArray(Ptr{S}(pm), _try_static(c.inputdim, size(parg)))
+    parg2 = PtrArray(Ptr{S}(pm), _try_static(c.inputdim, static_size(parg)))
     @inbounds @simd ivdep for i in eachindex(parg)
       parg2[i] = parg[i]
     end

@@ -154,7 +154,7 @@ end
 end
 
 function (::MaxPool{D})(A::AbstractArray{T}, p::Ptr, pu::Ptr{UInt8}) where {T,D}
-  B = PtrArray(Ptr{T}(pu), getoutputdim(MaxPool{D}(), size(A)))
+  B = PtrArray(Ptr{T}(pu), getoutputdim(MaxPool{D}(), static_size(A)))
   maxpool!(B, A, MaxPool{D}())
   B, p, pu + align(sizeof(T) * length(B))
 end

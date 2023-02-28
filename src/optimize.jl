@@ -74,18 +74,18 @@ function update!(
 ) where {T,N}
   GC.@preserve g p chain_valgrad_entry!(pointer(g), Xp, layers, pointer(p), pm)
   apply_penalty!(g, pen, p, sx)
-  gmul = loss_multiplier(last(layers), size(Xp, static(N)), T)
+  gmul = loss_multiplier(last(layers), static_size(Xp, static(N)), T)
   update!(opt, optbuffer, p, g, gmul)
 end
 function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
-  batchsize = size(Xp, ndims(Xp))
+  batchsize = static_size(Xp, ndims(Xp))
   if start > stop
     fill!(g, zero(eltype(g)))
     return nothing
   end
   off = start - 1
-  nt = size(g, static(2))
-  goff = stride(g, static(2)) * sizeof(eltype(g)) * off
+  nt = static_size(g, static(2))
+  goff = static_strides(g, static(2)) * sizeof(eltype(g)) * off
   f = ((off * batchsize) ÷ nt) + 1
   l = (stop * batchsize) ÷ nt
   Xpv = view_slice_last(Xp, f:l)
@@ -118,7 +118,7 @@ function update!(
   optbuffer,
   mpt
 ) where {T,N}
-  nthread = size(g, static(2))
+  nthread = static_size(g, static(2))
   Xpb = preserve_buffer(Xp)
   Xpp = PtrArray(Xp)
   loss = last(layers)
@@ -144,7 +144,7 @@ function update!(
   GC.@preserve gpb begin
     gv = PtrArray(pointer(g), (length(p),))
     apply_penalty!(gv, pen, p, sx)
-    gmul = loss_multiplier(loss, size(Xp, static(N)), T)
+    gmul = loss_multiplier(loss, static_size(Xp, static(N)), T)
     update!(opt, optbuffer, p, gv, gmul)
   end
 end
@@ -157,11 +157,12 @@ function shuffle_chain_valgrad_thread!(
   # will work over subrange of pstart+1:pstop
   # it is divided into nthread parts...
   subrangelen = pstop - pstart
-  numthread = size(g, static(2))
+  numthread = static_size(g, static(2))
   batchsize, r = divrem(subrangelen, numthread)
   off = start - 1
   goff =
-    g isa AbstractVector ? 0 : stride(g, static(2)) * sizeof(eltype(g)) * off
+    g isa AbstractVector ? 0 :
+    static_strides(g, static(2)) * sizeof(eltype(g)) * off
   pm += mpt * off
 
   fm1 = off * batchsize + pstart + min(r, off)
@@ -178,7 +179,7 @@ function shuffle_chain_valgrad_thread!(
   eltgt = eltype(tgt)
   szeltgt = sizeof(eltgt)
 
-  tgtsz = Base.front(size(tgt))
+  tgtsz = Base.front(static_size(tgt))
   tgttmp = PtrArray(Ptr{eltgt}(pm), (tgtsz..., lastdim))
   ptgttmp = pointer(tgttmp)
   tgtlen = tsprod(tgtsz)
@@ -225,7 +226,7 @@ function shuffle_update!(
   pstart,
   pstop
 ) where {T,N}
-  nthread = size(g, static(2))
+  nthread = static_size(g, static(2))
   #=
   batchsize = pstop - pstart
   if batchsize < nthread
@@ -290,7 +291,7 @@ function shuffle_update!(
   GC.@preserve gpb begin
     gv = PtrArray(pointer(g), (length(p),))
     apply_penalty!(gv, pen, p, sx)
-    gmul = loss_multiplier(last(layers), size(Xp, static(N)), T)
+    gmul = loss_multiplier(last(layers), static_size(Xp, static(N)), T)
     update!(opt, optbuffer, p, gv, gmul)
   end
   return nothing
@@ -316,7 +317,7 @@ function shuffle_update!(
     static(1)
   )
   apply_penalty!(g, pen, p, sx)
-  gmul = loss_multiplier(last(layers), size(Xp, static(N)), T)
+  gmul = loss_multiplier(last(layers), static_size(Xp, static(N)), T)
   update!(opt, optbuffer, p, g, gmul)
 end
 
@@ -335,7 +336,7 @@ function train_unbatched_core!(
   pen = getpenalty(c)
   fl = Base.front(layers)
   ll = last(layers)
-  sx = size(pX)
+  sx = static_size(pX)
   optbuffer, pm = optmemory(opt, p, pu)
   GC.@preserve p g begin
     for y ∈ t
@@ -357,7 +358,7 @@ function train_unbatched_core!(
   chn = getchain(c)
   @unpack layers = chn
   pen = getpenalty(c)
-  sx = size(pX)
+  sx = static_size(pX)
   optbuffer, pm = optmemory(opt, p, pu)
   GC.@preserve p g begin
     for _ ∈ 1:iters
@@ -404,7 +405,7 @@ function train_unbatched!(
   opt::AbstractOptimizer,
   t
 )
-  if g isa AbstractMatrix && size(g, 2) == 1
+  if g isa AbstractMatrix && static_size(g, static(2)) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
     GC.@preserve gpb train_unbatched!(gv, p, _chn, X, opt, t)
@@ -419,10 +420,10 @@ function train_unbatched!(
   bytes_per_thread, total_bytes = required_bytes(
     Val{T}(),
     layers,
-    size(pX),
+    static_size(pX),
     optoff,
     static(0),
-    size(g, static(2))
+    static_size(g, static(2))
   )
   GC.@preserve X begin
     with_memory(
@@ -458,7 +459,7 @@ function train_unbatched!(
   bytes_per_thread, total_bytes = required_bytes(
     Val{T}(),
     layers,
-    size(pX),
+    static_size(pX),
     optoff + align(glen) * numthreads,
     static(0),
     numthreads
@@ -559,7 +560,7 @@ function train_batched_core!(
   chn = getchain(_chn)
   pen = getpenalty(_chn) / N_bs
   @unpack layers = chn
-  sx = chain_input_dims(chn, size(pX))
+  sx = chain_input_dims(chn, static_size(pX))
   N = last(sx)
   # need to shuffle `N`
   perm_mem = align(sizeof(Int) * N)
@@ -662,7 +663,7 @@ function train_batched!(
   batchsize = nothing,
   leaveofflast::Bool = false
 )
-  if g isa AbstractMatrix && size(g, 2) == 1
+  if g isa AbstractMatrix && static_size(g, static(2)) == 1
     gpb = preserve_buffer(g)
     gv = PtrArray(pointer(g), (length(p),))
     GC.@preserve gpb train_batched!(gv, p, _chn, X, opt, iters; batchsize)
@@ -672,11 +673,11 @@ function train_batched!(
   pX = maybe_static_size_arg(chn.inputdim, X)
   @unpack layers = chn
   optoff = optmemsize(opt, p)
-  sx = chain_input_dims(chn, size(pX))
+  sx = chain_input_dims(chn, static_size(pX))
   N = last(sx)
   # need to shuffle `N`
   tgt = target(chn)
-  nthread = g === nothing ? _numthreads() : size(g, static(2))
+  nthread = g === nothing ? _numthreads() : static_size(g, static(2))
   N_bs = if batchsize === nothing
     static(8) *
     batch_size(layers, sx, Val(promote_type(eltype(p), eltype(X)))) *
@@ -688,7 +689,7 @@ function train_batched!(
     train_unbatched!(g, p, _chn, X, opt, iters)
     return p
   end
-  tgt_batch_len = tsprod(Base.front(size(tgt))) * N_bs
+  tgt_batch_len = tsprod(Base.front(static_size(tgt))) * N_bs
   X_batch_len = tsprod(Base.front(sx)) * N_bs
   sxb = (Base.front(sx)..., N_bs)
   shuffle_per_thread =

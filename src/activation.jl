@@ -20,7 +20,7 @@ Base.show(io::IO, a::Activation) = print(io, "Activation layer applying: ", a.f)
 
 function (a::Activation)(x::AbstractArray{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   f = a.f
-  C = PtrArray(Ptr{T}(pu), size(x))
+  C = PtrArray(Ptr{T}(pu), static_size(x))
   pu += length(C) * sizeof(T)
   @turbo for i ∈ eachindex(x)
     C[i] = f(x[i])
@@ -42,9 +42,9 @@ function valgrad_layer!(
   p::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T}
-  ∂C = PtrArray(Ptr{T}(pu), size(x))
+  ∂C = PtrArray(Ptr{T}(pu), static_size(x))
   pu += length(∂C) * sizeof(T)
-  C = PtrArray(Ptr{T}(pu), size(x))
+  C = PtrArray(Ptr{T}(pu), static_size(x))
   pu += length(C) * sizeof(T)
   _valgrad_layer!(∂C, C, pg, a, x, p, pu)
 end
@@ -74,7 +74,7 @@ function pullback!(
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
-  ∂C = PtrArray(Ptr{T}(pu), size(C̄))
+  ∂C = PtrArray(Ptr{T}(pu), static_size(C̄))
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
   end
