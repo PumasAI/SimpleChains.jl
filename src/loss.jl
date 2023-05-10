@@ -142,8 +142,9 @@ function chain_valgrad!(
     s = zero(T)
     @turbo for i ∈ eachindex(arg)
       δ = arg[i] - y[i]
-      arg[i] = δ
-      s += δ * δ * w[i]
+      δw = δ*w[i]
+      arg[i] = δw
+      s += δ * δw
     end
     T(0.5) * s, arg, pu
   end
