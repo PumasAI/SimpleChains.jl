@@ -118,7 +118,8 @@ struct WeightedSquaredLoss{Y, W<:AbstractVector{Y}} <: AbstractLoss{Y}
 end
 (::WeightedSquaredLoss)(y, w) = WeightedSquaredLoss(y, w)
 WeightedSquaredLoss() = WeightedSquaredLoss(nothing)
-target(wsl::WeightedSquaredLoss) = getfield(wsl, :y)#maybe need to return both :y and :weights?
+WeightedSquaredLoss(x::Tuple) = WeightedSquaredLoss(x...)
+target(wsl::WeightedSquaredLoss) = getfield(wsl, :y), getfield(wsl, :w)
 
 Base.getindex(wsl::WeightedSquaredLoss, r) = WeightedSquaredLoss(view_slice_last(target(wsl), r))
 
