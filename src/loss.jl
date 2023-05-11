@@ -120,6 +120,9 @@ end
 WeightedSquaredLoss() = WeightedSquaredLoss(nothing)
 WeightedSquaredLoss(x::Tuple) = WeightedSquaredLoss(x...)
 target(wsl::WeightedSquaredLoss) = getfield(wsl, :y), getfield(wsl, :w)
+function view_slice_last(target(wsl::WeightedSquaredLoss), r)
+    return Tuple(view_slice_last(f, r) for f in target(wsl))
+end
 
 Base.getindex(wsl::WeightedSquaredLoss, r) = WeightedSquaredLoss(view_slice_last(target(wsl), r))
 
