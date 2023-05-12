@@ -112,16 +112,16 @@ WeightedSquaredLoss(target)
 
 Calculates half of mean weighted squared loss of the target.
 """
-struct WeightedSquaredLoss{Y, W<:AbstractVector{Y}} <: AbstractLoss{Y}
+struct WeightedSquaredLoss{Y, W} <: AbstractLoss{Y}
     y::Y
     weights::W
 end
 (::WeightedSquaredLoss)(y, w) = WeightedSquaredLoss(y, w)
 WeightedSquaredLoss() = WeightedSquaredLoss(nothing)
 WeightedSquaredLoss(x::Tuple) = WeightedSquaredLoss(x...)
-target(wsl::WeightedSquaredLoss) = getfield(wsl, :y), getfield(wsl, :w)
-function view_slice_last(target(wsl::WeightedSquaredLoss), r)
-    return Tuple(view_slice_last(f, r) for f in target(wsl))
+target(wsl::WeightedSquaredLoss) = getfield(wsl, :y), getfield(wsl, :weights)
+function view_slice_last(x::Tuple, r)
+    return Tuple(view_slice_last(f, r) for f in x::Tuple)
 end
 
 Base.getindex(wsl::WeightedSquaredLoss, r) = WeightedSquaredLoss(view_slice_last(target(wsl), r))
@@ -130,7 +130,6 @@ weighted_squared_loss(chn::SimpleChain, y, w) = add_loss(chn, WeightedSquaredLos
 
 Base.show(io::IO, ::WeightedSquaredLoss) = print(io, "WeightedSquaredLoss")
 
-@inline loss_multiplier(::AbstractLoss, N, ::Type{T}) where {T} = inv(T(N))
 @inline loss_multiplier(::WeightedSquaredLoss, N, ::Type{T}) where {T} = T(2) / T(N)
 
 function chain_valgrad!(
