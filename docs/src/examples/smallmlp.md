@@ -36,9 +36,10 @@ G = SimpleChains.alloc_threaded_grad(mlpd);
 mlpdloss = SimpleChains.add_loss(mlpd, SquaredLoss(Y));
 mlpdtest = SimpleChains.add_loss(mlpd, SquaredLoss(Ytest));
 
+# define a function named report to calculate and report the value of loss function with train and test sets.
 report = let mtrain = mlpdloss, X=X, Xtest=Xtest, mtest = mlpdtest
   p -> begin
-    let train = mlpdloss(X, p), test = mlpdtest(Xtest, p)
+    let train = mtrain(X, p), test = mtest(Xtest, p)
       @info "Loss:" train test
     end
   end
