@@ -1,4 +1,3 @@
-
 if isdefined(ChainRulesCore, :NoTangent)
   const NoTangent = ChainRulesCore.NoTangent
 else
@@ -176,6 +175,60 @@ end
 _returns_scalar(::AbstractPenalty) = True()
 _returns_scalar(sc::SimpleChain) = has_loss_typed(sc)
 
-function ChainRulesCore.rrule(sc::Chain, arg, params)
-  _rrule(sc, arg, params, _returns_scalar(sc))
+function ChainRulesCore.rrule(::typeof(call_chain), sc::Chain, arg, params)
+  v, pb = _rrule(sc, arg, params, _returns_scalar(sc))
+  return v, Δ -> (NoTangent(), pb(collect(Δ))...)
+end
+function call_chain(sc::SimpleChain, arg::AbstractArray, params::ReverseDiff.TrackedVector)
+  return ReverseDiff.track(call_chain, sc, arg, params)
+end
+function call_chain(sc::SimpleChain, arg::AbstractArray, params::SubArray{<:ReverseDiff.TrackedReal, 1})
+  return ReverseDiff.track(call_chain, sc, arg, params)
+end
+function call_chain(sc::SimpleChain, arg::ReverseDiff.TrackedArray, params::ReverseDiff.AbstractVector)
+  return ReverseDiff.track(call_chain, sc, arg, params)
+end
+function call_chain(sc::SimpleChain, arg::ReverseDiff.TrackedArray, params::ReverseDiff.TrackedVector)
+  return ReverseDiff.track(call_chain, sc, arg, params)
+end
+function call_chain(sc::SimpleChain, arg::ReverseDiff.TrackedArray, params::SubArray{<:ReverseDiff.TrackedReal, 1})
+  return ReverseDiff.track(call_chain, sc, arg, params)
+end
+ReverseDiff.@grad function call_chain(sc::Chain, arg::AbstractArray, params::AbstractVector)
+  argv = ReverseDiff.value(arg)
+  paramsv = ReverseDiff.value(params)
+  v, pb = _rrule(sc, argv, paramsv, _returns_scalar(sc))
+  return v, Δ -> begin
+    _Δ = Base.tail(pb(collect(Δ)))
+    _Δ = Base.tail(pb(collect(Δ)))
+    (nothing, _Δ...)
+  end
+end
+
+function params_rrule(Δ)
+  n = sum(x -> sum(length, x), Δ)
+  T = eltype(first(first(Δ)))
+  v = zeros(T, n)
+  offset = 0
+  for x in Δ
+    for y in x
+      if y isa Real
+        v[offset + 1] = y 
+        offset += 1
+      else
+        l = length(y)
+        v[offset + 1 : offset + l] = vec(y)
+        offset += l
+      end
+    end
+  end
+  return v
+end
+function ChainRulesCore.rrule(::typeof(params), sc::SimpleChain, p::AbstractVector)
+  return params(sc, p), Δ -> (NoTangent(), NoTangent(), params_rrule(Δ))
+end
+params(sc::SimpleChain, p::ReverseDiff.TrackedArray) = ReverseDiff.track(params, sc, p)
+params(sc::SimpleChain, p::SubArray{<:ReverseDiff.TrackedReal, 1}) = ReverseDiff.track(params, sc, p)
+ReverseDiff.@grad function params(sc::SimpleChain, p::AbstractArray)
+  return params(sc, p), Δ -> (nothing, params_rrule(Δ))
 end
