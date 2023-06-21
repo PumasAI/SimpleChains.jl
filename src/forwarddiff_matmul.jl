@@ -170,7 +170,7 @@ function contract_loops(
     end
     push!(Bref.args, dimsym)
   end
-  q = :(Caccum += $Aref * $Bref)
+  q = :(Caccum = muladd($Aref, $Bref, Caccum))
   for (i, d) in enumerate(contract_dims)
     da = findfirst(==(d), DA)
     db = findfirst(==(d), DB)
