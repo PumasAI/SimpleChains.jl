@@ -22,7 +22,6 @@ function Base.show(io::IO, d::Dropout)
   print(io, "Dropout(p=$(Float64(d.p)/0xffffffff))")
 end
 
-
 gradval(::Val{T}, d::Dropout) where {T} = T(0xffffffff) / (T(0xffffffff) - d.p)
 numparam(::Dropout, id) = static(0), id
 parameter_free(::Dropout) = true
@@ -37,14 +36,27 @@ function (d::Dropout)(B::AbstractVecOrMat{T}, p::Ptr, pu::Ptr{UInt8}) where {T}
   B, p, pu # inference
 end
 
-
 getpcmp(::StaticInt{W}, ::StaticInt{W}, x) where {W} = x
-getpcmp(::StaticInt{W}, ::StaticInt{WU}, x) where {W,WU} =
-  getpcmp(StaticInt(W), StaticInt(WU), x, Static.gt(StaticInt(W), StaticInt(WU)))
-function getpcmp(::StaticInt{W}, ::StaticInt{WU}, x::UInt32, ::True) where {W,WU}
+getpcmp(::StaticInt{W}, ::StaticInt{WU}, x) where {W,WU} = getpcmp(
+  StaticInt(W),
+  StaticInt(WU),
+  x,
+  Static.gt(StaticInt(W), StaticInt(WU))
+)
+function getpcmp(
+  ::StaticInt{W},
+  ::StaticInt{WU},
+  x::UInt32,
+  ::True
+) where {W,WU}
   (x >> 16) % UInt16
 end
-function getpcmp(::StaticInt{W}, ::StaticInt{WU}, x::UInt32, ::False) where {W,WU}
+function getpcmp(
+  ::StaticInt{W},
+  ::StaticInt{WU},
+  x::UInt32,
+  ::False
+) where {W,WU}
   (x % UInt64) << 32
 end
 
@@ -52,11 +64,18 @@ forward_layer_output_size(::Val{T}, d::Dropout, s) where {T} = static(0), s
 layer_output_size(::Val{T}, d::Dropout, s::Tuple) where {T} =
   align((prod(s) + static(7)) >>> static(3)), s
 
-function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) where {T}
+function valgrad_layer!(
+  pg::Ptr{T},
+  d::Dropout,
+  x,
+  p::Ptr{T},
+  pu::Ptr{UInt8}
+) where {T}
   si = StrideIndex{1,(1,),1}((StaticInt(1),), (StaticInt(0),))
 
   N = static_length(x)
-  m = PtrArray(stridedpointer(reinterpret(Ptr{Bit}, pu), si), (N,), Val((true,)))
+  m =
+    PtrArray(stridedpointer(reinterpret(Ptr{Bit}, pu), si), (N,), Val((true,)))
   rng = getrng(d)
   _pcmp = d.p
   state = VectorizedRNG.getstate(rng, Val{2}(), pick_vector_width(UInt64))
@@ -64,7 +83,9 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
   GC.@preserve x begin
     ptrx = VectorizedRNG.zero_pointer(x)
     ptrm = VectorizedRNG.zero_pointer(m)
-    W = (pick_vector_width(T) * pick_vector_width(UInt64)) ÷ pick_vector_width(Float64)
+    W =
+      (pick_vector_width(T) * pick_vector_width(UInt64)) ÷
+      pick_vector_width(Float64)
     W2 = W + W
     WU = pick_vector_width(UInt32)
     pcmp = getpcmp(W, WU, _pcmp)
@@ -101,20 +122,19 @@ function valgrad_layer!(pg::Ptr{T}, d::Dropout, x, p::Ptr{T}, pu::Ptr{UInt8}) wh
 
   pg, x, p, align(pu + ((static(7) + N) >>> static(3)))
 end
-@inline pullback_param!(::Ptr, ::Dropout, _, __, ::Ptr, ::Ptr{UInt8}) = nothing
 
-function pullback!(
-  ::Ptr{T},
+function pullback_arg!(
   ::Dropout,
   C̄,
   B,
   ::Ptr{T},
   pu::Ptr{UInt8},
-  pu2::Ptr{UInt8},
+  pu2::Ptr{UInt8}
 ) where {T}
   N = static_length(C̄)
   si = StrideIndex{1,(1,),1}((StaticInt(1),), (StaticInt(1),))
-  m = PtrArray(stridedpointer(reinterpret(Ptr{Bit}, pu), si), (N,), Val((true,)))
+  m =
+    PtrArray(stridedpointer(reinterpret(Ptr{Bit}, pu), si), (N,), Val((true,)))
   @turbo for n ∈ eachindex(m)
     C̄[n] = m[n] ? C̄[n] : zero(C̄[n])
   end

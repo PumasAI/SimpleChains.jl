@@ -65,12 +65,11 @@ function _valgrad_layer!(
 end
 @inline pullback_param!(__::Ptr, ::Activation, C̄, B, p::Ptr, pu::Ptr{UInt8}) =
   nothing
-function pullback!(
-  __::Ptr{T},
-  a::Activation,
+function pullback_arg!(
+  ::Activation,
   C̄,
-  B,
-  p::Ptr{T},
+  _,
+  ::Ptr{T},
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
@@ -115,13 +114,12 @@ function _valgrad_layer!(
 ) where {T}
   pg, x, p, pu
 end
-function pullback!(
-  __::Ptr{T},
+function pullback_arg!(
   ::Activation{typeof(identity)},
   C̄,
-  B,
-  p::Ptr{T},
-  pu::Ptr{UInt8},
+  _,
+  ::Ptr{T},
+  ::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
   C̄, pu2

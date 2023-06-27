@@ -910,8 +910,7 @@ function alloc_return_B_dense(
   B̄ = PtrArray(sp, (input_dim, static_size(B, static(2))), val_dense_dims(B))
   B̄, pu + align(length(B̄) * sizeof(T))
 end
-function pullback!(
-  pg::Ptr{T},
+function pullback_arg!(
   td::TurboDense{O},
   C̄::PtrArray,
   B::PtrArray,
@@ -919,8 +918,6 @@ function pullback!(
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T,O}
-  # Start with 4-arg `pulback!` to update `∂C`
-  pullback_param!(pg, td, C̄, B, p, pu) # Ā = C̄ * B'
   # Now 5-arg
   # B̄ = A' * C̄
   intput_dims = static_size(B, StaticInt(1))
@@ -929,9 +926,7 @@ function pullback!(
   dense!(identity, nothing, B̄, matrix_view(td, A)', C̄, False())
   B̄, pu2
 end
-function pullback!(pg, td, C̄, B, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
-  @gc_preserve pullback!(pg, td, C̄, B, p, pu, pu2)
-end
+
 matrix_view(::TurboDense{false}, A) = A
 function matrix_view(::TurboDense{true}, A)
   Kp1 = static_size(A, StaticInt(2))

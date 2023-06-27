@@ -139,7 +139,9 @@ end
 function verify_arg(c, arg)
   if !matches(chain_input_dims(c), static_size(arg))
     throw(
-      ArgumentError("Input argument: !matches(chain_input_dims(c), static_size(arg))")
+      ArgumentError(
+        "Input argument: !matches(chain_input_dims(c), static_size(arg))"
+      )
     )
   end
 end
@@ -510,7 +512,7 @@ end
     arg
   end
 end
-@inline function maybe_static_size_arg(s::InputDimUnknown, arg)
+@inline function maybe_static_size_arg(::InputDimUnknown, arg)
   if SimpleChains.ArrayInterface.device(arg) === CPUPointer()
     PtrArray(pointer(arg), static_size(arg))
   else
@@ -548,8 +550,12 @@ function valgrad!(
   @assert has_loss(c)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)
-  num_bytes =
-    required_bytes(Val{promote_type(T0, T1)}(), layers, static_size(parg), static(0))
+  num_bytes = required_bytes(
+    Val{promote_type(T0, T1)}(),
+    layers,
+    static_size(parg),
+    static(0)
+  )
   GC.@preserve arg with_memory(unsafe_valgrad!, c, num_bytes, g, params, parg)
 end
 
@@ -580,6 +586,32 @@ function subset_batch(Xp::AbstractArray{T,N}, perm, pu) where {T,N}
     end
   end
   Xtmp, pu
+end
+
+# if pullback_param and pullback_arg can be implemented more efficiently
+# together, `pullback!` can be overloaded. Otherwise, it will
+# be default call `pullback_param!` and then `pullback_arg!`.
+# `pullback_arg!` should return `B̄` and `pu2`.
+function pullback!(
+  pg::Ptr{T},
+  layer, # layer
+  C̄::PtrArray,
+  B::PtrArray,
+  p::Ptr{T},
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8}
+) where {T}
+  # Start with 4-arg `pulback!` to update `∂C`
+  parameter_free(layer) || pullback_param!(pg, layer, C̄, B, p, pu) # Ā = C̄ * B'
+  pullback_arg!(layer, C̄, B, p, pu, pu2) # B̄ = A' * C̄
+end
+function pullback!(pg, layer, C̄, B, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
+  @gc_preserve pullback!(pg, layer, C̄, B, p, pu, pu2)
+end
+# fallback, only valid for layers without parameters!
+@inline function pullback_param!(::Ptr, layer, _, __, ::Ptr, ::Ptr{UInt8})
+  @assert parameter_free(layer)
+  nothing
 end
 
 function chain_valgrad_entry!(
@@ -730,7 +762,10 @@ function valgrad_core(
   @unpack layers = c
   g = PtrArray(Ptr{T}(pu), (glen,))
   l = unsafe_valgrad!(c, pu + align(glen * static_sizeof(T)), g, params, arg)
-  Base.FastMath.add_fast(l, apply_penalty!(g, getpenalty(c), params, static_size(arg)))
+  Base.FastMath.add_fast(
+    l,
+    apply_penalty!(g, getpenalty(c), params, static_size(arg))
+  )
 end
 function valgrad_core_sarray(
   c::Chain,

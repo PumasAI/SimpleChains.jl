@@ -9,7 +9,11 @@ MaxPool(x::Tuple{Vararg{Integer}}) = MaxPool{map(Int, x)}()
 MaxPool(x::Vararg{Integer}) = MaxPool{map(Int, x)}()
 
 parameter_free(::MaxPool) = true
-function forward_layer_output_size(::Val{T}, ::MaxPool{D}, inputdim::Tuple) where {T,D}
+function forward_layer_output_size(
+  ::Val{T},
+  ::MaxPool{D},
+  inputdim::Tuple
+) where {T,D}
   outdim = getoutputdim(MaxPool{D}(), inputdim)
   align(sizeof(T) * Static.reduce_tup(*, outdim)), outdim
 end
@@ -27,7 +31,8 @@ end
 function getoutputdim(::MaxPool{D}, inputdim) where {D}
   _maxpooloutputdim(map(StaticInt, D), inputdim)
 end
-init_params!(::MaxPool{D}, p, id, ::AbstractRNG) where {D} = p, getoutputdim(MaxPool{D}(), id)
+init_params!(::MaxPool{D}, p, id, ::AbstractRNG) where {D} =
+  p, getoutputdim(MaxPool{D}(), id)
 
 numparam(mp::MaxPool, inputdim) = 0, getoutputdim(mp, inputdim)
 
@@ -74,7 +79,7 @@ maxreduce(mp::Vector{Expr}) = maxreduce!(copy(mp))
 @generated function maxpool!(
   _B::AbstractArray{T,N},
   _A::AbstractArray{T,N},
-  ::MaxPool{D},
+  ::MaxPool{D}
 ) where {D,N,T}
   mp = maxreduce!(maxpoolexpr(D, N - length(D)))
   body = :((Base.Cartesian.@nref $N B i) = $mp)
@@ -87,7 +92,7 @@ maxreduce(mp::Vector{Expr}) = maxreduce!(copy(mp))
     )
   end
   isym = Symbol(:i_, N)
-  body = :(@turbo for $isym in axes(B, $N)
+  body = :(@turbo warn_check_args = false for $isym in axes(B, $N)
     $body
   end)
   quote
@@ -99,7 +104,7 @@ end
 @generated function ∂maxpool!(
   _A::AbstractArray{T,N},
   _B̄::AbstractArray{T,N},
-  ::MaxPool{D},
+  ::MaxPool{D}
 ) where {D,N,T}
   mp = maxpoolexpr(D, N - length(D))
   mr = maxreduce(mp)
@@ -162,14 +167,13 @@ function valgrad_layer!(pg::Ptr, ::MaxPool{D}, A, p, pu) where {D}
   B, p, pu = MaxPool{D}()(A, p, pu)
   return pg, B, p, pu
 end
-function pullback!(
-  ::Ptr,
+function pullback_arg!(
   ::MaxPool{D},
   B̄,
   A,
   p::Ptr,
   pu::Ptr{UInt8},
-  pu2::Ptr{UInt8},
+  pu2::Ptr{UInt8}
 ) where {D}
   ∂maxpool!(A, B̄, MaxPool{D}())
   return A, pu2

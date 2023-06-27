@@ -14,7 +14,7 @@ function convlayer!(
   K = zero_offsets(_K)
   b = zero_offsets(_b)
 
-  @turbo for j₁ ∈ axes(C, 1), o ∈ axes(K, 3)
+  @turbo warn_check_args = false for j₁ ∈ axes(C, 1), o ∈ axes(K, 3)
     s = zero(eltype(C))
     for k₁ ∈ axes(K, 1), i ∈ axes(K, 2)
       s += A[j₁+k₁, i] * K[k₁, i, o]
@@ -69,7 +69,7 @@ function convlayer!(
   K = zero_offsets(_K)
   b = zero_offsets(_b)
 
-  @turbo for j₁ ∈ axes(C, 1), o ∈ axes(K, 3)
+  @turbo warn_check_args = false for j₁ ∈ axes(C, 1), o ∈ axes(K, 3)
     s = zero(eltype(C))
     for k₁ ∈ axes(K, 1), i ∈ axes(K, 2)
       s += A[j₁+k₁, i] * K[k₁, i, o]
@@ -142,7 +142,10 @@ function convlayer!(
   A = zero_offsets(_A)
   K = zero_offsets(_K)
   b = zero_offsets(_b)
-  @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
+  @turbo warn_check_args = false for j₁ ∈ axes(C, 1),
+    j₂ ∈ axes(C, 2),
+    o ∈ axes(K, 4)
+
     s = zero(eltype(C))
     for k₁ ∈ axes(K, 1), k₂ ∈ axes(K, 2), i ∈ axes(K, 3)
       s += A[j₁+k₁, j₂+k₂, i] * K[k₁, k₂, i, o]
@@ -194,7 +197,11 @@ function convlayer!(
   A = zero_offsets(_A)
   K = zero_offsets(_K)
   b = zero_offsets(_b)
-  @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), j₃ ∈ axes(C, 3), o ∈ axes(K, 5)
+  @turbo warn_check_args = false for j₁ ∈ axes(C, 1),
+    j₂ ∈ axes(C, 2),
+    j₃ ∈ axes(C, 3),
+    o ∈ axes(K, 5)
+
     s = zero(eltype(C))
     for k₁ ∈ axes(K, 1), k₂ ∈ axes(K, 2), k₃ ∈ axes(K, 3), i ∈ axes(K, 4)
       s += A[j₁+k₁, j₂+k₂, j₃+k₃-1, i] * K[k₁, k₂, k₃, i, o]
@@ -252,7 +259,7 @@ function convlayer!(
   # FIXME: this seems to be buggy!!! The outer `@turbo` definitely
   # results in worse accuracy after training
   for o ∈ axes(K, 4)
-    @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2)
+    @turbo warn_check_args = false for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2)
       # @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
       # for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
       s = zero(eltype(C))
@@ -329,7 +336,11 @@ function convlayer!(
   A = zero_offsets(_A)
   K = zero_offsets(_K)
   b = zero_offsets(_b)
-  @turbo for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), j₃ ∈ axes(C, 3), o ∈ axes(K, 5)
+  @turbo warn_check_args = false for j₁ ∈ axes(C, 1),
+    j₂ ∈ axes(C, 2),
+    j₃ ∈ axes(C, 3),
+    o ∈ axes(K, 5)
+
     s = zero(eltype(C))
     for k₁ ∈ axes(K, 1), k₂ ∈ axes(K, 2), k₃ ∈ axes(K, 3), i ∈ axes(K, 4)
       s += A[j₁+k₁, j₂+k₂, j₃+k₃-1, i] * K[k₁, k₂, k₃, i, o]
@@ -388,7 +399,7 @@ end
 function convbadjoint!(_badj::AbstractVector, _Cadj::AbstractArray{<:Any,2})
   badj = zero_offsets(_badj)
   Cadj = zero_offsets(_Cadj)
-  @turbo for o ∈ axes(Cadj, 2)
+  @turbo warn_check_args = false for o ∈ axes(Cadj, 2)
     s = zero(eltype(badj))
     for j ∈ axes(Cadj, 1)
       s += Cadj[j, o]
@@ -405,7 +416,10 @@ function convlayeradjK!(
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
-  @turbo for k₁ ∈ axes(Kadj, 1), i ∈ axes(Kadj, 2), o ∈ axes(Kadj, 3)
+  @turbo warn_check_args = false for k₁ ∈ axes(Kadj, 1),
+    i ∈ axes(Kadj, 2),
+    o ∈ axes(Kadj, 3)
+
     s = zero(eltype(Kadj))
     for j₁ ∈ axes(Cadj, 1)
       s += A[j₁+k₁, i] * Cadj[j₁, o]
@@ -417,7 +431,7 @@ end
 function convbadjoint!(_badj::AbstractVector, _Cadj::AbstractArray{<:Any,3})
   badj = zero_offsets(_badj)
   Cadj = zero_offsets(_Cadj)
-  @turbo for o ∈ axes(Cadj, 2)
+  @turbo warn_check_args = false for o ∈ axes(Cadj, 2)
     s = zero(eltype(badj))
     for j ∈ axes(Cadj, 1), d ∈ axes(Cadj, 3)
       s += Cadj[j, o, d]
@@ -434,7 +448,10 @@ function convlayeradjK!(
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
-  @turbo for k₁ ∈ axes(Kadj, 1), i ∈ axes(Kadj, 2), o ∈ axes(Kadj, 3)
+  @turbo warn_check_args = false for k₁ ∈ axes(Kadj, 1),
+    i ∈ axes(Kadj, 2),
+    o ∈ axes(Kadj, 3)
+
     s = zero(eltype(Kadj))
     for j₁ ∈ axes(Cadj, 1), d ∈ axes(Cadj, 3)
       s += A[j₁+k₁, i, d] * Cadj[j₁, o, d]
@@ -452,7 +469,7 @@ function convlayeradjK!(
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
-  @turbo for k₁ ∈ axes(Kadj, 1),
+  @turbo warn_check_args = false for k₁ ∈ axes(Kadj, 1),
     k₂ ∈ axes(Kadj, 2),
     i ∈ axes(Kadj, 3),
     o ∈ axes(Kadj, 4)
@@ -474,7 +491,7 @@ function convlayeradjK!(
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
-  @turbo for k₁ ∈ axes(Kadj, 1),
+  @turbo warn_check_args = false for k₁ ∈ axes(Kadj, 1),
     k₂ ∈ axes(Kadj, 2),
     i ∈ axes(Kadj, 3),
     o ∈ axes(Kadj, 4)
@@ -497,7 +514,7 @@ function convlayeradjK!(
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
-  @turbo for k₁ ∈ axes(Kadj, 1),
+  @turbo warn_check_args = false for k₁ ∈ axes(Kadj, 1),
     k₂ ∈ axes(Kadj, 2),
     k₃ ∈ axes(Kadj, 3),
     i ∈ axes(Kadj, 4),
@@ -520,7 +537,7 @@ function convlayeradjK!(
   Cadj = zero_offsets(_Cadj)
   A = zero_offsets(_A)
   Kadj = zero_offsets(_Kadj)
-  @turbo for k₁ ∈ axes(Kadj, 1),
+  @turbo warn_check_args = false for k₁ ∈ axes(Kadj, 1),
     k₂ ∈ axes(Kadj, 2),
     k₃ ∈ axes(Kadj, 3),
     i ∈ axes(Kadj, 4),
@@ -552,7 +569,7 @@ function convlayeradjA!(
   I0 = static_size(Aadj, static(1))
   K0, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
-  @turbo for j0 = 0:I0-1, i = 0:K2-1
+  @turbo warn_check_args = false for j0 = 0:I0-1, i = 0:K2-1
     s = zero(T)
     for k0 = 0:K0-1, o = 0:K3-1
       ib0 = (j0 - k0 >= 0) & (j0 - k0 < J0)
@@ -574,7 +591,7 @@ function convlayeradjA!(
   K0, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
   for d = 0:I3-1
-    @turbo for j0 = 0:I0-1, i = 0:K2-1
+    @turbo warn_check_args = false for j0 = 0:I0-1, i = 0:K2-1
       s = zero(T)
       for k0 = 0:K0-1, o = 0:K3-1
         ib0 = (j0 - k0 >= 0) & (j0 - k0 < J0)
@@ -597,7 +614,7 @@ function convlayeradjA!(
   K0, K1, K2, K3 = static_size(K)
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
-  @turbo for j0 = 0:I0-1, j1 = 0:I1-1, i = 0:K2-1
+  @turbo warn_check_args = false for j0 = 0:I0-1, j1 = 0:I1-1, i = 0:K2-1
     s = zero(T)
     for k0 = 0:K0-1, k1 = 0:K1-1, o = 0:K3-1
       ib0 = (j0 - k0 >= 0) & (j0 - k0 < J0)
@@ -621,7 +638,10 @@ function convlayeradjA!(
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
   for d = 0:I3-1
-    @turbo unroll = (2, 1) for j0 = 0:I0-1, j1 = 0:I1-1, i = 0:K2-1
+    @turbo warn_check_args = false unroll = (2, 1) for j0 = 0:I0-1,
+      j1 = 0:I1-1,
+      i = 0:K2-1
+
       s = zero(T)
       for k0 = 0:K0-1, k1 = 0:K1-1, o = 0:K3-1
         ib0 = (j0 - k0 >= 0) & (j0 - k0 < J0)
@@ -679,7 +699,11 @@ function convlayeradjA!(
   J0 = I0 - K0 + static(1)
   J1 = I1 - K1 + static(1)
   J2 = I2 - K2 + static(1)
-  @turbo for j0 = 0:I0-1, j1 = 0:I1-1, j2 = 0:I2-1, i = 0:K3-1
+  @turbo warn_check_args = false for j0 = 0:I0-1,
+    j1 = 0:I1-1,
+    j2 = 0:I2-1,
+    i = 0:K3-1
+
     s = zero(T)
     for k0 = 0:K0-1, k1 = 0:K1-1, k2 = 0:K2-1, o = 0:K4-1
       ib0 = (j0 - k0 >= 0) & (j0 - k0 < J0)
@@ -705,7 +729,11 @@ function convlayeradjA!(
   J1 = I1 - K1 + static(1)
   J2 = I2 - K2 + static(1)
   for d = 0:I4-1
-    @turbo for j0 = 0:I0-1, j1 = 0:I1-1, j2 = 0:I2-1, i = 0:K3-1
+    @turbo warn_check_args = false for j0 = 0:I0-1,
+      j1 = 0:I1-1,
+      j2 = 0:I2-1,
+      i = 0:K3-1
+
       s = zero(T)
       for k0 = 0:K0-1, k1 = 0:K1-1, k2 = 0:K2-1, o = 0:K4-1
         ib0 = (j0 - k0 >= 0) & (j0 - k0 < J0)
@@ -840,7 +868,7 @@ end
 function init_params!(c::Conv, p, inputdim, rng::AbstractRNG)
   (K, b), p2 = getparams(c, p, inputdim)
   glorot_uniform!(K, rng)
-  @turbo for i in eachindex(b)
+  @turbo warn_check_args = false for i in eachindex(b)
     b[i] = 0
   end
   return p2, getoutputdim(c, inputdim)
@@ -977,33 +1005,16 @@ function valgrad_layer!(
     Ptr{UInt8}(pu3)
   )
 end
-function pullback!(
-  pg::Ptr{T},
+function pullback_arg!(
   c::Conv,
   C̄,
   A,
   p::Ptr{T},
-  pu::Ptr{UInt8},
+  ::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
-  _pullback!(pg, c, C̄, A, p, pu)
-  return A, pu2
-end
-function _pullback!(
-  pg::Ptr{T},
-  c::Conv,
-  C̄,
-  A,
-  p::Ptr{T},
-  pu::Ptr{UInt8}
-) where {T}
-  _pullback_param!(pg, c, C̄, A, pu)
-  _pullback_A!(c, C̄, A, p)
-  return
-end
-function _pullback_A!(c::Conv, C̄, A, p::Ptr{T}) where {T}
   convlayeradjA!(A, first(first(getparams(c, p, static_size(A)))), C̄) # overwrite A
-  return
+  return A, pu2
 end
 function pullback_param!(
   pg::Ptr{T},
@@ -1013,9 +1024,6 @@ function pullback_param!(
   ::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T}
-  _pullback_param!(pg, c, C̄, A, pu)
-end
-function _pullback_param!(pg::Ptr{T}, c::Conv, C̄, A, pu::Ptr{UInt8}) where {T}
   ∂C = first(get∂C(c.f, static_size(C̄), Ptr{T}(pu)))
   update_C̄!(c.f, C̄, ∂C)
   (gK, gb), _ = getparams(c, pg, static_size(A))
