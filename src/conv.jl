@@ -953,17 +953,19 @@ function valgrad_layer!(
   )
 end
 function chain_valgrad_entry!(
-  pg,
+  pga,
+  pg::Ptr,
   arg,
   layers::Tuple{Conv,X,Vararg},
-  inds,
+  inds::AbstractVector{<:Integer},
   p::Ptr,
   pu::Ptr{UInt8}
 ) where {X}
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, inds, p, pu)
-  val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+  val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
   pullback_param!(pg, l, grad, arg, p, pu)
+  pga === nothing || pullback_arg!(pga, l, grad, arg, p, pu, pu3)
   return val
 end
 
@@ -1006,6 +1008,7 @@ function valgrad_layer!(
   )
 end
 function pullback_arg!(
+  Āptr::Ptr,
   c::Conv,
   C̄,
   A,
@@ -1013,9 +1016,11 @@ function pullback_arg!(
   ::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
-  convlayeradjA!(A, first(first(getparams(c, p, static_size(A)))), C̄) # overwrite A
-  return A, pu2
+  Ā = PtrArray(Āptr, static_size(A))
+  convlayeradjA!(Ā, first(first(getparams(c, p, static_size(Ā)))), C̄) # overwrite A
+  return Ā, pu2
 end
+
 function pullback_param!(
   pg::Ptr{T},
   c::Conv,

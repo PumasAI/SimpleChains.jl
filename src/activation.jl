@@ -124,6 +124,18 @@ function pullback_arg!(
 ) where {T}
   C̄, pu2
 end
+function pullback_arg!(
+  C̄ptr::Ptr,
+  ::Activation{typeof(identity)},
+  B̄,
+  __,
+  ::Ptr{T},
+  ::Ptr{UInt8},
+  pu2::Ptr{UInt8}
+) where {T}
+  C̄ = PtrArray(C̄ptr, static_size(B̄))
+  copyto!(C̄, B̄), pu2
+end
 
 fast_fuse(::typeof(relu)) = True()
 fast_fuse(::typeof(abs)) = True()

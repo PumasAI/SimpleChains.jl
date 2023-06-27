@@ -29,6 +29,7 @@ struct SimpleChain{I<:InputDim,L<:Tuple}
   inputdim::I
   layers::L
 end
+
 """
     AbstractPenalty
 
@@ -521,6 +522,14 @@ end
 end
 
 """
+    valgrad!(g, c::SimpleChain, arg, params)
+
+`g` can be either an `AbstractVector` with the same size as `params`, or a `Tuple{A,G}`.
+If `g` is a tuple, the first element is the gradient with respect to `arg`, and should
+either be `nothing` (for not taking this gradient) or have the same `size` as arg.
+The second element is the gradient with respect to `params`, and should likewise either be
+`nothing` or have the same size as `params`.
+
 Allowed destruction:
 
     valgrad_layer!
@@ -540,6 +549,8 @@ function valgrad!(memory::Ptr{UInt8}, g, c::SimpleChain, arg, params)
   parg = maybe_static_size_arg(c.inputdim, arg)
   GC.@preserve arg unsafe_valgrad!(c, memory, g, params, parg)
 end
+_ptr(x::AbstractArray) = pointer(x)
+_ptr(::Nothing) = nothing
 function valgrad!(
   g,
   c::SimpleChain,
@@ -561,8 +572,25 @@ end
 
 function unsafe_valgrad!(c::Chain, pu::Ptr{UInt8}, g, params, arg)
   @unpack layers = c
-  GC.@preserve g params begin
-    chain_valgrad_entry!(pointer(g), arg, layers, pointer(params), pu)
+  if g isa Tuple
+    ga, gp = g
+    ga === nothing && return unsafe_valgrad!(c, pu, gp, params, arg)
+    @assert size(ga) == size(arg) && size(gp) == size(params)
+    pga = pointer(ga)
+    GC.@preserve ga gp params begin
+      chain_valgrad_entry!(pga, _ptr(gp), arg, layers, pointer(params), pu)
+    end
+  else
+    GC.@preserve g params begin
+      chain_valgrad_entry!(
+        nothing,
+        pointer(g),
+        arg,
+        layers,
+        pointer(params),
+        pu
+      )
+    end
   end
 end
 # fallback valgrad_layer for functions not implementing fusion w/ indexing
@@ -588,9 +616,23 @@ function subset_batch(Xp::AbstractArray{T,N}, perm, pu) where {T,N}
   Xtmp, pu
 end
 
+"""
+    pullback_arg!(dest, layer, C̄, A, p, pu, pu2)
+
+Computes the pullback of `layer` with respect to `A` and `C̄`, storing the result in `dest`.
+
+    pullback_arg!(layer, C̄, A, p, pu, pu2)
+
+Computes the pullback of `layer` with respect to `A` and `C̄`, storing the result in `A`.
+"""
+function pullback_arg!(layer, C̄, A, p, pu, pu2)
+  # default impl forwards to `pullback_arg!` with `dest = A`
+  pullback_arg!(pointer(A), layer, C̄, A, p, pu, pu2)
+end
+
 # if pullback_param and pullback_arg can be implemented more efficiently
 # together, `pullback!` can be overloaded. Otherwise, it will
-# be default call `pullback_param!` and then `pullback_arg!`.
+# by default call `pullback_param!` and then `pullback_arg!`.
 # `pullback_arg!` should return `B̄` and `pu2`.
 function pullback!(
   pg::Ptr{T},
@@ -615,32 +657,36 @@ end
 end
 
 function chain_valgrad_entry!(
-  pg,
+  pga,
+  pgp::Ptr,
   arg,
   layers::Tuple{X1,X2,Vararg},
   p1::Ptr,
   pu::Ptr{UInt8}
 ) where {X1,X2}
   l = getfield(layers, 1)
-  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, p1, pu)
+  pg2, larg, p2, pu2 = valgrad_layer!(pgp, l, arg, p1, pu)
   if parameter_free(l)
-    val = chain_valgrad_entry!(pg2, larg, Base.tail(layers), p2, pu2)
+    val = chain_valgrad_entry!(nothing, pg2, larg, Base.tail(layers), p2, pu2)
+    pu3 = pu2   # to be valid, we need pullback_arg! to never read from this pointer
   else
-    val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-    pullback_param!(pg, l, grad, arg, p1, pu)
+    val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+    pullback_param!(pgp, l, grad, arg, p1, pu)
   end
+  pga === nothing || pullback_arg!(pga, l, grad, arg, p1, pu, pu3)
   return val
 end
 function chain_valgrad_entry!(
-  pg,
+  pga,
+  pgp::Ptr,
   arg,
   layers::Tuple{X1,X2,Vararg},
-  inds,
+  inds::AbstractVector{<:Integer},
   p::Ptr,
   pu::Ptr{UInt8}
 ) where {X1,X2}
   arg_subset, pu = subset_batch(arg, inds, pu)
-  chain_valgrad_entry!(pg, arg_subset, layers, p, pu)
+  chain_valgrad_entry!(pga, pgp, arg_subset, layers, p, pu)
 end
 
 @static if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)

@@ -24,6 +24,24 @@ function pullback_layer!(pbl::PullBackLayer, lgrad)
 end
 pullback_layer!(pbl::Ptr{UInt8}, grad) = grad, pbl
 
+function pullback_layer!(x, pbl::PullBackLayer, x̄)
+  grad, pu3 = pullback_layer!(pbl.pbl, lgrad)
+  pullback_param!(pbl.pg, pbl.l, grad, pbl.arg, pbl.p, pbl.pu)
+  pullback_arg!(x̄, pbl.pg, pbl.l, grad, pbl.arg, pbl.p, pbl.pu, pu3)
+end
+
+# TODO: delete this method? (unused)
+function alloc_return_B_dense(
+  B::AbstractArray{T},
+  pu::Ptr{UInt8},
+  input_dim
+) where {T}
+  si = bytestrideindex(B)
+  sp = stridedpointer(reinterpret(Ptr{T}, pu), si)
+  B̄ = PtrArray(sp, (input_dim, static_size(B, static(2))), val_dense_dims(B))
+  B̄, pu + align(length(B̄) * sizeof(T))
+end
+
 #TODO: add support for not getting gradient with respect to input `x`
 # struct PullBackParam{T,L,A,PBL}
 #   pg::Ptr{T}
@@ -130,8 +148,12 @@ function valgrad_noloss(
   goff = align(glen * static_sizeof(T))
   aoff = align(arglen * static_sizeof(S))
 
-  num_bytes =
-    required_bytes(Val{promote_type(T, S)}(), layers, static_size(parg), aoff + goff)
+  num_bytes = required_bytes(
+    Val{promote_type(T, S)}(),
+    layers,
+    static_size(parg),
+    aoff + goff
+  )
   memory = get_heap_memory(sc, num_bytes)
 
   GC.@preserve barg params memory begin
@@ -164,7 +186,7 @@ function (ep::ElementwisePullback)(l̄)
       g[i] *= l̄
     end
   end
-  # assumes no grad w/ respect to arg
+  # FIXME: assumes no grad w/ respect to arg
   NoTangent(), NoTangent(), g
 end
 # Loss: call `valgrad`.

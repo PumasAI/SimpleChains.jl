@@ -72,7 +72,14 @@ function update!(
   optbuffer,
   _
 ) where {T,N}
-  GC.@preserve g p chain_valgrad_entry!(pointer(g), Xp, layers, pointer(p), pm)
+  GC.@preserve g p chain_valgrad_entry!(
+    nothing,
+    pointer(g),
+    Xp,
+    layers,
+    pointer(p),
+    pm
+  )
   apply_penalty!(g, pen, p, sx)
   gmul = loss_multiplier(last(layers), static_size(Xp, static(N)), T)
   update!(opt, optbuffer, p, g, gmul)
@@ -97,6 +104,7 @@ function chain_valgrad_thread!((g, Xp, layers, p, pm, mpt), start, stop)
   # newlayers = (Base.front(layers)..., last(layers)[f:l])
   GC.@preserve tgtpb Xpb begin
     chain_valgrad_entry!(
+      nothing,
       pointer(g) + goff,
       PtrArray(Xpv),
       newlayers,
@@ -202,6 +210,7 @@ function shuffle_chain_valgrad_thread!(
     (lastdim,)
   )
   chain_valgrad_entry!(
+    nothing,
     pointer(g) + goff,
     Xp,
     newlayers,

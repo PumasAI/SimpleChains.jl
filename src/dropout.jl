@@ -140,5 +140,24 @@ function pullback_arg!(
   end
   C̄, pu2# returns `pu2` because we don't know where `C̄` was allocated
 end
+function pullback_arg!(
+  Āptr::Ptr,
+  ::Dropout,
+  C̄,
+  B,
+  ::Ptr{T},
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8}
+) where {T}
+  N = static_length(C̄)
+  si = StrideIndex{1,(1,),1}((StaticInt(1),), (StaticInt(1),))
+  m =
+    PtrArray(stridedpointer(reinterpret(Ptr{Bit}, pu), si), (N,), Val((true,)))
+  Ā = PtrArray(Āptr, static_size(C̄))
+  @turbo for n ∈ eachindex(m)
+    Ā[n] = m[n] ? C̄[n] : zero(C̄[n])
+  end
+  Ā, pu2# returns `pu2` because we don't know where `Ā` was allocated
+end
 
 isstochastic(::Dropout) = true

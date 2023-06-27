@@ -68,3 +68,15 @@ function pullback_arg!(
 )
   return reshape(B̄, static_size(A)), pu2
 end
+function pullback_arg!(
+  C̄ptr::Ptr,
+  ::Flatten,
+  B̄,
+  A,
+  p::Ptr,
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8}
+)
+  C̄ = PtrArray(C̄ptr, static_size(B̄))
+  return reshape(copyto!(C̄, B̄), static_size(A)), pu2
+end
