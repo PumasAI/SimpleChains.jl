@@ -101,7 +101,8 @@ if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
     forward_output_size,
     _numparam,
     pullback_layer!,
-    contract!
+    contract!,
+    _init_params!
   )
     for m in methods(f)
       m.recursion_relation = dont_limit

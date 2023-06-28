@@ -1,5 +1,5 @@
 using SimpleChains
-using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
+using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random, JET
 
 countallocations!(g, sc, x, p) = @allocated valgrad!(g, sc, x, p)
 dual(x::T) where {T} = ForwardDiff.Dual(x, 4randn(T), 4randn(T), 4randn(T))
@@ -97,6 +97,10 @@ InteractiveUtils.versioninfo(; verbose = true)
       gx0 = similar(x);
       gx1 = similar(x);
       let ret = scflp(x, p)
+        JET.@test_opt valgrad!(g, scflp, x, p)
+        JET.@test_opt valgrad!((gx0, g1), scflp, x, p)
+        JET.@test_opt valgrad!((nothing, g3), scflp, x, p)
+        JET.@test_opt valgrad!((gx1, nothing), scflp, x, p)
         @test ret ≈ valgrad!(g, scflp, x, p)
         @test ret ≈ valgrad!((gx0, g1), scflp, x, p)
         @test ret ≈ valgrad!((nothing, g3), scflp, x, p)
