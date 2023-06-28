@@ -1,7 +1,7 @@
 using SimpleChains
 using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
 @static if VERSION >= v"1.9"
-  using JET
+  using JET: @test_opt
 else
   macro test_opt(ex)
     ex
@@ -104,10 +104,10 @@ InteractiveUtils.versioninfo(; verbose = true)
       gx0 = similar(x)
       gx1 = similar(x)
       let ret = scflp(x, p)
-        JET.@test_opt valgrad!(g, scflp, x, p)
-        JET.@test_opt valgrad!((gx0, g1), scflp, x, p)
-        JET.@test_opt valgrad!((nothing, g3), scflp, x, p)
-        JET.@test_opt valgrad!((gx1, nothing), scflp, x, p)
+        @test_opt valgrad!(g, scflp, x, p)
+        @test_opt valgrad!((gx0, g1), scflp, x, p)
+        @test_opt valgrad!((nothing, g3), scflp, x, p)
+        @test_opt valgrad!((gx1, nothing), scflp, x, p)
         @test ret ≈ valgrad!(g, scflp, x, p)
         @test ret ≈ valgrad!((gx0, g1), scflp, x, p)
         @test ret ≈ valgrad!((nothing, g3), scflp, x, p)
