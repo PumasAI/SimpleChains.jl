@@ -1,5 +1,12 @@
 using SimpleChains
-using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random, JET
+using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
+@static if VERSION >= v"1.9"
+  using JET
+else
+  macro test_opt(ex)
+    ex
+  end
+end
 
 countallocations!(g, sc, x, p) = @allocated valgrad!(g, sc, x, p)
 dual(x::T) where {T} = ForwardDiff.Dual(x, 4randn(T), 4randn(T), 4randn(T))
@@ -92,10 +99,10 @@ InteractiveUtils.versioninfo(; verbose = true)
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
       end
-      g1 = similar(g);
-      g3 = similar(g);
-      gx0 = similar(x);
-      gx1 = similar(x);
+      g1 = similar(g)
+      g3 = similar(g)
+      gx0 = similar(x)
+      gx1 = similar(x)
       let ret = scflp(x, p)
         JET.@test_opt valgrad!(g, scflp, x, p)
         JET.@test_opt valgrad!((gx0, g1), scflp, x, p)
@@ -141,9 +148,9 @@ InteractiveUtils.versioninfo(; verbose = true)
         2.3 * (sum(abs2, A1) + sum(abs2, b1)) +
         0.45 * (sum(abs, A2) + sum(abs, b2))
       end
-      gfd = ForwardDiff.gradient(p -> f(x,p,y.data), p)
+      gfd = ForwardDiff.gradient(p -> f(x, p, y.data), p)
       @test g ≈ gfd ≈ g1 ≈ g3
-      gxfd = ForwardDiff.gradient(x -> f(x,p,y.data), x)
+      gxfd = ForwardDiff.gradient(x -> f(x, p, y.data), x)
       @test gxfd ≈ gx0 ≈ gx1
       scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
       @test_throws ArgumentError SimpleChains.init_params(scd, T)
