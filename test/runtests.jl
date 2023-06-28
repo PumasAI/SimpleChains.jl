@@ -92,8 +92,17 @@ InteractiveUtils.versioninfo(; verbose = true)
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
         @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
       end
-      @test scflp(x, p) ≈ valgrad!(g, scflp, x, p)
-      @test g == only(Zygote.gradient(Base.Fix1(scflp, x), p))
+      g1 = similar(g);
+      g3 = similar(g);
+      gx0 = similar(x);
+      gx1 = similar(x);
+      let ret = scflp(x, p)
+        @test ret ≈ valgrad!(g, scflp, x, p)
+        @test ret ≈ valgrad!((gx0, g1), scflp, x, p)
+        @test ret ≈ valgrad!((nothing, g3), scflp, x, p)
+        @test ret ≈ valgrad!((gx1, nothing), scflp, x, p)
+      end
+      @test g == only(Zygote.gradient(Base.Fix1(scflp, x), p)) == g1 == g3
       # 0.5 and .*= 2.0 is to test !isone path in ElementwisePullback
       @test ((ChainRules.rrule(scflp, x, p)[2](0.5)[3]) .*= 2.0) ≈ g
       _gzyg = Zygote.gradient(p) do p
@@ -104,7 +113,7 @@ InteractiveUtils.versioninfo(; verbose = true)
       @test sc(x, p) ≈ valgrad!(g2, sc, x, p)
       @test g2 ≈ gzyg
 
-      gfd = ForwardDiff.gradient(p) do p
+      function f(x, p, y)
         off = 8 * 24
         A1 = reshape(view(p, 1:off), (8, 24))
         off_old = off
@@ -121,14 +130,17 @@ InteractiveUtils.versioninfo(; verbose = true)
         b2 = view(p, 1+off_old:off)
         l2 = (A2 * l1 .+ b2)
 
-        l = mapreduce(+, vec(l2), y.data) do xi, yi
+        l = mapreduce(+, vec(l2), y) do xi, yi
           abs2(xi - yi)
         end / 2 #/size(x)[end]
         l +
         2.3 * (sum(abs2, A1) + sum(abs2, b1)) +
         0.45 * (sum(abs, A2) + sum(abs, b2))
       end
-      @test g ≈ gfd
+      gfd = ForwardDiff.gradient(p -> f(x,p,y.data), p)
+      @test g ≈ gfd ≈ g1 ≈ g3
+      gxfd = ForwardDiff.gradient(x -> f(x,p,y.data), x)
+      @test gxfd ≈ gx0 ≈ gx1
       scd = SimpleChains.add_loss(scdbase, SquaredLoss(y))
       @test_throws ArgumentError SimpleChains.init_params(scd, T)
       @test length(SimpleChains.init_params(scd, size(x), T)) == length(p)

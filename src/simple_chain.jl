@@ -557,6 +557,7 @@ function valgrad!(
   arg::AbstractArray{T0},
   params::AbstractVector{T1}
 ) where {T0,T1}
+  g === (nothing, nothing) && return c(arg, params)
   verify_arg(c, arg)
   @assert has_loss(c)
   @unpack layers = c
@@ -570,29 +571,39 @@ function valgrad!(
   GC.@preserve arg with_memory(unsafe_valgrad!, c, num_bytes, g, params, parg)
 end
 
-function unsafe_valgrad!(c::Chain, pu::Ptr{UInt8}, g, params, arg)
+function unsafe_valgrad!(
+  c::Chain,
+  pu::Ptr{UInt8},
+  g::AbstractArray,
+  params,
+  arg
+)
   @unpack layers = c
-  if g isa Tuple
-    ga, gp = g
-    ga === nothing && return unsafe_valgrad!(c, pu, gp, params, arg)
-    @assert size(ga) == size(arg) && size(gp) == size(params)
-    pga = pointer(ga)
-    GC.@preserve ga gp params begin
-      chain_valgrad_entry!(pga, _ptr(gp), arg, layers, pointer(params), pu)
-    end
-  else
-    GC.@preserve g params begin
-      chain_valgrad_entry!(
-        nothing,
-        pointer(g),
-        arg,
-        layers,
-        pointer(params),
-        pu
-      )
-    end
+  GC.@preserve g params begin
+    chain_valgrad_entry!(nothing, pointer(g), arg, layers, pointer(params), pu)
   end
 end
+function unsafe_valgrad!(
+  c::Chain,
+  pu::Ptr{UInt8},
+  g::Tuple{GA,GP},
+  params,
+  arg
+) where {GA,GP}
+  @unpack layers = c
+  ga, gp = g
+  ga === nothing && return unsafe_valgrad!(c, pu, gp, params, arg)
+  if gp === nothing
+    @assert size(ga) == size(arg)
+  else
+    @assert size(ga) == size(arg) && size(gp) == size(params)
+  end
+  pga = pointer(ga)
+  GC.@preserve ga gp params begin
+    chain_valgrad_entry!(pga, _ptr(gp), arg, layers, pointer(params), pu)
+  end
+end
+
 # fallback valgrad_layer for functions not implementing fusion w/ indexing
 
 function subset_batch(Xp::AbstractArray{T,N}, perm, pu) where {T,N}
@@ -635,7 +646,7 @@ end
 # by default call `pullback_param!` and then `pullback_arg!`.
 # `pullback_arg!` should return `B̄` and `pu2`.
 function pullback!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   layer, # layer
   C̄::PtrArray,
   B::PtrArray,
@@ -643,13 +654,18 @@ function pullback!(
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
-  # Start with 4-arg `pulback!` to update `∂C`
-  parameter_free(layer) || pullback_param!(pg, layer, C̄, B, p, pu) # Ā = C̄ * B'
+  pu = pullback_common!(pg, layer, C̄, B, p, pu)::Ptr{UInt8} # update `∂C`
+  if !(parameter_free(layer) || pg === nothing)
+    pullback_param!(pg, layer, C̄, B, p, pu) # Ā = C̄ * B'
+  end
   pullback_arg!(layer, C̄, B, p, pu, pu2) # B̄ = A' * C̄
 end
 function pullback!(pg, layer, C̄, B, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
   @gc_preserve pullback!(pg, layer, C̄, B, p, pu, pu2)
 end
+@nospecialize
+pullback_common!(_, _, _, _, _, pu::Ptr{UInt8}) = pu
+@specialize
 # fallback, only valid for layers without parameters!
 @inline function pullback_param!(::Ptr, layer, _, __, ::Ptr, ::Ptr{UInt8})
   @assert parameter_free(layer)
@@ -658,27 +674,7 @@ end
 
 function chain_valgrad_entry!(
   pga,
-  pgp::Ptr,
-  arg,
-  layers::Tuple{X1,X2,Vararg},
-  p1::Ptr,
-  pu::Ptr{UInt8}
-) where {X1,X2}
-  l = getfield(layers, 1)
-  pg2, larg, p2, pu2 = valgrad_layer!(pgp, l, arg, p1, pu)
-  if parameter_free(l)
-    val = chain_valgrad_entry!(nothing, pg2, larg, Base.tail(layers), p2, pu2)
-    pu3 = pu2   # to be valid, we need pullback_arg! to never read from this pointer
-  else
-    val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-    pullback_param!(pgp, l, grad, arg, p1, pu)
-  end
-  pga === nothing || pullback_arg!(pga, l, grad, arg, p1, pu, pu3)
-  return val
-end
-function chain_valgrad_entry!(
-  pga,
-  pgp::Ptr,
+  pgp,
   arg,
   layers::Tuple{X1,X2,Vararg},
   inds::AbstractVector{<:Integer},
@@ -687,6 +683,23 @@ function chain_valgrad_entry!(
 ) where {X1,X2}
   arg_subset, pu = subset_batch(arg, inds, pu)
   chain_valgrad_entry!(pga, pgp, arg_subset, layers, p, pu)
+end
+function chain_valgrad_entry!(
+  pga,
+  pgp::Union{Ptr,Nothing},
+  arg,
+  layers::Tuple{X1,X2,Vararg},
+  p1::Ptr,
+  pu::Ptr{UInt8}
+) where {X1,X2}
+  l = getfield(layers, 1)
+  pg2, larg, p2, pu2 = valgrad_layer!(pgp, l, arg, p1, pu)
+  val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+  @assert !((pgp === nothing) && (pga === nothing))
+  pu = pullback_common!(pgp, l, grad, arg, p1, pu)::Ptr{UInt8}
+  pgp === nothing || pullback_param!(pgp, l, grad, arg, p1, pu)
+  pga === nothing || pullback_arg!(pga, l, grad, arg, p1, pu, pu3)
+  return val
 end
 
 @static if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)

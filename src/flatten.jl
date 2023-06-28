@@ -54,7 +54,13 @@ end
 ) where {N}
   Flatten{N}()(A), p, pu
 end
-function valgrad_layer!(pg::Ptr, ::Flatten{N}, A, p, pu) where {N}
+function valgrad_layer!(
+  pg::Union{Nothing,Ptr},
+  ::Flatten{N},
+  A,
+  p,
+  pu
+) where {N}
   B, p, pu = Flatten{N}()(A, p, pu)
   return pg, B, p, pu
 end

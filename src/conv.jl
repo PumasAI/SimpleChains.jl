@@ -913,7 +913,7 @@ function (c::Conv)(
 end
 
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   c::Conv{typeof(identity)},
   A,
   inds,
@@ -925,10 +925,10 @@ function valgrad_layer!(
   R, pu3 = alloc_return(outputdim, Ptr{T}(pu))
   (K, b), p2 = getparams(c, p, sz)
   convlayer!(identity, R, A, K, b, inds)
-  pg + (length(K) + length(b)) * sizeof(T), R, p2, Ptr{UInt8}(pu3)
+  _add(pg, (length(K) + length(b))), R, p2, Ptr{UInt8}(pu3)
 end
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   c::Conv,
   A,
   inds,
@@ -945,7 +945,7 @@ function valgrad_layer!(
   _valgrad_layer!(
     ∂C,
     C,
-    pg + (length(K) + length(b)) * sizeof(T),
+    _add(pg, (length(K) + length(b))),
     unfused_fun(c),
     C,
     p2,
@@ -964,13 +964,14 @@ function chain_valgrad_entry!(
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, inds, p, pu)
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+  pu = pullback_common!(pg, l, grad, arg, p, pu)::Ptr{UInt8}
   pullback_param!(pg, l, grad, arg, p, pu)
   pga === nothing || pullback_arg!(pga, l, grad, arg, p, pu, pu3)
   return val
 end
 
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   c::Conv{typeof(identity)},
   A,
   p::Ptr{T},
@@ -981,10 +982,10 @@ function valgrad_layer!(
   R, pu3 = alloc_return(outputdim, Ptr{T}(pu))
   (K, b), p2 = getparams(c, p, sz)
   convlayer!(identity, R, A, K, b)
-  pg + (length(K) + length(b)) * sizeof(T), R, p2, Ptr{UInt8}(pu3)
+  _add(pg, (length(K) + length(b))), R, p2, Ptr{UInt8}(pu3)
 end
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   c::Conv,
   A,
   p::Ptr{T},
@@ -1000,7 +1001,7 @@ function valgrad_layer!(
   _valgrad_layer!(
     ∂C,
     C,
-    pg + (length(K) + length(b)) * sizeof(T),
+    _add(pg, (length(K) + length(b))),
     unfused_fun(c),
     C,
     p2,
@@ -1020,7 +1021,18 @@ function pullback_arg!(
   convlayeradjA!(Ā, first(first(getparams(c, p, static_size(Ā)))), C̄) # overwrite A
   return Ā, pu2
 end
-
+function pullback_common!(
+  ::Union{Nothing,Ptr{T}},
+  c::Conv,
+  C̄,
+  _,
+  ::Ptr{T},
+  pu::Ptr{UInt8}
+) where {T}
+  ∂C = first(get∂C(c.f, static_size(C̄), Ptr{T}(pu)))
+  update_C̄!(c.f, C̄, ∂C)
+  return pu
+end
 function pullback_param!(
   pg::Ptr{T},
   c::Conv,
@@ -1029,8 +1041,6 @@ function pullback_param!(
   ::Ptr{T},
   pu::Ptr{UInt8}
 ) where {T}
-  ∂C = first(get∂C(c.f, static_size(C̄), Ptr{T}(pu)))
-  update_C̄!(c.f, C̄, ∂C)
   (gK, gb), _ = getparams(c, pg, static_size(A))
   convlayeradjK!(gK, gb, A, C̄)
   return

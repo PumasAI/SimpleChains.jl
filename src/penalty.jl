@@ -6,10 +6,9 @@ function (Λ::AbstractPenalty{<:SimpleChain})(arg, params)
   )
 end
 function valgrad!(g, Λ::AbstractPenalty{<:SimpleChain}, arg, params)
-  Base.FastMath.add_fast(
-    valgrad!(g, getchain(Λ), arg, params),
-    apply_penalty!(g, Λ, params, static_size(arg))
-  )
+  loss = @gc_preserve valgrad!(g, getchain(Λ), arg, params)
+  pen = @gc_preserve apply_penalty!(g, Λ, params, static_size(arg))
+  Base.FastMath.add_fast(loss, pen)
 end
 
 _penalty_applied_to_sc(_::IO, ::Nothing) = nothing
@@ -39,7 +38,6 @@ Base.front(Λ::AbstractPenalty) = Base.front(getchain(Λ))
 numparam(Λ::AbstractPenalty, id = nothing) = numparam(getchain(Λ), id)
 
 remove_loss(Λ::AbstractPenalty) = remove_loss(getchain(Λ))
-_type_sym(c::Chain) = __type_sym(remove_loss(c))
 
 function init_params(
   Λ::AbstractPenalty,
@@ -217,7 +215,7 @@ end
   )
 end
 @inline function apply_penalty!(
-  grad,
+  grad::AbstractVector,
   Λ::FrontLastPenalty{<:SimpleChain},
   param,
   id
@@ -233,3 +231,9 @@ end
 
 params(sc::AbstractPenalty, p::AbstractVector, inputdim = nothing) =
   params(getchain(sc), p, inputdim)
+
+@inline function apply_penalty!(grad::Tuple{GA,GP}, Λ, param, id) where {GA,GP}
+  gp = grad[2]
+  gp === nothing && return apply_penalty(Λ, param, id)
+  return apply_penalty!(gp, Λ, param, id)
+end

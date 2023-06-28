@@ -870,13 +870,15 @@ function chain_valgrad_entry!(
   l = getfield(layers, 1)
   pg2, larg, p2, pu2 = valgrad_layer!(pgp, l, arg, inds, p, pu)
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+  pu = pullback_common!(pgp, l, grad, arg, p, pu)::Ptr{UInt8}
   pullback_param!(pgp, l, grad, arg, p, pu)
   pga === nothing || pullback_arg!(pga, l, grad, arg, p, pu, pu3)
   return val
 end
-
+@inline _add(::Nothing, ::Int) = nothing
+@inline _add(p::Ptr{T}, i::Int) where {T} = p + i * sizeof(T)
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   td::TurboDense{O},
   B,
   p::Ptr{T},
@@ -901,8 +903,8 @@ function valgrad_layer!(
   A, p2 = getparams(td, p, input_dim)
   f = td.f
   dense!(f, ∂C, C, A, B, static(O))
-  # doesn'tneed a pullback
-  pg + length(A) * sizeof(T), C, p2, pu3
+  # doesn't need a pullback
+  _add(pg, length(A)), C, p2, pu3
 end
 function pullback_arg!(
   B̄ptr::Ptr,
@@ -932,6 +934,20 @@ update_C̄!(::typeof(identity), _, __) = nothing #=∂C=#
 update_C̄!(::F, C̄, ∂C) where {F} = @turbo for i ∈ eachindex(∂C)
   C̄[i] *= ∂C[i]
 end
+function pullback_common!(
+  pg::Union{Nothing,Ptr{T}},
+  td::TurboDense{O},
+  C̄,
+  _,
+  ::Ptr{T},
+  pu::Ptr{UInt8}
+) where {T,O}
+  td.f === identity && return pu
+  # Ā = C̄ * B'
+  ∂C = first(get∂C(td, C̄, pu))
+  update_C̄!(td.f, C̄, ∂C)
+  return pu
+end
 function pullback_param!(
   pg::Ptr{T},
   td::TurboDense{O},
@@ -941,9 +957,7 @@ function pullback_param!(
   pu::Ptr{UInt8}
 ) where {T,O}
   # Ā = C̄ * B'
-  ∂C = first(get∂C(td, C̄, pu))
-  update_C̄!(td.f, C̄, ∂C)
-  Ā, __ = getparams(td, pg, static_size(B, StaticInt(1)))
+  Ā = first(getparams(td, pg, static_size(B, StaticInt(1))))
   dense_param_update!(td, Ā, C̄, B)
   return nothing
 end

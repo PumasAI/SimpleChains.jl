@@ -65,7 +65,7 @@ layer_output_size(::Val{T}, d::Dropout, s::Tuple) where {T} =
   align((prod(s) + static(7)) >>> static(3)), s
 
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   d::Dropout,
   x,
   p::Ptr{T},

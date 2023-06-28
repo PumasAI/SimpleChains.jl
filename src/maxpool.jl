@@ -192,9 +192,14 @@ function (::MaxPool{D})(A::AbstractArray{T}, p::Ptr, pu::Ptr{UInt8}) where {T,D}
   maxpool!(B, A, MaxPool{D}())
   B, p, pu + align(sizeof(T) * length(B))
 end
-function valgrad_layer!(pg::Ptr, ::MaxPool{D}, A, p, pu) where {D}
-  B, p, pu = MaxPool{D}()(A, p, pu)
-  return pg, B, p, pu
+function valgrad_layer!(
+  pg::Union{Nothing,Ptr},
+  ::MaxPool{D},
+  A,
+  p,
+  pu
+) where {D}
+  return pg, MaxPool{D}()(A, p, pu)...
 end
 function pullback_arg!(
   ::MaxPool{D},

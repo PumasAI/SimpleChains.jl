@@ -36,7 +36,7 @@ function call!(x::AbstractArray, a::Activation, p::Ptr, pu::Ptr{UInt8})
 end
 
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   a::Activation,
   x,
   p::Ptr{T},
@@ -51,7 +51,7 @@ end
 function _valgrad_layer!(
   ∂C,
   C,
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   a::Activation,
   x,
   p::Ptr{T},
@@ -79,6 +79,22 @@ function pullback_arg!(
   end
   C̄, pu2
 end
+function pullback_arg!(
+  C̄ptr::Ptr,
+  ::Activation,
+  B̄,
+  _,
+  ::Ptr{T},
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8}
+) where {T}
+  C̄ = PtrArray(C̄ptr, static_size(B̄))
+  ∂C = PtrArray(Ptr{T}(pu), static_size(C̄))
+  @turbo for i ∈ eachindex(∂C)
+    C̄[i] = B̄[i] * ∂C[i]
+  end
+  C̄, pu2
+end
 
 # specialization for identity
 function (::Activation{typeof(identity)})(
@@ -95,7 +111,7 @@ call!(
   pu::Ptr{UInt8}
 ) = x, p, pu
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   ::Activation{typeof(identity)},
   x,
   p::Ptr{T},
