@@ -4,7 +4,7 @@ using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
   using JET: @test_opt
 else
   macro test_opt(ex)
-    ex
+    nothing
   end
 end
 

@@ -83,14 +83,16 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
     SimpleChains.ADAM(3e-4),
     10
   )
-  @test_opt SimpleChains.train_batched!(
-    G,
-    p,
-    lenetloss,
-    xtrain4,
-    SimpleChains.ADAM(3e-4),
-    10
-  )
+  if VERSION >= v"1.10"
+    @test_opt SimpleChains.train_batched!(
+      G,
+      p,
+      lenetloss,
+      xtrain4,
+      SimpleChains.ADAM(3e-4),
+      10
+    )
+  end
   @test all(isfinite, p)
   @test all(isfinite, G)
   g = Matrix{eltype(G)}(undef, size(G, 1), 1)
