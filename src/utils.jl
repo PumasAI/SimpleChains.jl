@@ -220,8 +220,12 @@ function _alloc_grad(mem::Vector{T}, np, numthreads, x) where {T}
   StrideArray(_alloc_grad(align(pointer(mem)), np, numthreads, x), mem)
 end
 
-_numthreads() = min(Threads.nthreads(), convert(Int, num_cores())::Int)::Int
-
+if VERSION >= v"1.9"
+  _numthreads() =
+    min(Threads.nthreads(:default), convert(Int, num_cores())::Int)::Int
+else
+  _numthreads() = min(Threads.nthreads(), convert(Int, num_cores())::Int)::Int
+end
 """
     alloc_threaded_grad(chn, id = nothing, ::Type{T} = Float32; numthreads = min(Threads.nthreads(), SimpleChains.num_cores())
 
