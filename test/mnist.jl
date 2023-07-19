@@ -29,6 +29,7 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
   # initialize parameters
   @time p = SimpleChains.init_params(lenet; rng = SimpleChains.local_rng())
   @test all(isfinite, p)
+  @test_opt SimpleChains.init_params!(p, lenet)
 
   @testset "Cache Corrupting Results" begin
     g = similar(p)
@@ -40,6 +41,7 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
       lenentmem = SimpleChains.get_heap_memory(lenetloss, 0)
       lenentmem .= 0x00
       valgrad!(g, lenetloss, x, p)
+      @test_opt valgrad!(g, lenetloss, x, p)
       g2 = similar(g)
       lenentmem .= 0xff
       valgrad!(g2, lenetloss, x, p)
@@ -58,6 +60,15 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
     SimpleChains.ADAM(3e-4),
     10
   )
+  if VERSION >= v"1.10"
+    @test_opt SimpleChains.train_batched!(
+      p,
+      lenetloss,
+      xtrain4,
+      SimpleChains.ADAM(3e-4),
+      10
+    )
+  end
   @test all(isfinite, p)
   # @test all(isfinite, G)
   # assess training and test loss
@@ -74,6 +85,16 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
     SimpleChains.ADAM(3e-4),
     10
   )
+  if VERSION >= v"1.10"
+    @test_opt SimpleChains.train_batched!(
+      G,
+      p,
+      lenetloss,
+      xtrain4,
+      SimpleChains.ADAM(3e-4),
+      10
+    )
+  end
   @test all(isfinite, p)
   @test all(isfinite, G)
   g = Matrix{eltype(G)}(undef, size(G, 1), 1)

@@ -36,7 +36,7 @@ function call!(x::AbstractArray, a::Activation, p::Ptr, pu::Ptr{UInt8})
 end
 
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   a::Activation,
   x,
   p::Ptr{T},
@@ -51,7 +51,7 @@ end
 function _valgrad_layer!(
   ∂C,
   C,
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   a::Activation,
   x,
   p::Ptr{T},
@@ -65,18 +65,33 @@ function _valgrad_layer!(
 end
 @inline pullback_param!(__::Ptr, ::Activation, C̄, B, p::Ptr, pu::Ptr{UInt8}) =
   nothing
-function pullback!(
-  __::Ptr{T},
-  a::Activation,
+function pullback_arg!(
+  ::Activation,
   C̄,
-  B,
-  p::Ptr{T},
+  _,
+  ::Ptr{T},
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
   ∂C = PtrArray(Ptr{T}(pu), static_size(C̄))
   @turbo for i ∈ eachindex(∂C)
     C̄[i] *= ∂C[i]
+  end
+  C̄, pu2
+end
+function pullback_arg!(
+  C̄ptr::Ptr,
+  ::Activation,
+  B̄,
+  _,
+  ::Ptr{T},
+  pu::Ptr{UInt8},
+  pu2::Ptr{UInt8}
+) where {T}
+  C̄ = PtrArray(C̄ptr, static_size(B̄))
+  ∂C = PtrArray(Ptr{T}(pu), static_size(C̄))
+  @turbo for i ∈ eachindex(∂C)
+    C̄[i] = B̄[i] * ∂C[i]
   end
   C̄, pu2
 end
@@ -96,7 +111,7 @@ call!(
   pu::Ptr{UInt8}
 ) = x, p, pu
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   ::Activation{typeof(identity)},
   x,
   p::Ptr{T},
@@ -115,16 +130,27 @@ function _valgrad_layer!(
 ) where {T}
   pg, x, p, pu
 end
-function pullback!(
-  __::Ptr{T},
+function pullback_arg!(
   ::Activation{typeof(identity)},
   C̄,
-  B,
-  p::Ptr{T},
-  pu::Ptr{UInt8},
+  _,
+  ::Ptr{T},
+  ::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T}
   C̄, pu2
+end
+function pullback_arg!(
+  C̄ptr::Ptr,
+  ::Activation{typeof(identity)},
+  B̄,
+  __,
+  ::Ptr{T},
+  ::Ptr{UInt8},
+  pu2::Ptr{UInt8}
+) where {T}
+  C̄ = PtrArray(C̄ptr, static_size(B̄))
+  copyto!(C̄, B̄), pu2
 end
 
 fast_fuse(::typeof(relu)) = True()

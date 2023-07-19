@@ -584,7 +584,6 @@ end
   end
 end
 
-#=
 @inline function dense!(
   f::F,
   _∂C::AbstractArray{T1,N},
@@ -592,7 +591,7 @@ end
   _A::AbstractMatrix,
   _B::AbstractArray{T3,N},
   inds::AbstractVector{<:Integer},
-  ::True,
+  ::True
 ) where {F,T1<:Base.HWReal,T2<:Base.HWReal,T3<:Base.HWReal,N}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
@@ -600,7 +599,7 @@ end
   B = zero_offsets(_B)
   K = static_size(A, StaticInt(2)) - StaticInt(1)
   ∂f = ∂(f)
-  @turbo for n ∈ indices((inds, C, ∂C), (1,2,2)), m ∈ indices((A, C, ∂C), 1)
+  @turbo for n ∈ indices((inds, C, ∂C), (1, 2, 2)), m ∈ indices((A, C, ∂C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
       Cmn += A[m, k] * B[k, inds[n]]
@@ -617,14 +616,14 @@ end
   _A::AbstractMatrix{<:Base.HWReal},
   _B::AbstractMatrix{<:Base.HWReal},
   inds::AbstractVector{<:Integer},
-  ::True,
+  ::True
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
   K = static_size(A, StaticInt(2)) - StaticInt(1)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
       Cmn += A[m, k] * B[k, inds[n]]
@@ -646,14 +645,14 @@ end
   _A::AbstractMatrix,
   _B::AbstractArray{T3,N},
   inds::AbstractVector{<:Integer},
-  ::False,
+  ::False
 ) where {F,T1<:Base.HWReal,T2<:Base.HWReal,T3<:Base.HWReal,N}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
   ∂f = ∂(f)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A, B), (2, 1))
       Cmn += A[m, k] * B[k, inds[n]]
@@ -670,13 +669,13 @@ end
   _A::AbstractMatrix{<:Base.HWReal},
   _B::AbstractMatrix{<:Base.HWReal},
   inds::AbstractVector{<:Integer},
-  ::False,
+  ::False
 ) where {F}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A, B), (2, 1))
       Cmn += A[m, k] * B[k, inds[n]]
@@ -698,14 +697,14 @@ end
   _A::AbstractMatrix{<:Base.HWReal},
   _B::AbstractMatrix{<:Base.HWReal},
   inds::AbstractVector{<:Integer},
-  ::True,
+  ::True
 )
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
   K = static_size(A, StaticInt(2)) - StaticInt(1)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
       Cmn += A[m, k] * B[k, inds[n]]
@@ -726,13 +725,13 @@ end
   _A::AbstractMatrix{<:Base.HWReal},
   _B::AbstractMatrix{<:Base.HWReal},
   inds::AbstractVector{<:Integer},
-  ::False,
+  ::False
 )
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A, B), (2, 1))
       Cmn += A[m, k] * B[k, inds[n]]
@@ -752,14 +751,14 @@ end
   _A::AbstractMatrix,
   _B::AbstractArray{T2,N},
   inds::AbstractVector{<:Integer},
-  ::True,
+  ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
   K = static_size(A, StaticInt(2)) - StaticInt(1)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
       Cmn += A[m, k] * B[k, inds[n]]
@@ -777,13 +776,13 @@ end
   _A::AbstractMatrix,
   _B::AbstractArray{T2,N},
   inds::AbstractVector{<:Integer},
-  ::False,
+  ::False
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   ∂C = zero_offsets(_∂C)
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A, B), (2, 1))
       Cmn += A[m, k] * B[k, inds[n]]
@@ -800,13 +799,13 @@ end
   _A::AbstractMatrix,
   _B::AbstractArray{T2,N},
   inds::AbstractVector{<:Integer},
-  ::True,
+  ::True
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
   K = static_size(A, StaticInt(2)) - One()
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ CloseOpen(K)
       Cmn += A[m, k] * B[k, inds[n]]
@@ -821,12 +820,12 @@ end
   _A::AbstractMatrix,
   _B::AbstractArray{T2,N},
   inds::AbstractVector{<:Integer},
-  ::False,
+  ::False
 ) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
   C = zero_offsets(_C)
   A = zero_offsets(_A)
   B = zero_offsets(_B)
-  @turbo for n ∈ indices((inds, C), (1,2)), m ∈ indices((A, C), 1)
+  @turbo for n ∈ indices((inds, C), (1, 2)), m ∈ indices((A, C), 1)
     Cmn = zero(eltype(C))
     for k ∈ indices((A, B), (2, 1))
       Cmn += A[m, k] * B[k, inds[n]]
@@ -838,14 +837,19 @@ end
 function valgrad_layer!(
   pg::Ptr{T},
   td::TurboDense{O},
-  B, inds,
+  B,
+  inds::AbstractVector{<:Integer},
   p::Ptr{T},
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {T,O}
   input_dim = static_size(B, StaticInt(1))
   batch_size = static_size(B, StaticInt(2))
-  pu2 = Base.unsafe_convert(Ptr{T}, pu + align(batch_size * td.outputdim * sizeof(T)))
-  C, _pu3 = alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(B))
+  pu2 = Base.unsafe_convert(
+    Ptr{T},
+    pu + align(batch_size * td.outputdim * sizeof(T))
+  )
+  C, _pu3 =
+    alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(B))
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
   ∂C, _ = get∂C(td, C, pu)
   A, p2 = getparams(td, p, input_dim)
@@ -855,23 +859,26 @@ function valgrad_layer!(
   pg + length(A) * sizeof(T), C, p2, pu3
 end
 function chain_valgrad_entry!(
-  pg,
+  pga,
+  pgp::Ptr,
   arg,
   layers::Tuple{TurboDense,X,Vararg},
-  inds,
+  inds::AbstractVector{<:Integer},
   p::Ptr,
-  pu::Ptr{UInt8},
+  pu::Ptr{UInt8}
 ) where {X}
   l = getfield(layers, 1)
-  pg2, larg, p2, pu2 = valgrad_layer!(pg, l, arg, inds, p, pu)
-  val, grad, _ = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
-  pullback_param!(pg, l, grad, arg, p, pu)
+  pg2, larg, p2, pu2 = valgrad_layer!(pgp, l, arg, inds, p, pu)
+  val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
+  pu = pullback_common!(pgp, l, grad, arg, p, pu)::Ptr{UInt8}
+  pullback_param!(pgp, l, grad, arg, p, pu)
+  pga === nothing || pullback_arg!(pga, l, grad, arg, p, pu, pu3)
   return val
 end
-=#
-
+@inline _add(::Nothing, ::Int) = nothing
+@inline _add(p::Ptr{T}, i::Int) where {T} = p + i * sizeof(T)
 function valgrad_layer!(
-  pg::Ptr{T},
+  pg::Union{Nothing,Ptr{T}},
   td::TurboDense{O},
   B,
   p::Ptr{T},
@@ -896,22 +903,11 @@ function valgrad_layer!(
   A, p2 = getparams(td, p, input_dim)
   f = td.f
   dense!(f, ∂C, C, A, B, static(O))
-  # doesn'tneed a pullback
-  pg + length(A) * sizeof(T), C, p2, pu3
+  # doesn't need a pullback
+  _add(pg, length(A)), C, p2, pu3
 end
-alloc_return_B_dense(B::PtrArray, pu::Ptr{UInt8}, _) = (B, pu) # assume `PtrArray` means we can destroy it
-function alloc_return_B_dense(
-  B::AbstractArray{T},
-  pu::Ptr{UInt8},
-  input_dim
-) where {T}
-  si = bytestrideindex(B)
-  sp = stridedpointer(reinterpret(Ptr{T}, pu), si)
-  B̄ = PtrArray(sp, (input_dim, static_size(B, static(2))), val_dense_dims(B))
-  B̄, pu + align(length(B̄) * sizeof(T))
-end
-function pullback!(
-  pg::Ptr{T},
+function pullback_arg!(
+  B̄ptr::Ptr,
   td::TurboDense{O},
   C̄::PtrArray,
   B::PtrArray,
@@ -919,19 +915,15 @@ function pullback!(
   pu::Ptr{UInt8},
   pu2::Ptr{UInt8}
 ) where {T,O}
-  # Start with 4-arg `pulback!` to update `∂C`
-  pullback_param!(pg, td, C̄, B, p, pu) # Ā = C̄ * B'
   # Now 5-arg
   # B̄ = A' * C̄
   intput_dims = static_size(B, StaticInt(1))
   A, _ = getparams(td, p, intput_dims)
-  B̄, pu2 = alloc_return_B_dense(B, pu2, intput_dims)
+  B̄ = PtrArray(B̄ptr, static_size(B))
   dense!(identity, nothing, B̄, matrix_view(td, A)', C̄, False())
   B̄, pu2
 end
-function pullback!(pg, td, C̄, B, p::Ptr, pu::Ptr{UInt8}, pu2::Ptr{UInt8})
-  @gc_preserve pullback!(pg, td, C̄, B, p, pu, pu2)
-end
+
 matrix_view(::TurboDense{false}, A) = A
 function matrix_view(::TurboDense{true}, A)
   Kp1 = static_size(A, StaticInt(2))
@@ -942,6 +934,20 @@ update_C̄!(::typeof(identity), _, __) = nothing #=∂C=#
 update_C̄!(::F, C̄, ∂C) where {F} = @turbo for i ∈ eachindex(∂C)
   C̄[i] *= ∂C[i]
 end
+function pullback_common!(
+  pg::Union{Nothing,Ptr{T}},
+  td::TurboDense{O},
+  C̄,
+  _,
+  ::Ptr{T},
+  pu::Ptr{UInt8}
+) where {T,O}
+  td.f === identity && return pu
+  # Ā = C̄ * B'
+  ∂C = first(get∂C(td, C̄, pu))
+  update_C̄!(td.f, C̄, ∂C)
+  return pu
+end
 function pullback_param!(
   pg::Ptr{T},
   td::TurboDense{O},
@@ -951,9 +957,7 @@ function pullback_param!(
   pu::Ptr{UInt8}
 ) where {T,O}
   # Ā = C̄ * B'
-  ∂C = first(get∂C(td, C̄, pu))
-  update_C̄!(td.f, C̄, ∂C)
-  Ā, __ = getparams(td, pg, static_size(B, StaticInt(1)))
+  Ā = first(getparams(td, pg, static_size(B, StaticInt(1))))
   dense_param_update!(td, Ā, C̄, B)
   return nothing
 end

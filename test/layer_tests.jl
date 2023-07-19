@@ -30,35 +30,37 @@ p = SimpleChains.init_params(sc)
 
 @test SimpleChains.remove_loss(sc)(x, p) isa AbstractVector
 using SimpleChains.StaticArrays
-@test @inferred(SimpleChains.remove_loss(sc)(SVector{5}(x), p)) isa SVector{2,Float64}
-@test @inferred(SimpleChains.valgrad(sc, SVector{5}(x), p)) isa Tuple{Float64,SVector{126,Float32}}
+@test @inferred(SimpleChains.remove_loss(sc)(SVector{5}(x), p)) isa
+      SVector{2,Float64}
+@test @inferred(SimpleChains.valgrad(sc, SVector{5}(x), p)) isa
+      Tuple{Float64,SVector{126,Float32}}
 
 g = similar(p);
 g2 = similar(g);
 g3 = similar(g);
 g4 = similar(g);
-xm = reshape(x,length(x),1);
-yml = SquaredLoss(reshape(y,length(y),1));
+xm = reshape(x, length(x), 1);
+yml = SquaredLoss(reshape(y, length(y), 1));
 
 for seed = 1:4
-  SimpleChains.VectorizedRNG.seed!(seed);
+  SimpleChains.VectorizedRNG.seed!(seed)
   valgrad!(g, sc, x, p)
 
-  SimpleChains.VectorizedRNG.seed!(seed);
+  SimpleChains.VectorizedRNG.seed!(seed)
   valgrad!(g2, sc, xm, p)
-  SimpleChains.VectorizedRNG.seed!(seed);
+  SimpleChains.VectorizedRNG.seed!(seed)
   valgrad!(g3, SimpleChains.add_loss(sc, yml), xm, p)
-  SimpleChains.VectorizedRNG.seed!(seed);
+  SimpleChains.VectorizedRNG.seed!(seed)
   valgrad!(g4, SimpleChains.add_loss(sc, yml), x, p)
 
-  SimpleChains.VectorizedRNG.seed!(seed);
+  SimpleChains.VectorizedRNG.seed!(seed)
   gzyg = Zygote.gradient(p) do p
-    sum(abs2, Base.front(sc)(x, p) .- y)/2
+    sum(abs2, Base.front(sc)(x, p) .- y) / 2
   end |> only |> Vector
   gzyg2 = Zygote.gradient(p) do p
-    sum(abs2, Base.front(sc_dynamic)(x, p) .- y)/2
+    sum(abs2, Base.front(sc_dynamic)(x, p) .- y) / 2
   end |> only |> Vector
-  SimpleChains.VectorizedRNG.seed!(seed);
+  SimpleChains.VectorizedRNG.seed!(seed)
   gz = Zygote.gradient(sc, x, p)[2]
   @test gzyg ≈ gz
 
@@ -71,10 +73,10 @@ for seed = 1:4
   @test !iszero(g3)
   @test !iszero(g4)
 
-  @test gz ≈ g rtol=1e-6
-  @test gz ≈ g2 rtol=1e-6
-  @test gz ≈ g3 rtol=1e-6
-  @test gz ≈ g4 rtol=1e-6
+  @test gz ≈ g rtol = 1e-6
+  @test gz ≈ g2 rtol = 1e-6
+  @test gz ≈ g3 rtol = 1e-6
+  @test gz ≈ g4 rtol = 1e-6
 end
 
 xmat = rand(5, 20)
@@ -97,7 +99,4 @@ gz2 = Zygote.gradient(sc2, xmat, p2)[2]
 @test !iszero(gz2)
 @test !iszero(g2)
 
-@test g2 ≈ gz2 rtol=1e-6
-
-
-
+@test g2 ≈ gz2 rtol = 1e-6

@@ -2,7 +2,7 @@
 _static_max_stack(::StaticInt{N}) where {N} = StaticInt{N}()
 _static_max_stack(_) = StaticInt{MAXSTACK}()
 
-_type_sym(x) = __type_sym(x)
+_type_sym(x) = __type_sym(remove_loss(getchain(x)))
 @generated __type_sym(::T) where {T} = QuoteNode(Symbol(T))
 
 function task_local_memory(sc)::Vector{UInt8}
@@ -29,18 +29,14 @@ end
 end
 function get_heap_memory(sc, num_bytes)
   heap_memory = task_local_memory(sc)
-  length(heap_memory) >= num_bytes ||
+  length(heap_memory) < num_bytes &&
     resize!(empty!(heap_memory), Int(num_bytes))
   return heap_memory
 end
 function with_heap_memory(f::F, sc, num_bytes, args::Vararg{Any,K}) where {F,K}
   heap_memory = get_heap_memory(sc, num_bytes)
-  GC.@preserve heap_memory f(
-    sc,
-    align(Base.unsafe_convert(Ptr{UInt8}, heap_memory)),
-    args...
-  ),
-  heap_memory
+  p = align(Base.unsafe_convert(Ptr{UInt8}, heap_memory))
+  GC.@preserve heap_memory f(sc, p, args...), heap_memory
 end
 @inline function with_memory(
   f::F,
