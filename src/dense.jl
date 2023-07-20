@@ -848,11 +848,11 @@ function valgrad_layer!(
     Ptr{T},
     pu + align(batch_size * td.outputdim * sizeof(T))
   )
+  A, p2 = getparams(td, p, input_dim)
   C, _pu3 =
-    alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(B))
+    alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(A),Val(ndims(B)))
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
   ∂C, _ = get∂C(td, C, pu)
-  A, p2 = getparams(td, p, input_dim)
   f = td.f
   dense!(f, ∂C, C, A, B, inds, static(O))
   # doesn'tneed a pullback
