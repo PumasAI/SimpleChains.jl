@@ -869,8 +869,14 @@ function valgrad_layer!(
     pu + align(batch_size * td.outputdim * sizeof(T))
   )
   A, p2 = getparams(td, p, input_dim)
-  C, _pu3 =
-    alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(A), Val(ndims(B)))
+  C, _pu3 = alloc_return(
+    td,
+    batch_size,
+    pu2,
+    contiguous_axis(B),
+    stride_rank(A),
+    Val(ndims(B))
+  )
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
   ∂C, _ = get∂C(td, C, pu)
   f = td.f
