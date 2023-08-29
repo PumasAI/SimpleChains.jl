@@ -565,6 +565,9 @@ InteractiveUtils.versioninfo(; verbose = true)
   @testset "Glorot" begin
     include("random.jl")
   end
+  @testset "Batch" begin
+    include("batch.jl")
+  end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 # For now, there are the tests at the start.

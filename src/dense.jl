@@ -833,6 +833,26 @@ end
     C[m, n] = Cmn
   end
 end
+@inline function denserev!(
+  ::typeof(identity),
+  ::Nothing,
+  _C::AbstractArray{T1,N},
+  _A::AbstractMatrix,
+  _B::AbstractArray{T2,N},
+  inds::AbstractVector{<:Integer},
+  ::False
+) where {T1<:Base.HWReal,T2<:Base.HWReal,N}
+  C = zero_offsets(_C)
+  A = zero_offsets(_A)
+  B = zero_offsets(_B)
+  @turbo for n ∈ indices((B, C), 2), m ∈ indices((A, C), 1)
+    Cmn = zero(eltype(C))
+    for k ∈ indices((A, inds), (2, 1))
+      Cmn += A[m, k] * B[inds[k], n]
+    end
+    C[m, n] = Cmn
+  end
+end
 
 function valgrad_layer!(
   pg::Ptr{T},
@@ -843,16 +863,22 @@ function valgrad_layer!(
   pu::Ptr{UInt8}
 ) where {T,O}
   input_dim = static_size(B, StaticInt(1))
-  batch_size = static_size(B, StaticInt(2))
+  batch_size = static_size(inds, StaticInt(1))
   pu2 = Base.unsafe_convert(
     Ptr{T},
     pu + align(batch_size * td.outputdim * sizeof(T))
   )
-  C, _pu3 =
-    alloc_return(td, batch_size, pu2, contiguous_axis(B), stride_rank(B))
+  A, p2 = getparams(td, p, input_dim)
+  C, _pu3 = alloc_return(
+    td,
+    batch_size,
+    pu2,
+    contiguous_axis(B),
+    stride_rank(A),
+    Val(ndims(B))
+  )
   pu3 = Base.unsafe_convert(Ptr{UInt8}, _pu3)
   ∂C, _ = get∂C(td, C, pu)
-  A, p2 = getparams(td, p, input_dim)
   f = td.f
   dense!(f, ∂C, C, A, B, inds, static(O))
   # doesn'tneed a pullback
@@ -871,7 +897,7 @@ function chain_valgrad_entry!(
   pg2, larg, p2, pu2 = valgrad_layer!(pgp, l, arg, inds, p, pu)
   val, grad, pu3 = chain_valgrad!(pg2, larg, Base.tail(layers), p2, pu2)
   pu = pullback_common!(pgp, l, grad, arg, p, pu)::Ptr{UInt8}
-  pullback_param!(pgp, l, grad, arg, p, pu)
+  pullback_param!(pgp, l, grad, arg, p, pu, inds)
   pga === nothing || pullback_arg!(pga, l, grad, arg, p, pu, pu3)
   return val
 end
@@ -961,6 +987,20 @@ function pullback_param!(
   dense_param_update!(td, Ā, C̄, B)
   return nothing
 end
+function pullback_param!(
+  pg::Ptr{T},
+  td::TurboDense{O},
+  C̄,
+  B,
+  ::Ptr{T},
+  pu::Ptr{UInt8},
+  inds
+) where {T,O}
+  # Ā = C̄ * B'
+  Ā = first(getparams(td, pg, static_size(B, StaticInt(1))))
+  dense_param_update!(td, Ā, C̄, B, inds)
+  return nothing
+end
 function dense_param_update!(::TurboDense{true}, Ā, C̄, B)
   Kp1 = static_size(Ā, StaticInt(2))
   K = Kp1 - StaticInt(1)
@@ -975,6 +1015,21 @@ function dense_param_update!(::TurboDense{true}, Ā, C̄, B)
 end
 function dense_param_update!(::TurboDense{false}, Ā, C̄, B)
   dense!(identity, nothing, Ā, C̄, B', False())
+end
+function dense_param_update!(::TurboDense{true}, Ā, C̄, B, inds)
+  Kp1 = static_size(Ā, StaticInt(2))
+  K = Kp1 - StaticInt(1)
+  denserev!(identity, nothing, view(Ā, :, static(1):K), C̄, B', inds, False())
+  @turbo for m ∈ axes(Ā, 1)
+    s = zero(eltype(Ā))
+    for n ∈ axes(C̄, 2)
+      s += C̄[m, n]
+    end
+    Ā[m, Kp1] = s
+  end
+end
+function dense_param_update!(::TurboDense{false}, Ā, C̄, B, inds)
+  dense!(identity, nothing, Ā, C̄, B', inds, False())
 end
 
 @inline function dense!(

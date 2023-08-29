@@ -52,6 +52,9 @@ using LoopVectorization: matmul_params, @turbo
 # macro turbo(ex0, ex1)
 #   esc(ex1)
 # end
+# macro turbo(ex0, ex1, ex2)
+#   esc(ex2)
+# end
 
 export SimpleChain,
   TurboDense,
