@@ -41,6 +41,7 @@ jobs:
         version:
           - 'nightly' # coverage fast on nightly
         threads:
+          - '1'
           - '3'
           - '4'
     steps:
