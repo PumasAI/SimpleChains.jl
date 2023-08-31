@@ -473,7 +473,7 @@ function train_unbatched!(
     Val{T}(),
     layers,
     static_size(pX),
-    optoff + align(glen) * numthreads,
+    optoff + align(glen) * numthreads * static_sizeof(T),
     static(0),
     numthreads
   )
