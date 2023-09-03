@@ -43,6 +43,7 @@ import ForwardDiff
 import LoopVectorization
 import StaticArrays
 using Random: AbstractRNG
+using ReverseDiff
 
 using LoopVectorization: matmul_params, @turbo
 # using LoopVectorization: matmul_params

@@ -154,7 +154,11 @@ end
   _maybe_sarray(fx, static_size(fx))
 end
 
-function (c::SimpleChain)(
+function (c::SimpleChain)(arg::AbstractArray, params::AbstractVector)
+  return call_chain(c, arg, params)
+end
+function call_chain(
+  c::SimpleChain,
   arg::AbstractArray{T0},
   params::AbstractVector{T1}
 ) where {T0,T1}
@@ -270,6 +274,9 @@ end
   arg::StaticArrays.SArray,
   params::AbstractVector
 )
+  call_chain(c, arg, params)
+end
+function call_chain(c::SimpleChain, arg::StaticArrays.SArray, params::AbstractVector)
   verify_arg(c, arg)
   @unpack layers = c
   marg = StaticArrays.MArray(arg)
