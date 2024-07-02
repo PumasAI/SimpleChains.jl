@@ -44,12 +44,12 @@ jobs:
           - '3'
           - '4'
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
-      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc # v1.9.2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8
+      - uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         env:
           cache-name: cache-artifacts
         with:
@@ -59,15 +59,15 @@ jobs:
             ${{ runner.os }}-test-${{ env.cache-name }}-
             ${{ runner.os }}-test-
             ${{ runner.os }}-
-      - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8
-      - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f
+      - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8 # v1.4.2
+      - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f # v1.9.3
         with:
           coverage: true
         env:
           JULIA_NUM_THREADS: ${{ matrix.threads }}
           JULIA_CPU_THREADS: ${{ matrix.threads }}
-      - uses: julia-actions/julia-processcoverage@03114f09f119417c3242a9fb6e0b722676aedf38
-      - uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d
+      - uses: julia-actions/julia-processcoverage@03114f09f119417c3242a9fb6e0b722676aedf38 # v1.2.2
+      - uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
         with:
           file: lcov.info
   nocoverage:
@@ -84,12 +84,12 @@ jobs:
           - '1.6'
           - '1'
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
-      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc # v1.9.2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8
+      - uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         env:
           cache-name: cache-artifacts
         with:
@@ -99,8 +99,8 @@ jobs:
             ${{ runner.os }}-test-${{ env.cache-name }}-
             ${{ runner.os }}-test-
             ${{ runner.os }}-
-      - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8
-      - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f
+      - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8 # v1.4.2
+      - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f # v1.9.3
         with:
           coverage: false
         env:
@@ -109,8 +109,8 @@ jobs:
     name: Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
-      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc # v1.9.2
         with:
           version: '1'
       - run: |
@@ -129,8 +129,8 @@ jobs:
     name: Doctests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
-      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc # v1.9.2
         with:
           version: '1'
       - run: |
