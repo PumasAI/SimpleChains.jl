@@ -337,9 +337,9 @@ function _add_memory(t::Tuple, p)
 end
 _add_memory(::Nothing, p) = nothing
 
-@inline __add(x, y) = x + y
-@inline __add(x::Ptr, ::StaticInt{N}) where {N} = x + N
-@inline __add(::StaticInt{N}, y::Ptr) where {N} = y + N
+__add(x, y) = x + y
+__add(x::Ptr, ::StaticInt{N}) where {N} = x + N
+__add(::StaticInt{N}, y::Ptr) where {N} = y + N
 
-@inline __adjoint(x) = x'
-@inline __adjoint(x::SVector{N, <:Real}) where {N} = SMatrix{1, N, eltype(x)}(x.data)
+__adjoint(x) = x'
+__adjoint(x::SVector{N, <:Real}) where {N} = SMatrix{1, N, eltype(x)}(x.data)
