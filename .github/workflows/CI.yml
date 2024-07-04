@@ -62,7 +62,7 @@ jobs:
       - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8
       - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f
         with:
-          coverage: true
+          coverage: false
         env:
           JULIA_NUM_THREADS: ${{ matrix.threads }}
           JULIA_CPU_THREADS: ${{ matrix.threads }}
@@ -101,7 +101,7 @@ jobs:
       - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8
       - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f
         with:
-          coverage: false
+          coverage: true
         env:
           JULIA_NUM_THREADS: 2
   docs:
