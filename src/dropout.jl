@@ -120,7 +120,7 @@ function valgrad_layer!(
     VectorizedRNG.storestate!(rng, state)
   end # GC preserve  
 
-  pg, x, p, align(pu + ((static(7) + N) >>> static(3)))
+  pg, x, p, align(__add(pu, ((static(7) + N) >>> static(3))))
 end
 
 function pullback_arg!(

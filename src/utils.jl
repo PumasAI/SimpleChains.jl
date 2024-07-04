@@ -336,3 +336,7 @@ function _add_memory(t::Tuple, p)
   (A, B...)
 end
 _add_memory(::Nothing, p) = nothing
+
+__add(x, y) = x + y
+__add(x::Ptr, ::StaticInt{N}) where {N} = x + N
+__add(::StaticInt{N}, y::Ptr) where {N} = y + N
