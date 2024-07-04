@@ -1004,7 +1004,7 @@ end
 function dense_param_update!(::TurboDense{true}, Ā, C̄, B)
   Kp1 = static_size(Ā, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  dense!(identity, nothing, view(Ā, :, static(1):K), C̄, B', False())
+  dense!(identity, nothing, view(Ā, :, static(1):K), C̄, __adjoint(B), False())
   @turbo for m ∈ axes(Ā, 1)
     s = zero(eltype(Ā))
     for n ∈ axes(C̄, 2)
@@ -1014,12 +1014,12 @@ function dense_param_update!(::TurboDense{true}, Ā, C̄, B)
   end
 end
 function dense_param_update!(::TurboDense{false}, Ā, C̄, B)
-  dense!(identity, nothing, Ā, C̄, B', False())
+  dense!(identity, nothing, Ā, C̄, __adjoint(B), False())
 end
 function dense_param_update!(::TurboDense{true}, Ā, C̄, B, inds)
   Kp1 = static_size(Ā, StaticInt(2))
   K = Kp1 - StaticInt(1)
-  denserev!(identity, nothing, view(Ā, :, static(1):K), C̄, B', inds, False())
+  denserev!(identity, nothing, view(Ā, :, static(1):K), C̄, __adjoint(B), inds, False())
   @turbo for m ∈ axes(Ā, 1)
     s = zero(eltype(Ā))
     for n ∈ axes(C̄, 2)
@@ -1029,7 +1029,7 @@ function dense_param_update!(::TurboDense{true}, Ā, C̄, B, inds)
   end
 end
 function dense_param_update!(::TurboDense{false}, Ā, C̄, B, inds)
-  dense!(identity, nothing, Ā, C̄, B', inds, False())
+  dense!(identity, nothing, Ā, C̄, __adjoint(B), inds, False())
 end
 
 @inline function dense!(
