@@ -564,5 +564,4 @@ end
 Aqua.test_all(
   SimpleChains;
   ambiguities = false,
-  project_toml_formatting = false
 )
