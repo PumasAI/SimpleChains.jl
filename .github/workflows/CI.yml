@@ -39,6 +39,7 @@ jobs:
         os:
           - ubuntu-latest
         version:
+          - '1'
           - 'nightly' # coverage fast on nightly
         threads:
           - '3'
@@ -62,7 +63,7 @@ jobs:
       - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8
       - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f
         with:
-          coverage: false
+          coverage: true
         env:
           JULIA_NUM_THREADS: ${{ matrix.threads }}
           JULIA_CPU_THREADS: ${{ matrix.threads }}
@@ -81,7 +82,7 @@ jobs:
         os:
           - ubuntu-latest
         version:
-          - '1'
+          - '1.6'
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
       - uses: julia-actions/setup-julia@f40c4b69330df1d22e7590c12e76dc2f9c66e0bc
@@ -101,7 +102,7 @@ jobs:
       - uses: julia-actions/julia-buildpkg@72ddd0fcdc760e6d2ef7ef2bbb11ae5032b671a8
       - uses: julia-actions/julia-runtest@79a7e100883947123f8263c5f06e6c0ea3eb972f
         with:
-          coverage: true
+          coverage: false
         env:
           JULIA_NUM_THREADS: 2
   docs:

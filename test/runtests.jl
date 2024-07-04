@@ -1,6 +1,12 @@
 using SimpleChains
 using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
-using JET: @test_opt
+@static if VERSION ≥ v"1.9"
+  using JET: @test_opt
+else
+  macro test_opt(ex)
+    nothing
+  end
+end
 
 countallocations!(g, sc, x, p) = @allocated valgrad!(g, sc, x, p)
 dual(x::T) where {T} = ForwardDiff.Dual(x, 4randn(T), 4randn(T), 4randn(T))
