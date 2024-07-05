@@ -40,7 +40,6 @@ jobs:
           - ubuntu-latest
         version:
           - '1'
-          - 'nightly' # coverage fast on nightly
         threads:
           - '3'
           - '4'
