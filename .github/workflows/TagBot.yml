@@ -4,12 +4,28 @@ on:
     types:
       - created
   workflow_dispatch:
+    inputs:
+      lookback:
+        default: "3"
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  deployments: read
+  issues: read
+  discussions: read
+  packages: read
+  pages: read
+  pull-requests: read
+  repository-projects: read
+  security-events: read
+  statuses: read
 jobs:
   TagBot:
     if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'
     runs-on: ubuntu-latest
     steps:
-      - uses: JuliaRegistries/TagBot@4dfecaadc4586c55ebd870b8ed3298435362c9cf
+      - uses: JuliaRegistries/TagBot@4dfecaadc4586c55ebd870b8ed3298435362c9cf # v1.14.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ssh: ${{ secrets.DOCUMENTER_KEY }}
