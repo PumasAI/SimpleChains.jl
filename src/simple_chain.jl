@@ -820,7 +820,7 @@ function valgrad_core(
 ) where {T}
   @unpack layers = c
   g = PtrArray(Ptr{T}(pu), (glen,))
-  l = unsafe_valgrad!(c, pu + align(glen * static_sizeof(T)), g, params, arg)
+  l = unsafe_valgrad!(c, __add(pu, align(glen * static_sizeof(T))), g, params, arg)
   Base.FastMath.add_fast(
     l,
     apply_penalty!(g, getpenalty(c), params, static_size(arg))
@@ -838,7 +838,7 @@ function valgrad_core_sarray(
   l = Base.FastMath.add_fast(
     unsafe_valgrad!(
       c,
-      pu + align(static(L) * static_sizeof(T)),
+      __add(pu, align(static(L) * static_sizeof(T))),
       g,
       params,
       arg

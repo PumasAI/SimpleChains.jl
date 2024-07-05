@@ -336,3 +336,10 @@ function _add_memory(t::Tuple, p)
   (A, B...)
 end
 _add_memory(::Nothing, p) = nothing
+
+__add(x, y) = x + y
+__add(x::Ptr, ::StaticInt{N}) where {N} = x + N
+__add(::StaticInt{N}, y::Ptr) where {N} = y + N
+
+__adjoint(x) = x'
+__adjoint(x::SVector{N, <:Real}) where {N} = SMatrix{1, N, eltype(x)}(x.data)

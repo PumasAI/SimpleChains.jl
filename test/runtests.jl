@@ -1,6 +1,6 @@
 using SimpleChains
 using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
-@static if VERSION >= v"1.9"
+@static if VERSION ≥ v"1.9"
   using JET: @test_opt
 else
   macro test_opt(ex)
@@ -84,12 +84,8 @@ InteractiveUtils.versioninfo(; verbose = true)
       SquaredLoss"""
 
       @test sprint((io, t) -> show(io, t), sc) == print_str0
-      if VERSION >= v"1.6"
-        @test sprint((io, t) -> show(io, t), scflp) == print_str1
-      else
-        # typename doesn't work on 1.5
-        @test_broken sprint((io, t) -> show(io, t), scflp) == print_str1
-      end
+      @test sprint((io, t) -> show(io, t), scflp) == print_str1
+
       p = SimpleChains.init_params(scflp, T; rng = Random.default_rng())
       g = similar(p)
       let sc = SimpleChains.remove_loss(sc)
@@ -574,5 +570,4 @@ end
 Aqua.test_all(
   SimpleChains;
   ambiguities = false,
-  project_toml_formatting = false
 )

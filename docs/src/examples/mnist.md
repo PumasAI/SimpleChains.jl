@@ -43,7 +43,7 @@ We define the inputs as being statically sized `(28,28,1)` images.
 Specifying the input sizes allows these to be checked.
 Making them static, which we can do either in our simple chain, or by adding
 static sizing to the images themselves using a package like [StrideArrays.jl](https://github.com/JuliaSIMD/StrideArrays.jl)
-or [HybridArrays.jl](git@github.com:JuliaArrays/HybridArrays.jl.git). These packages are recommended
+or [HybridArrays.jl](https://github.com/JuliaArrays/HybridArrays.jl). These packages are recommended
 for allowing you to mix dynamic and static sizes; the batch size should probably
 be left dynamic, as you're unlikely to want to specialize code generation on this,
 given that it is likely to vary, increasing compile times while being unlikely to
