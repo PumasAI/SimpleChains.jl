@@ -162,9 +162,9 @@ function valgrad_noloss(
     @inbounds @simd ivdep for i in eachindex(parg)
       parg2[i] = parg[i]
     end
-    pm += aoff
+    pm = __add(pm, aoff)
     g = PtrArray(Ptr{T}(pm), (glen,))
-    pm += goff
+    pm = __add(pm, goff)
     l, pbl =
       chain_valgrad_pullback!(pointer(g), parg2, layers, pointer(params), pm)
   end
