@@ -60,15 +60,15 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
     SimpleChains.ADAM(3e-4),
     10
   )
-  # if VERSION >= v"1.10"
-  #   @test_opt SimpleChains.train_batched!(
-  #     p,
-  #     lenetloss,
-  #     xtrain4,
-  #     SimpleChains.ADAM(3e-4),
-  #     10
-  #   )
-  # end
+  if VERSION >= v"1.10"
+    @test_opt SimpleChains.train_batched!(
+      p,
+      lenetloss,
+      xtrain4,
+      SimpleChains.ADAM(3e-4),
+      10
+    )
+  end
   @test all(isfinite, p)
   # @test all(isfinite, G)
   # assess training and test loss
