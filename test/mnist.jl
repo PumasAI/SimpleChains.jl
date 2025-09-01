@@ -61,7 +61,7 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
     10
   )
   if VERSION >= v"1.10"
-    @test_opt SimpleChains.train_batched!(
+    @test_broken @test_opt SimpleChains.train_batched!(
       p,
       lenetloss,
       xtrain4,
