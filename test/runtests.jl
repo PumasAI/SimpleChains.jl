@@ -8,7 +8,13 @@ else
   end
 end
 
-countallocations!(g, sc, x, p) = @allocated valgrad!(g, sc, x, p)
+macro countallocations!(g, sc, x, p)
+  return quote
+    let g = $(esc(g)), sc = $(esc(sc)), x = $(esc(x)), p = $(esc(p))
+      @allocated $(SimpleChains.valgrad!)(g, sc, x, p)
+    end
+  end
+end
 dual(x::T) where {T} = ForwardDiff.Dual(x, 4randn(T), 4randn(T), 4randn(T))
 function dual(x::ForwardDiff.Dual{<:Any,T}) where {T}
   ForwardDiff.Dual(x, dual(4randn(T)), dual(4randn(T)))
@@ -261,13 +267,13 @@ InteractiveUtils.versioninfo(; verbose = true)
         @show isapprox(g, gfdd, rtol = 1e-8)
       end
       # let g=g, sc=sc, x=x, p=p
-      @test countallocations!(
+      @countallocations!(
         g,
         FrontLastPenalty(sc, L2Penalty(2.3), NoPenalty()),
         x,
         p
       ) == 0
-      @test countallocations!(
+      @countallocations!(
         g,
         FrontLastPenalty(scd, L2Penalty(2.3), L1Penalty(0.45)),
         x,
