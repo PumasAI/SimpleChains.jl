@@ -1,7 +1,9 @@
 using SimpleChains, Zygote, Test
 
-x = rand(5)
-y = rand(2)
+rng = StableRNG(42)
+
+x = rand(rng, 5)
+y = rand(rng, 2)
 
 sc = SimpleChain(
   5,
@@ -79,8 +81,8 @@ for seed = 1:4
   @test gz ≈ g4 rtol = 1e-6
 end
 
-xmat = rand(5, 20)
-ymat = rand(2, 20)
+xmat = rand(rng, 5, 20)
+ymat = rand(rng, 2, 20)
 
 sc2 = SimpleChains.add_loss(sc, SquaredLoss(ymat))
 

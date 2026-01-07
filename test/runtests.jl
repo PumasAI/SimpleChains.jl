@@ -1,5 +1,6 @@
 using SimpleChains
 using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
+using StableRNGs
 @static if VERSION ≥ v"1.9"
   using JET: @test_opt
 else
@@ -15,9 +16,11 @@ macro countallocations!(g, sc, x, p)
     end
   end
 end
-dual(x::T) where {T} = ForwardDiff.Dual(x, 4randn(T), 4randn(T), 4randn(T))
-function dual(x::ForwardDiff.Dual{<:Any,T}) where {T}
-  ForwardDiff.Dual(x, dual(4randn(T)), dual(4randn(T)))
+function dual(rng::AbstractRNG, x::T) where {T}
+  ForwardDiff.Dual(x, 4randn(rng, T), 4randn(rng, T), 4randn(rng, T))
+end
+function dual(rng::AbstractRNG, x::ForwardDiff.Dual{<:Any,T}) where {T}
+  ForwardDiff.Dual(x, dual(rng, 4randn(rng, T)), dual(rng, 4randn(rng, T)))
 end
 
 import InteractiveUtils
@@ -27,6 +30,7 @@ InteractiveUtils.versioninfo(; verbose = true)
   @test isempty(Test.detect_unbound_args(SimpleChains))
   @test isempty(Test.detect_ambiguities(SimpleChains))
   @testset "Dropout ForwardDiff" begin
+    rng = StableRNG(42)
     for T in (Float32, Float64)
       if T === Float32 # test construction using tuples
         scbase = SimpleChain(
@@ -56,9 +60,9 @@ InteractiveUtils.versioninfo(; verbose = true)
         ) # test inputdim unknown
       end
 
-      x = rand(T, 24, 199)
+      x = rand(rng, T, 24, 199)
 
-      y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.() .* 10
+      y = StrideArray{T}(undef, (static(2), size(x, 2))) .= randn.(rng) .* 10
       sc = SimpleChains.add_loss(scbase, SquaredLoss(y))
 
       @test first(
@@ -69,7 +73,7 @@ InteractiveUtils.versioninfo(; verbose = true)
         )
       ) === x
       @test sum(iszero, x) == 0
-      x .= rand.()
+      x .= rand.(rng)
 
       scflp = FrontLastPenalty(sc, L2Penalty(2.3), L1Penalty(0.45))
       print_str0 = """
@@ -95,11 +99,11 @@ InteractiveUtils.versioninfo(; verbose = true)
       p = SimpleChains.init_params(scflp, T; rng = Random.default_rng())
       g = similar(p)
       let sc = SimpleChains.remove_loss(sc)
-        @test_throws ArgumentError sc(rand(T, 23, 2), p)
-        @test_throws ArgumentError sc(rand(T, 23), p)
+        @test_throws ArgumentError sc(rand(rng, T, 23, 2), p)
+        @test_throws ArgumentError sc(rand(rng, T, 23), p)
         @test_throws MethodError sc(Array{T,0}(undef), p)
-        @test_throws ArgumentError valgrad!(g, sc, rand(T, 23, 2), p)
-        @test_throws ArgumentError valgrad!(g, sc, rand(T, 23), p)
+        @test_throws ArgumentError valgrad!(g, sc, rand(rng, T, 23, 2), p)
+        @test_throws ArgumentError valgrad!(g, sc, rand(rng, T, 23), p)
       end
       g1 = similar(g)
       g3 = similar(g)
@@ -282,11 +286,11 @@ InteractiveUtils.versioninfo(; verbose = true)
       # @test iszero(@allocated(valgrad!(g, sc, x, p)))
 
       td = TurboDense{true}(tanh, static(8))
-      pd = dual.(p)
-      xd = dual.(x)
+      pd = dual.(rng, p)
+      xd = dual.(rng, x)
 
-      pdd = dual.(pd)
-      xdd = dual.(xd)
+      pdd = dual.(rng, pd)
+      xdd = dual.(rng, xd)
 
       pu = Vector{UInt8}(
         undef,
@@ -334,7 +338,7 @@ InteractiveUtils.versioninfo(; verbose = true)
         )
       end
       @testset "training" begin
-        p .= randn.() .* 100
+        p .= randn.(rng) .* 100
         # small penalties since we don't care about overfitting here
         scpen = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))
         vg1 = valgrad!(g, scpen, x, p)
@@ -346,7 +350,7 @@ InteractiveUtils.versioninfo(; verbose = true)
           x,
           p
         ) < vg1
-        p .= randn.() .* 100
+        p .= randn.(rng) .* 100
         vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p)
         SimpleChains.train!(
           gt,
@@ -359,8 +363,8 @@ InteractiveUtils.versioninfo(; verbose = true)
         @test FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p) < vg2
       end
       @testset "vector of targets" begin
-        p .= randn.() .* 100
-        ys = [@. y + 0.1randn() for _ = 1:1000]
+        p .= randn.(rng) .* 100
+        ys = [@. y + 0.1randn(rng) for _ = 1:1000]
         # small penalties since we don't care about overfitting here
         scpen = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))
         vg1 = valgrad!(g, scpen, x, p)
@@ -372,7 +376,7 @@ InteractiveUtils.versioninfo(; verbose = true)
           x,
           p
         ) < vg1
-        p .= randn.() .* 100
+        p .= randn.(rng) .* 100
         vg2 = FrontLastPenalty(sc, L2Penalty(1e-4), L1Penalty(1e-4))(x, p)
         SimpleChains.train_unbatched!(
           gt,
@@ -387,6 +391,7 @@ InteractiveUtils.versioninfo(; verbose = true)
     end
   end
   @testset "Convolution" begin
+    rng = StableRNG(42)
     function clt(f, x, K, b)
       d1 = size(x, 1) - size(K, 1) + 1
       d2 = size(x, 2) - size(K, 2) + 1
@@ -425,8 +430,8 @@ InteractiveUtils.versioninfo(; verbose = true)
       #  Conv(tanh, (5,5), 4, 3)
     )
     batch = 3
-    x = rand(Float32, 28, 28, 1, batch)
-    y = rand(Float32, 26, 26, 4, batch)
+    x = rand(rng, Float32, 28, 28, 1, batch)
+    y = rand(rng, Float32, 26, 26, 4, batch)
     scconvl = SimpleChains.add_loss(scconv, SquaredLoss(y))
     p = @inferred(SimpleChains.init_params(scconvl, size(x)))
     (K, b), p2 = @inferred(
@@ -450,7 +455,7 @@ InteractiveUtils.versioninfo(; verbose = true)
       Conv(relu, (3, 3), 4), # fast_fuse == true
       Conv(tanh, (5, 5), 3)  # fast_fuse == false
     )
-    z = rand(Float32, 22, 22, 3, batch)
+    z = rand(rng, Float32, 22, 22, 3, batch)
     scconv2l = @inferred(SimpleChains.add_loss(scconv2, SquaredLoss(z)))
     p = @inferred(SimpleChains.init_params(scconv2l, size(x)))
     (K0, b0), p2 = @inferred(
@@ -472,7 +477,8 @@ InteractiveUtils.versioninfo(; verbose = true)
   end
   @testset "MaxPool" begin
     using Test, ForwardDiff
-    A = rand(8, 8, 2)
+    rng = StableRNG(42)
+    A = rand(rng, 8, 8, 2)
     firstmax = max(A[1, 1, 1], A[1, 2, 1], A[2, 1, 1], A[2, 2, 1])
     # test duplicates
     A[1, 1, 1] = firstmax
@@ -480,7 +486,7 @@ InteractiveUtils.versioninfo(; verbose = true)
     # B = similar(A, (4,4,2));
     mp = MaxPool(2, 2)
 
-    d = rand(SimpleChains.getoutputdim(mp, size(A))...)
+    d = rand(rng, SimpleChains.getoutputdim(mp, size(A))...)
     function maxpool(A, mp)
       B = similar(A, SimpleChains.getoutputdim(mp, size(A)))
       SimpleChains.maxpool!(B, A, mp)

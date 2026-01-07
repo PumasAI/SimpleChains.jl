@@ -1,6 +1,7 @@
 using SimpleChains, Test
 @testset "batch" begin
-  x = randn(3, 100)
+  rng = StableRNG(42)
+  x = randn(rng, 3, 100)
   chain = SimpleChain(
     static(3),
     TurboDense{true}(tanh, 8),
