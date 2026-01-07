@@ -694,7 +694,7 @@ function train_batched!(
   else
     batchsize
   end
-  if N_bs >= N
+  if convert(Int, N_bs) ≥ convert(Int, N) # explicit conversion is easier on JET
     train_unbatched!(g, p, _chn, X, opt, iters)
     return p
   end
