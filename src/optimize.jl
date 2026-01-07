@@ -591,7 +591,7 @@ function train_batched_core!(
     while true
       doff = 0
       while true
-        doffnext = doff + N_bs
+        doffnext = doff + convert(Int, N_bs) # explicit conversion is easier on JET
         ifelse(leaveofflast, doffnext, doff) > (N - (!leaveofflast)) && break
         batchstop::Int = min(doffnext, N)
         shuffle_update!(
