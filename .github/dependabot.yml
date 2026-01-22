@@ -1,10 +1,15 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
+    groups:
+      # Group all GitHub Actions PRs into a single PR:
+      all-github-actions:
+        patterns:
+          - "*"
     directory: "/"
     schedule:
       interval: "monthly"
-    open-pull-requests-limit: 99
+    open-pull-requests-limit: 100
     labels:
       - "dependencies"
       - "github-actions"
