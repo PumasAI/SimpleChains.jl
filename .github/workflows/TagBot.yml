@@ -12,7 +12,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'
     runs-on: ubuntu-latest
     steps:
-      - uses: JuliaRegistries/TagBot@fdeda6bc5e30641e181adf155388e61dcee1526e # v1.24.3
+      - uses: JuliaRegistries/TagBot@cd42473a4fc34302627f0ece76783b591456d4a9 # v1.24.7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ssh: ${{ secrets.DOCUMENTER_KEY }}
