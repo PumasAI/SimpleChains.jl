@@ -3,6 +3,7 @@ using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
 using StableRNGs
 @static if VERSION ≥ v"1.9"
   using JET: @test_opt
+  using Enzyme
 else
   macro test_opt(ex)
     nothing
@@ -583,3 +584,7 @@ Aqua.test_all(
   SimpleChains;
   ambiguities = false,
 )
+
+@static if VERSION ≥ v"1.9"
+  include("enzyme.jl")
+end
