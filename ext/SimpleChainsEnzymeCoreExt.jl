@@ -1,163 +1,146 @@
 module SimpleChainsEnzymeCoreExt
 
-using ChainRulesCore
 using EnzymeCore
 using SimpleChains
+using SimpleChains.StaticArrays
 
 const EnzymeRules = EnzymeCore.EnzymeRules
-const ReverseConfig = if isdefined(EnzymeRules, :RevConfig)
-    EnzymeRules.RevConfig
-else
-    EnzymeRules.Config
-end
-const ReverseConfigWidth = if isdefined(EnzymeRules, :RevConfigWidth)
-    EnzymeRules.RevConfigWidth
-else
-    EnzymeRules.ConfigWidth
-end
-const RuleReturnAnnotation = if isdefined(EnzymeRules, :augmented_rule_return_type)
-    EnzymeCore.Annotation
-else
-    Union{
-        EnzymeCore.Const,
-        EnzymeCore.Active{<:AbstractArray},
-        EnzymeCore.Duplicated,
-        EnzymeCore.DuplicatedNoNeed,
-        EnzymeCore.BatchDuplicated,
-        EnzymeCore.BatchDuplicatedNoNeed,
-    }
+
+# A `SimpleChain` evaluates through scratch memory whose allocation type deliberately
+# disagrees with the values stored through it, which Enzyme's type analysis rejects.
+# The chain is therefore treated as the differentiation boundary and the reverse pass
+# delegates to SimpleChains' own hand written pullbacks.
+#
+# The whole VJP runs inside `EnzymeRules.reverse`. That is load bearing: the scratch
+# buffer backing a pullback comes from `get_heap_memory`, which is task local and keyed
+# by chain type, so a pullback held across the augmented/reverse boundary is corrupted
+# by any intervening call to a chain of the same type — Enzyme runs every augmented
+# pass before the first reverse pass, so `sc(x, p) + sc(y, p)` is enough to trigger it.
+# Recomputing the forward sweep here keeps the buffer's lifetime inside a single call.
+
+@inline _mutable_like(x::AbstractArray{T}) where {T} = zeros(T, size(x))
+
+# `overwritten` is a per-argument tuple for most configurations but collapses to a
+# single `Bool` covering every argument for some, so it cannot be indexed blindly.
+@inline function is_overwritten(config, i)
+    overwritten = EnzymeRules.overwritten(config)
+    return overwritten isa Bool ? overwritten : overwritten[i]
 end
 
-@inline function EnzymeRules.augmented_primal(
-        config::ReverseConfig,
-        fn::EnzymeCore.Const{<:SimpleChains.SimpleChain},
-        ::Type{ReturnAnnotation},
-        arg::ArgumentAnnotation,
-        params::ParameterAnnotation
-    ) where {
-        ReturnAnnotation <: RuleReturnAnnotation,
-        ArgumentAnnotation <: EnzymeCore.Annotation,
-        ParameterAnnotation <: EnzymeCore.Annotation,
-    }
-    arg_primal = EnzymeRules.overwritten(config)[2] ? deepcopy(arg.val) : arg.val
-    params_primal =
-        EnzymeRules.overwritten(config)[3] ? deepcopy(params.val) : params.val
-    result, pullback = ChainRulesCore.rrule(fn.val, arg_primal, params_primal)
-    primal = EnzymeRules.needs_primal(config) ? result : nothing
-    @static if isdefined(EnzymeRules, :augmented_rule_return_type)
-        if ReturnAnnotation <: EnzymeCore.Const
-            return EnzymeRules.augmented_rule_return_type(
-                config,
-                ReturnAnnotation
-            ){Nothing}(primal, nothing, nothing)
-        elseif ReturnAnnotation <: EnzymeCore.Active
-            return EnzymeRules.augmented_rule_return_type(
-                config,
-                ReturnAnnotation
-            ){typeof(pullback)}(primal, nothing, pullback)
-        end
+# `pullback_arg!` is only defined for `PtrArray` inputs, so an input gradient needs the
+# argument materialized out of a `StaticArray` first.
+@inline _materialize(x::StaticArrays.StaticArray) = Array(x)
+@inline _materialize(x) = x
 
-        shadow = if !EnzymeRules.needs_shadow(config)
-            nothing
-        elseif EnzymeRules.width(config) == 1
-            Ref(zero(result))
-        else
-            ntuple(_ -> Ref(zero(result)), Val(EnzymeRules.width(config)))
-        end
-        tape = (shadow, pullback)
-        return EnzymeRules.augmented_rule_return_type(
-            config,
-            ReturnAnnotation
-        ){typeof(tape)}(primal, shadow, tape)
+# Loss terminated chains return a scalar and `valgrad!` fills both gradients. The
+# `(ga, gp)` form is what makes the input gradient available, which the ChainRules
+# `ElementwisePullback` path does not provide, but it costs a materialized argument, so
+# an inactive input takes the cheaper parameter-only path.
+function chain_vjp(sc, arg, params, seed::Number, wants_arg::Bool)
+    gp = _mutable_like(params)
+    ga = if wants_arg
+        marg = _materialize(arg)
+        g = _mutable_like(marg)
+        SimpleChains.valgrad!((g, gp), sc, marg, params)
+        g
     else
-        shadow = if !EnzymeRules.needs_shadow(config)
-            nothing
-        elseif EnzymeRules.width(config) == 1
-            zero(result)
-        else
-            ntuple(_ -> zero(result), Val(EnzymeRules.width(config)))
-        end
-        return EnzymeRules.AugmentedReturn(primal, shadow, (shadow, pullback))
+        SimpleChains.valgrad!(gp, sc, arg, params)
+        nothing
     end
+    if !isone(seed)
+        gp .*= seed
+        wants_arg && (ga .*= seed)
+    end
+    return ga, gp
 end
 
-function accumulate_tangent!(annotation, tangent, batch, width)
-    if annotation isa Union{EnzymeCore.Const, EnzymeCore.Active} ||
-            tangent isa ChainRulesCore.NoTangent
-        return nothing
-    end
-    target = width == 1 ? annotation.dval : annotation.dval[batch]
-    target .+= ChainRulesCore.unthunk(tangent)
+function chain_vjp(sc, arg, params, seed, _wants_arg::Bool)
+    _, pullback = SimpleChains.valgrad_noloss(sc, arg, params)
+    _, ga, gp = pullback(seed)
+    return ga, gp
+end
+
+# With runtime activity Enzyme may hand a rule a shadow that is the primal itself for
+# values that turn out to be inactive; accumulating there would corrupt the primal.
+@inline function accumulate!(config, annotation, tangent, batch)
+    annotation isa Union{EnzymeCore.Const, EnzymeCore.Active} && return nothing
+    target = EnzymeRules.width(config) == 1 ? annotation.dval : annotation.dval[batch]
+    EnzymeRules.runtime_activity(config) && target === annotation.val && return nothing
+    target .+= tangent
     return nothing
 end
 
-function active_tangent(annotation::EnzymeCore.Active{T}, tangent)::T where {T}
-    tangent isa ChainRulesCore.NoTangent && return zero(annotation.val)
-    return convert(T, ChainRulesCore.unthunk(tangent))
+@inline active_tangent(a::EnzymeCore.Active{T}, tangent) where {T} = convert(T, tangent)::T
+@inline active_tangent(::EnzymeCore.Annotation, _) = nothing
+
+# When Enzyme cannot infer the chain call's return type it reports `RealRt === Any`,
+# takes its generic reverse path, and accumulates through a `Base.RefValue` for
+# immutable results (its `MixedDuplicated` convention) -- a bare value is rejected
+# there. In that case the expected shadow type is `Any`, so the `Ref` needs no flexible
+# shadow return. When the return type is known, an immutable result is `Active` and no
+# shadow is requested at all, so a plain zero is always right.
+@inline _cell(::Type{Any}, result) = ismutable(result) ? zero(result) : Ref(zero(result))
+@inline _cell(::Type, result) = zero(result)
+
+@inline _seed(shadow::Base.RefValue) = shadow[]
+@inline _seed(shadow) = shadow
+
+@inline function augmented_shadow(config, ::Type{RT}, result) where {RT}
+    EnzymeRules.needs_shadow(config) || return nothing
+    width = EnzymeRules.width(config)
+    RealRt = Base.eltype(RT)
+    return width == 1 ? _cell(RealRt, result) :
+        ntuple(_ -> _cell(RealRt, result), Val(width))
 end
 
-active_tangent(::EnzymeCore.Annotation, tangent) = nothing
-
-function pullback_tangents(config, pullback, seed, arg, params, batch)
-    tangents = pullback(seed)
-    width = EnzymeRules.width(config)
-    accumulate_tangent!(arg, tangents[2], batch, width)
-    accumulate_tangent!(params, tangents[3], batch, width)
-    return active_tangent(arg, tangents[2]), active_tangent(params, tangents[3])
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfig,
+        fn::EnzymeCore.Const{<:SimpleChains.SimpleChain},
+        ::Type{RT},
+        arg::EnzymeCore.Annotation,
+        params::EnzymeCore.Annotation
+    ) where {RT}
+    saved_arg = is_overwritten(config, 2) ? deepcopy(arg.val) : arg.val
+    saved_params = is_overwritten(config, 3) ? deepcopy(params.val) : params.val
+    result = fn.val(saved_arg, saved_params)
+    shadow = augmented_shadow(config, RT, result)
+    tape = (shadow, saved_arg, saved_params)
+    return EnzymeRules.augmented_rule_return_type(config, RT){typeof(tape)}(
+        EnzymeRules.needs_primal(config) ? result : nothing, shadow, tape
+    )
 end
 
 function EnzymeRules.reverse(
-        config::ReverseConfig,
-        ::EnzymeCore.Const{<:SimpleChains.SimpleChain},
-        ::Type{<:EnzymeCore.Const},
+        config::EnzymeRules.RevConfig,
+        fn::EnzymeCore.Const{<:SimpleChains.SimpleChain},
+        dret,
         tape,
         arg::EnzymeCore.Annotation,
         params::EnzymeCore.Annotation
     )
-    return nothing, nothing
-end
-
-function EnzymeRules.reverse(
-        config::ReverseConfig,
-        ::EnzymeCore.Const{<:SimpleChains.SimpleChain},
-        ::Type{ReturnAnnotation},
-        tape,
-        arg::EnzymeCore.Annotation,
-        params::EnzymeCore.Annotation
-    ) where {ReturnAnnotation <: EnzymeCore.Annotation}
-    shadow, pullback = tape
+    shadow, saved_arg, saved_params = tape
     width = EnzymeRules.width(config)
     tangents = ntuple(Val(width)) do batch
-        @static if isdefined(EnzymeRules, :augmented_rule_return_type)
-            seed = width == 1 ? shadow[] : shadow[batch][]
+        seed = if dret isa EnzymeCore.Active
+            dret.val
+        elseif dret isa Tuple
+            # Batched immutable returns arrive as one `Active` annotation per batch.
+            dret[batch].val
         else
-            seed = width == 1 ? shadow : shadow[batch]
+            _seed(width == 1 ? shadow : shadow[batch])
         end
-        pullback_tangents(config, pullback, seed, arg, params, batch)
+        ga, gp = chain_vjp(
+            fn.val, saved_arg, saved_params, seed, !(arg isa EnzymeCore.Const)
+        )
+        accumulate!(config, arg, ga, batch)
+        accumulate!(config, params, gp, batch)
+        (active_tangent(arg, ga), active_tangent(params, gp))
     end
     arg_tangent = arg isa EnzymeCore.Active ?
-        (width == 1 ? tangents[1][1] : ntuple(i -> tangents[i][1], Val(width))) :
-        nothing
+        (width == 1 ? tangents[1][1] : ntuple(i -> tangents[i][1], Val(width))) : nothing
     params_tangent = params isa EnzymeCore.Active ?
-        (width == 1 ? tangents[1][2] : ntuple(i -> tangents[i][2], Val(width))) :
-        nothing
-    return arg_tangent, params_tangent
-end
-
-function EnzymeRules.reverse(
-        config::ReverseConfigWidth{1},
-        ::EnzymeCore.Const{<:SimpleChains.SimpleChain},
-        return_tangent::EnzymeCore.Active,
-        tape,
-        arg::EnzymeCore.Annotation,
-        params::EnzymeCore.Annotation
-    )
-    @static if isdefined(EnzymeRules, :augmented_rule_return_type)
-        pullback = tape
-    else
-        pullback = tape[2]
-    end
-    return pullback_tangents(config, pullback, return_tangent.val, arg, params, 1)
+        (width == 1 ? tangents[1][2] : ntuple(i -> tangents[i][2], Val(width))) : nothing
+    return (arg_tangent, params_tangent)
 end
 
 end
