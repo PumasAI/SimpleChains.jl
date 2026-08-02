@@ -20,13 +20,6 @@ const EnzymeRules = EnzymeCore.EnzymeRules
 
 @inline _mutable_like(x::AbstractArray{T}) where {T} = zeros(T, size(x))
 
-# `overwritten` is a per-argument tuple for most configurations but collapses to a
-# single `Bool` covering every argument for some, so it cannot be indexed blindly.
-@inline function is_overwritten(config, i)
-    overwritten = EnzymeRules.overwritten(config)
-    return overwritten isa Bool ? overwritten : overwritten[i]
-end
-
 # `pullback_arg!` is only defined for `PtrArray` inputs, so an input gradient needs the
 # argument materialized out of a `StaticArray` first.
 @inline _materialize(x::StaticArrays.StaticArray) = Array(x)
@@ -100,8 +93,9 @@ function EnzymeRules.augmented_primal(
         arg::EnzymeCore.Annotation,
         params::EnzymeCore.Annotation
     ) where {RT}
-    saved_arg = is_overwritten(config, 2) ? deepcopy(arg.val) : arg.val
-    saved_params = is_overwritten(config, 3) ? deepcopy(params.val) : params.val
+    overwritten = EnzymeRules.overwritten(config)
+    saved_arg = overwritten[2] ? copy(arg.val) : arg.val
+    saved_params = overwritten[3] ? copy(params.val) : params.val
     result = fn.val(saved_arg, saved_params)
     shadow = augmented_shadow(config, RT, result)
     tape = (shadow, saved_arg, saved_params)
