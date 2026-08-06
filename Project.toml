@@ -58,7 +58,7 @@ UnPack = "1"
 VectorizationBase = "0.21.40"
 VectorizedRNG = "0.2.13"
 Zygote = "0.6, 0.7"
-julia = "1.6"
+julia = "1.10"
 
 [extensions]
 SimpleChainsEnzymeCoreExt = "EnzymeCore"
