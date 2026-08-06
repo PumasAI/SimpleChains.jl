@@ -1,5 +1,9 @@
 # SimpleChains
 
+<!-- hy-mt2-i18n:start -->
+**English** · [中文](./README_zh-CN.md) · [日本語](./README_ja.md) · [Español](./README_es.md)
+<!-- hy-mt2-i18n:end -->
+
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://PumasAI.github.io/SimpleChains.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://PumasAI.github.io/SimpleChains.jl/dev)
 [![CI](https://github.com/PumasAI/SimpleChains.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/PumasAI/SimpleChains.jl/actions/workflows/CI.yml)
@@ -67,4 +71,3 @@ BechmarkTools.Trial: 10000 samples with 1 evaluations.
  Time  (mean ± σ):   106.897 μs ± 197.689 μs  ┊ GC (mean ± σ):  7.96% ±  4.22%
  Memory estimate: 182.55 KiB, allocs estimate: 316.
 ```
-
