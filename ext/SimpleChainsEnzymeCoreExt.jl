@@ -18,22 +18,29 @@ const EnzymeRules = EnzymeCore.EnzymeRules
 # pass before the first reverse pass, so `sc(x, p) + sc(y, p)` is enough to trigger it.
 # Recomputing the forward sweep here keeps the buffer's lifetime inside a single call.
 
-@inline _mutable_like(x::AbstractArray{T}) where {T} = zeros(T, size(x))
-
-# `pullback_arg!` is only defined for `PtrArray` inputs, so an input gradient needs the
-# argument materialized out of a `StaticArray` first.
-@inline _materialize(x::StaticArrays.StaticArray) = Array(x)
-@inline _materialize(x) = x
+# `pullback_arg!` is only defined for `PtrArray` inputs,
+# and `maybe_static_size_arg` builds one exactly when `device(arg) === CPUPointer()`,
+# so that is what we need to ensure the objects passed to `valgrad!` satisfy.
+@inline function _materialize(x::AbstractArray)
+    dev = SimpleChains.ArrayInterface.device(x)
+    if dev === SimpleChains.CPUPointer()
+        return x
+    elseif x isa StaticArrays.SArray
+        return StaticArrays.MArray(x)
+    else
+        return Array(x) 
+    end
+end
 
 # Loss terminated chains return a scalar and `valgrad!` fills both gradients. The
 # `(ga, gp)` form is what makes the input gradient available, which the ChainRules
 # `ElementwisePullback` path does not provide, but it costs a materialized argument, so
 # an inactive input takes the cheaper parameter-only path.
 function chain_vjp(sc, arg, params, seed::Number, wants_arg::Bool)
-    gp = _mutable_like(params)
+    gp = similar(params)
     ga = if wants_arg
         marg = _materialize(arg)
-        g = _mutable_like(marg)
+        g = similar(marg)
         SimpleChains.valgrad!((g, gp), sc, marg, params)
         g
     else
@@ -55,6 +62,12 @@ end
 
 # With runtime activity Enzyme may hand a rule a shadow that is the primal itself for
 # values that turn out to be inactive; accumulating there would corrupt the primal.
+#
+# The broadcast needs the shadow and the tangent to share axes. They do on the scalar
+# seed path, where the tangent is a `similar` of the caller's container, but the no-loss
+# path takes its tangents from `valgrad_noloss`'s pullback, which are always 1-based: an
+# `OffsetArray` shadow throws `DimensionMismatch` there. Loud, and rare enough to leave
+# unhandled.
 @inline function accumulate!(config, annotation, tangent, batch)
     annotation isa Union{EnzymeCore.Const, EnzymeCore.Active} && return nothing
     target = EnzymeRules.width(config) == 1 ? annotation.dval : annotation.dval[batch]
@@ -70,8 +83,15 @@ end
 # takes its generic reverse path, and accumulates through a `Base.RefValue` for
 # immutable results (its `MixedDuplicated` convention) -- a bare value is rejected
 # there. In that case the expected shadow type is `Any`, so the `Ref` needs no flexible
-# shadow return. When the return type is known, an immutable result is `Active` and no
-# shadow is requested at all, so a plain zero is always right.
+# shadow return.
+#
+# With the return type known, a shadow is only asked for when Enzyme classifies the
+# result as `DupState` -- data behind a heap buffer -- which for a chain means a
+# `StrideArray`; an `SArray` or a loss scalar is `ActiveState`, so the seed arrives
+# as an `Active` instead. `zero` does not reproduce a `StrideArray`'s type -- the
+# `Vector{UInt8}` buffer is not carried over -- so the `AugmentedReturn` constructor
+# cannot convert it: the pre-1.12 abort noted in `test/enzyme.jl`.
+# `Enzyme.make_zero` does keep the type, but aliases the primal's data pointer.
 @inline _cell(::Type{Any}, result) = ismutable(result) ? zero(result) : Ref(zero(result))
 @inline _cell(::Type, result) = zero(result)
 
@@ -135,6 +155,76 @@ function EnzymeRules.reverse(
     params_tangent = params isa EnzymeCore.Active ?
         (width == 1 ? tangents[1][2] : ntuple(i -> tangents[i][2], Val(width))) : nothing
     return (arg_tangent, params_tangent)
+end
+
+# A `Const` return annotation is what Enzyme hands a rule
+# whose result carries no derivative (which is not the same as being unused).
+# The generic `reverse` would set `seed = nothing` and pass it to the SimpleChains pullback,
+# leading to infinite recursion and a stack overflow.
+
+@inline function zero_tangent(config, a::EnzymeCore.Active)
+    z = active_tangent(a, zero(a.val))
+    width = EnzymeRules.width(config)
+    return width == 1 ? z : ntuple(_ -> z, Val(width))
+end
+@inline zero_tangent(_, ::EnzymeCore.Annotation) = nothing
+
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfig,
+        fn::EnzymeCore.Const{<:SimpleChains.SimpleChain},
+        ::Type{RT},
+        arg::EnzymeCore.Annotation,
+        params::EnzymeCore.Annotation
+    ) where {RT <: EnzymeCore.Const}
+    primal = EnzymeRules.needs_primal(config) ? fn.val(arg.val, params.val) : nothing
+    return EnzymeRules.augmented_rule_return_type(config, RT){Nothing}(
+        primal, nothing, nothing
+    )
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfig,
+        ::EnzymeCore.Const{<:SimpleChains.SimpleChain},
+        ::Type{<:EnzymeCore.Const},
+        _tape,
+        arg::EnzymeCore.Annotation,
+        params::EnzymeCore.Annotation
+    )
+    return (zero_tangent(config, arg), zero_tangent(config, params))
+end
+
+# A chain can hold active data -- a loss layer keeps its target array --
+# so a caller may reasonably annotate the chain `Duplicated` and ask for its gradient.
+# Explicitly mark this as currently not supported.
+# Note that even if `augmented_primal` is called before `reverse`,
+# we need a method for `reverse` to prevent Enzyme to fail when automatically generating the rule.
+
+function EnzymeRules.augmented_primal(
+        ::EnzymeRules.RevConfig,
+        fn::EnzymeCore.Annotation{<:SimpleChains.SimpleChain},
+        ::Type,
+        ::EnzymeCore.Annotation,
+        ::EnzymeCore.Annotation
+    )
+    throw(
+        ArgumentError(
+            "Enzyme's `SimpleChain` rule needs the chain itself to be `Enzyme.Const`, got " *
+            "`$(nameof(typeof(fn)))`. SimpleChains provides pullbacks with respect to the " *
+            "input and the parameters only, so a chain holding active data -- a loss " *
+            "layer's target, say -- cannot be differentiated with respect to."
+        )
+    )
+end
+
+function EnzymeRules.reverse(
+        ::EnzymeRules.RevConfig,
+        ::EnzymeCore.Annotation{<:SimpleChains.SimpleChain},
+        _dret,
+        _tape,
+        ::EnzymeCore.Annotation,
+        ::EnzymeCore.Annotation
+    )
+    error("internal error: unreachable, augmented_primal is called first")
 end
 
 end

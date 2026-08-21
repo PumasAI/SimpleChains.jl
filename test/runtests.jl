@@ -1,14 +1,8 @@
 using SimpleChains
 using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
 using StableRNGs
-@static if VERSION ≥ v"1.9"
-  using JET: @test_opt
-  using Enzyme
-else
-  macro test_opt(ex)
-    nothing
-  end
-end
+using JET: @test_opt
+using Enzyme
 
 macro countallocations!(g, sc, x, p)
   return quote
@@ -585,6 +579,4 @@ Aqua.test_all(
   ambiguities = false,
 )
 
-@static if VERSION ≥ v"1.9"
-  include("enzyme.jl")
-end
+include("enzyme.jl")
