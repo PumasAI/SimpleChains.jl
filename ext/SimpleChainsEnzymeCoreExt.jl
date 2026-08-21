@@ -28,7 +28,7 @@ const EnzymeRules = EnzymeCore.EnzymeRules
     elseif x isa StaticArrays.SArray
         return StaticArrays.MArray(x)
     else
-        return Array(x) 
+        return Array(x)
     end
 end
 
