@@ -90,7 +90,7 @@ end
 # `StrideArray`; an `SArray` or a loss scalar is `ActiveState`, so the seed arrives
 # as an `Active` instead. `zero` does not reproduce a `StrideArray`'s type -- the
 # `Vector{UInt8}` buffer is not carried over -- so the `AugmentedReturn` constructor
-# cannot convert it: the pre-1.12 abort noted in `test/enzyme.jl`.
+# cannot convert it: one of the heap array aborts noted in `test/enzyme.jl`.
 # `Enzyme.make_zero` does keep the type, but aliases the primal's data pointer.
 @inline _cell(::Type{Any}, result) = ismutable(result) ? zero(result) : Ref(zero(result))
 @inline _cell(::Type, result) = zero(result)
@@ -196,8 +196,8 @@ end
 # A chain can hold active data -- a loss layer keeps its target array --
 # so a caller may reasonably annotate the chain `Duplicated` and ask for its gradient.
 # Explicitly mark this as currently not supported.
-# Note that even if `augmented_primal` is called before `reverse`,
-# we need a method for `reverse` to prevent Enzyme to fail when automatically generating the rule.
+# Note that even if `augmented_primal` is called before `reverse`, a `reverse` method
+# is still needed to keep Enzyme from failing when it generates the rule automatically.
 
 function EnzymeRules.augmented_primal(
         ::EnzymeRules.RevConfig,
