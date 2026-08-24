@@ -1,13 +1,8 @@
 using SimpleChains
 using Test, Aqua, ForwardDiff, Zygote, ChainRules, Random
 using StableRNGs
-@static if VERSION ≥ v"1.9"
-  using JET: @test_opt
-else
-  macro test_opt(ex)
-    nothing
-  end
-end
+using JET: @test_opt
+using Enzyme
 
 macro countallocations!(g, sc, x, p)
   return quote
@@ -575,6 +570,9 @@ InteractiveUtils.versioninfo(; verbose = true)
   end
   @testset "Batch" begin
     include("batch.jl")
+  end
+  @testset "Enzyme" begin
+    include("enzyme.jl")
   end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped

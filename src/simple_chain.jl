@@ -521,6 +521,18 @@ end
   end
 end
 
+# see https://github.com/PumasAI/SimpleChains.jl/issues/224
+function _check_params_for_gradient(params::AbstractArray)
+  if SimpleChains.ArrayInterface.device(params) !== CPUPointer()
+    throw(
+      ArgumentError(
+        "only pointer-backed parameters are supported when computing gradients, e.g. `SVector` parameters are not allowed (note that `SVectors` are allowed as chain inputs instead)"
+      )
+    )
+  end
+  return nothing
+end
+
 """
     valgrad!(g, c::SimpleChain, arg, params)
 
@@ -578,6 +590,7 @@ function unsafe_valgrad!(
   params,
   arg
 )
+  _check_params_for_gradient(params)
   @unpack layers = c
   GC.@preserve g params begin
     chain_valgrad_entry!(nothing, pointer(g), arg, layers, pointer(params), pu)
@@ -590,6 +603,7 @@ function unsafe_valgrad!(
   params,
   arg
 ) where {GA,GP}
+  _check_params_for_gradient(params)
   @unpack layers = c
   ga, gp = g
   ga === nothing && return unsafe_valgrad!(c, pu, gp, params, arg)
