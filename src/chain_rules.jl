@@ -129,16 +129,9 @@ _rrule(sc, arg, params, ::False) = valgrad_noloss(sc, arg, params)
 function valgrad_noloss(
   sc,
   arg::AbstractArray{S},
-  params::StaticArrays.SVector{T}
-) where {T,S}
-  mp = StaticArrays.MVector(params)
-  @gc_preserve valgrad_noloss(sc, arg, mp)
-end
-function valgrad_noloss(
-  sc,
-  arg::AbstractArray{S},
   params::AbstractVector{T}
 ) where {T,S}
+  _check_params_for_gradient(params)
   c = getchain(sc)
   @unpack layers = c
   parg = maybe_static_size_arg(c.inputdim, arg)

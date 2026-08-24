@@ -113,6 +113,11 @@ function EnzymeRules.augmented_primal(
         arg::EnzymeCore.Annotation,
         params::EnzymeCore.Annotation
     ) where {RT}
+    # there is no guarantee that valgrad! will be called
+    # so we need to check that parameters are not an SVector
+    # due to https://github.com/PumasAI/SimpleChains.jl/issues/224
+    # Example: autodiff_thunk(ReverseSplitWithPrimal, …)
+    SimpleChains._check_params_for_gradient(params.val)
     overwritten = EnzymeRules.overwritten(config)
     saved_arg = overwritten[2] ? copy(arg.val) : arg.val
     saved_params = overwritten[3] ? copy(params.val) : params.val
@@ -176,7 +181,12 @@ function EnzymeRules.augmented_primal(
         arg::EnzymeCore.Annotation,
         params::EnzymeCore.Annotation
     ) where {RT <: EnzymeCore.Const}
-    primal = EnzymeRules.needs_primal(config) ? fn.val(arg.val, params.val) : nothing
+    primal = if EnzymeRules.needs_primal(config)
+        SimpleChains._check_params_for_gradient(params.val)
+        fn.val(arg.val, params.val)
+    else
+        nothing
+    end
     return EnzymeRules.augmented_rule_return_type(config, RT){Nothing}(
         primal, nothing, nothing
     )
