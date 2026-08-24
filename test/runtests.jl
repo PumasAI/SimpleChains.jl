@@ -571,6 +571,9 @@ InteractiveUtils.versioninfo(; verbose = true)
   @testset "Batch" begin
     include("batch.jl")
   end
+  @testset "Enzyme" begin
+    include("enzyme.jl")
+  end
 end
 # TODO: test ambiguities once ForwardDiff fixes them, or once ForwardDiff is dropped
 # For now, there are the tests at the start.
@@ -578,5 +581,3 @@ Aqua.test_all(
   SimpleChains;
   ambiguities = false,
 )
-
-include("enzyme.jl")
