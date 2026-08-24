@@ -53,11 +53,8 @@ forw = f(y, p_nn, t)
   @test forw_sv isa SVector{2,Float32}
   @test forw_sv ≈ forw
 
-  # Otherwise a pointer of an SVector is used which cannot be relied upon.
-  # Repeated so that it cannot pass by accident.
-  @test_broken let x = Array(y)
-    all(f(x, p_nn_sv, t) ≈ forw for _ = 1:10)
-  end
+  # Otherwise a pointer of an SVector is used, which cannot be relied upon on all platforms
+  # @test f(Array(y), p_nn_sv, t) ≈ forw
 
   # Gradient computation currently not supported in any case
   scl = SimpleChains.add_loss(sc, SquaredLoss(Vector(y)))
@@ -83,12 +80,8 @@ forw = f(y, p_nn, t)
   # The convenience function with both gradients set to nothing is the same as the forward call
   l_ref = scl(y, p_nn_sv)
   @test SimpleChains.valgrad!((nothing, nothing), scl, y, p_nn_sv) == l_ref
-  @test_broken let x = Array(y)
-    all(
-      SimpleChains.valgrad!((nothing, nothing), scl, x, p_nn_sv) ≈ l_ref for
-      _ = 1:10
-    )
-  end
+  # Here a pointer of an SVector is used, which cannot be relied upon on all platforms
+  # @test SimpleChains.valgrad!((nothing, nothing), scl, Array(y), p_nn_sv) ≈ l_ref
 
   # `MVectors` are fine instead
   mv = MVector(p_nn_sv)
