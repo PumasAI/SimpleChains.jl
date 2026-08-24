@@ -196,12 +196,12 @@ function EnzymeRules.augmented_primal(
   arg::EnzymeCore.Annotation,
   params::EnzymeCore.Annotation
 ) where {RT<:EnzymeCore.Const}
-  primal = if EnzymeRules.needs_primal(config)
-    SimpleChains._check_params_for_gradient(params.val)
-    fn.val(arg.val, params.val)
-  else
-    nothing
-  end
+  # The chain is evaluated even when the primal is not needed:
+  # an invalid call, a wrong input size say, has to error
+  # whether or not anything reads the result
+  SimpleChains._check_params_for_gradient(params.val)
+  result = fn.val(arg.val, params.val)
+  primal = EnzymeRules.needs_primal(config) ? result : nothing
   return EnzymeRules.augmented_rule_return_type(config, RT){Nothing}(
     primal,
     nothing,

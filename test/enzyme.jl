@@ -401,6 +401,18 @@ enz_inactive_2(chain, x, q) = (chain(x, q) > 0 ? 1 : 2) * sum(abs2, q)
         ENZ_P
       )
     end
+    # Enzyme runs a discarded call for a function without a rule, so an invalid one has to
+    # error here as well, even though no primal is asked for
+    @testset "invalid call with an unused result" begin
+      @test_throws "Input argument" Enzyme.autodiff(
+        Enzyme.Reverse,
+        enz_inactive_1,
+        Enzyme.Active,
+        Enzyme.Const(ENZ_CHAIN),
+        Enzyme.Const(Float32[0.3, -1.2, 0.7, 0.5]),
+        Enzyme.Duplicated(ENZ_P, zero(ENZ_P))
+      )
+    end
   end
 
   @testset "the chain itself must be Const" begin
@@ -420,7 +432,8 @@ enz_inactive_2(chain, x, q) = (chain(x, q) > 0 ? 1 : 2) * sum(abs2, q)
   # see https://github.com/PumasAI/SimpleChains.jl/issues/224
   @testset "SVector parameters are rejected" begin
     ps = SVector{length(ENZ_P),Float32}(ENZ_P)
-    @test_throws "pointer-backed" Enzyme.autodiff(
+    msg = @static VERSION ≥ v"1.11" ? "pointer-backed" : "conversion to pointer"
+    @test_throws msg Enzyme.autodiff(
       Enzyme.Reverse,
       enz_sumsq,
       Enzyme.Active,
@@ -428,7 +441,7 @@ enz_inactive_2(chain, x, q) = (chain(x, q) > 0 ? 1 : 2) * sum(abs2, q)
       Enzyme.Const(ENZ_U),
       Enzyme.Active(ps)
     )
-    @test_throws "pointer-backed" Enzyme.autodiff(
+    @test_throws msg Enzyme.autodiff(
       Enzyme.Reverse,
       enz_call,
       Enzyme.Active,
@@ -438,7 +451,7 @@ enz_inactive_2(chain, x, q) = (chain(x, q) > 0 ? 1 : 2) * sum(abs2, q)
     )
     # The parameter values are needed for the input gradient too,
     # so freezing them does not help
-    @test_throws "pointer-backed" Enzyme.autodiff(
+    @test_throws msg Enzyme.autodiff(
       Enzyme.Reverse,
       enz_sumsq,
       Enzyme.Active,
@@ -449,7 +462,7 @@ enz_inactive_2(chain, x, q) = (chain(x, q) > 0 ? 1 : 2) * sum(abs2, q)
     # Even if the chain does not contribute to the gradient,
     # it may still need to be evaluated,
     # so that we need to check for `SVector` params
-    @test_throws "pointer-backed" Enzyme.autodiff(
+    @test_throws msg Enzyme.autodiff(
       Enzyme.Reverse,
       enz_inactive_2,
       Enzyme.Active,
@@ -465,15 +478,14 @@ enz_inactive_2(chain, x, q) = (chain(x, q) > 0 ? 1 : 2) * sum(abs2, q)
       Enzyme.Const{typeof(ENZ_U)},
       Enzyme.Active{typeof(ps)}
     )
-    @test_throws "pointer-backed" forward(
+    @test_throws msg forward(
       Enzyme.Const(enz_call),
       Enzyme.Const(ENZ_LOSSY),
       Enzyme.Const(ENZ_U),
       Enzyme.Active(ps)
     )
-    # A result that is never used computes no primal at all,
-    # so `SVector` parameters can be simply ignored
-    result = Enzyme.autodiff(
+    # The chain runs even when nothing reads its result, so this errors too
+    @test_throws msg Enzyme.autodiff(
       Enzyme.Reverse,
       enz_inactive_1,
       Enzyme.Active,
@@ -481,7 +493,6 @@ enz_inactive_2(chain, x, q) = (chain(x, q) > 0 ? 1 : 2) * sum(abs2, q)
       Enzyme.Const(ENZ_U),
       Enzyme.Active(ps)
     )
-    @test result[1][3] ≈ 2 .* ps
   end
 
   # What matters is that an unsupported heap array result aborts loudly instead of
