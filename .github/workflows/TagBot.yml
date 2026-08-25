@@ -11,6 +11,9 @@ jobs:
   TagBot:
     if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
     steps:
       - uses: JuliaRegistries/TagBot@304fc93e4623081443fee5b6317ac73b37923574 # v1.25.8
         with:
