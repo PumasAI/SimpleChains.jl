@@ -15,7 +15,7 @@ jobs:
       contents: write
       issues: write
     steps:
-      - uses: JuliaRegistries/TagBot@304fc93e4623081443fee5b6317ac73b37923574 # v1.25.8
+      - uses: JuliaRegistries/TagBot@cded32665b34ca0496d3ac10a67d08ddfc726963 # v1.25.11
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ssh: ${{ secrets.DOCUMENTER_KEY }}
