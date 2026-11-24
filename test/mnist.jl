@@ -61,7 +61,10 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
     10
   )
   if VERSION >= v"1.10"
-    @test_opt SimpleChains.train_batched!(
+    # Only report problems detected in SimpleChains itself. `train_batched!`
+    # reaches `Base.yield` via Polyester and ThreadingUtilities, and JET
+    # reports optimization failures inside Base for that call on Julia 1.13.
+    @test_opt target_modules = (SimpleChains,) SimpleChains.train_batched!(
       p,
       lenetloss,
       xtrain4,
@@ -86,7 +89,7 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
     10
   )
   if VERSION >= v"1.10"
-    @test_opt SimpleChains.train_batched!(
+    @test_opt target_modules = (SimpleChains,) SimpleChains.train_batched!(
       G,
       p,
       lenetloss,
