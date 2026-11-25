@@ -13,3 +13,7 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+  - package-ecosystem: "julia"
+    directory: "/"
+    schedule:
+      interval: "daily"
